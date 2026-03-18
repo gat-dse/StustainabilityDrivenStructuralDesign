@@ -5,7 +5,7 @@ import statistics
 import seaborn as sns
 
 # create or open database sustainability
-connection = sqlite3.connect('database_260126.db')
+connection = sqlite3.connect('../Version 260126/database_260126.db')
 # create cursor object
 cursor = connection.cursor()
 #------------------------------------------------------------------------------------------------------------------------
