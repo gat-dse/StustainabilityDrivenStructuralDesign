@@ -22,7 +22,7 @@ mat_names = ["'Glue_laminated_timber'"]
 # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
 for mat_name in mat_names:
     inquiry = ("""
-            SELECT PRO_ID FROM products
+            SELECT PRO_ID, MECH_PROP, "Total_GWP" FROM products
             WHERE DENSITY IS NOT NULL
             AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
             AND MECH_PROP IS NOT NULL
@@ -32,20 +32,8 @@ for mat_name in mat_names:
     # inquiry = ("SELECT PRO_ID FROM products WHERE"
     #            " material=" + mat_name)
     cursor.execute(inquiry)
-    resultGLULAM = cursor.fetchall()
-    mech_propGLULAM = []
-    for i, prod_id in enumerate(resultGLULAM):
-        prod_id_str = "'" + str(prod_id[0]) + "'"
-        inquiry = ("""
-                SELECT MECH_PROP FROM products
-                WHERE  PRO_ID LIKE """ + prod_id_str
-                   )
-        # inquiry = ("SELECT mech_prop FROM products WHERE"
-        #            " PRO_ID=" + prod_id_str)
-        cursor.execute(inquiry)
-        GLULAMID = cursor.fetchall()
-        wert = "'" + GLULAMID[0][0] + "'"
-        mech_propGLULAM.append(wert)
+    result = cursor.fetchall()
+    GLULAMprod_id, GLULAMmech_prop, GLULAM_GWP = zip(*result)
 
 # _____________________________________________________________________________________________________________________
 # CHECK PLYWOOD
