@@ -37,35 +37,23 @@ for mat_name in mat_names:
 
 # _____________________________________________________________________________________________________________________
 # CHECK PLYWOOD
-mat_names = ["'3- and 5-ply wood'"]
-
+mat_names = ["'3_and_5_plywood'"]
 # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
 for mat_name in mat_names:
     inquiry = ("""
-            SELECT PRO_ID FROM products
+            SELECT PRO_ID, MECH_PROP, "Total_GWP" FROM products
             WHERE DENSITY IS NOT NULL
+            AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
             AND MECH_PROP IS NOT NULL
-            AND Statistik = 1 
-            AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
-            AND "SOURCE" NOT LIKE '%Ecoinvent%'
-            AND "SOURCE" NOT LIKE '%KBOB%'
+            AND ValidEPD = 1 
             AND "MATERIAL" LIKE """ + mat_name
                )
     # inquiry = ("SELECT PRO_ID FROM products WHERE"
     #            " material=" + mat_name)
     cursor.execute(inquiry)
-    resultPLY = cursor.fetchall()
-    for i, prod_id in enumerate(resultPLY):
-        prod_id_str = "'" + str(prod_id[0]) + "'"
-        inquiry = ("""
-                SELECT MECH_PROP FROM products
-                WHERE  PRO_ID LIKE """ + prod_id_str
-                   )
-        # inquiry = ("SELECT mech_prop FROM products WHERE"
-        #            " PRO_ID=" + prod_id_str)
-        cursor.execute(inquiry)
-        resultPLY = cursor.fetchall()
-        mech_propPLY = "'" + resultPLY[0][0] + "'"
+    result = cursor.fetchall()
+    PLYprod_id, PLYmech_prop, PLY_GWP = zip(*result)
+
 
 # _____________________________________________________________________________________________________________________
 # CHECK Solid structural timber
@@ -75,30 +63,18 @@ mat_names = ["'Solid_structural_timber'"]
 # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
 for mat_name in mat_names:
     inquiry = ("""
-            SELECT PRO_ID FROM products
+            SELECT PRO_ID, MECH_PROP, "Total_GWP" FROM products
             WHERE DENSITY IS NOT NULL
+            AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
             AND MECH_PROP IS NOT NULL
-            AND Statistik = 1 
-            AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
-            AND "SOURCE" NOT LIKE '%Ecoinvent%'
-            AND "SOURCE" NOT LIKE '%KBOB%'
+            AND ValidEPD = 1 
             AND "MATERIAL" LIKE """ + mat_name
                )
     # inquiry = ("SELECT PRO_ID FROM products WHERE"
     #            " material=" + mat_name)
     cursor.execute(inquiry)
-    resultTimber = cursor.fetchall()
-    for i, prod_id in enumerate(resultTimber):
-        prod_id_str = "'" + str(prod_id[0]) + "'"
-        inquiry = ("""
-                SELECT MECH_PROP FROM products
-                WHERE  PRO_ID LIKE """ + prod_id_str
-                   )
-        # inquiry = ("SELECT mech_prop FROM products WHERE"
-        #            " PRO_ID=" + prod_id_str)
-        cursor.execute(inquiry)
-        resultTimber = cursor.fetchall()
-        mech_propTimber = "'" + resultTimber[0][0] + "'"
+    result = cursor.fetchall()
+    STprod_id, STmech_prop, ST_GWP = zip(*result)
 
 # _____________________________________________________________________________________________________________________
 # CHECK ready mixed concrete
@@ -109,29 +85,17 @@ mat_names = ["'ready_mixed_concrete'"]
 # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
 for mat_name in mat_names:
     inquiry = ("""
-            SELECT PRO_ID FROM products
+            SELECT PRO_ID, MECH_PROP, "Total_GWP" FROM products
             WHERE DENSITY IS NOT NULL
+            AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
             AND MECH_PROP IS NOT NULL
-            AND Statistik = 1 
-            AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
-            AND "SOURCE" NOT LIKE '%Ecoinvent%'
-            AND "SOURCE" NOT LIKE '%KBOB%'
+            AND ValidEPD = 1 
             AND "MATERIAL" LIKE """ + mat_name
                )
     # inquiry = ("SELECT PRO_ID FROM products WHERE"
     #            " material=" + mat_name)
     cursor.execute(inquiry)
-    resultRC = cursor.fetchall()
-    for i, prod_id in enumerate(resultRC):
-        prod_id_str = "'" + str(prod_id[0]) + "'"
-        inquiry = ("""
-                SELECT MECH_PROP FROM products
-                WHERE  PRO_ID LIKE """ + prod_id_str
-                   )
-        # inquiry = ("SELECT mech_prop FROM products WHERE"
-        #            " PRO_ID=" + prod_id_str)
-        cursor.execute(inquiry)
-        resultRC = cursor.fetchall()
-        mech_propRC = "'" + resultRC[0][0] + "'"
+    result = cursor.fetchall()
+    RCprod_id, RCmech_prop, RC_GWP = zip(*result)
 
 Test=1
