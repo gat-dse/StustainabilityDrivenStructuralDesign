@@ -8,7 +8,7 @@ import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [ 4, 6, 8, 10]
+lengths = [ 4, 6, 7, 8, 10, 12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
