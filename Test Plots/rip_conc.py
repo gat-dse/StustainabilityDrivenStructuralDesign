@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 # INPUT
 # define database name
-database_name = "database_250514.db"
+database_name = "database_260126.db"
 
 # define system lengths for plot
 lengths = [4, 6, 8]

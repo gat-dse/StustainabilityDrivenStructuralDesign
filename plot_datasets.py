@@ -368,14 +368,17 @@ def plot_section(section):
         # add stirrups to plot (if stirrups are defined)
         if section.bw_bg[0] > 0 and section.bw_bg[2] > 0:
             plot_stirrups(ax, section, offset)
-        legend = (f'{section.concrete_type.mech_prop}, prod_ID:{section.concrete_type.prod_id} \n'
-                  f'{section.rebar_type.mech_prop}, prod_ID:{section.rebar_type.prod_id} \n'
+        legend = (f'{section.concrete_type.mech_prop}, prod_ID:{section.concrete_type.prod_id}, density:{section.concrete_type.density}, GWP_material:{section.concrete_type.GWP*1e3:.3f} kgCO2-eq/t \n'
+                  f'{section.rebar_type.mech_prop}, prod_ID:{section.rebar_type.prod_id}, density:{section.rebar_type.density}, GWP_material:{section.rebar_type.GWP*1e3:.3f} kgCO2-eq/t \n'
                   f'di_xo / s_xo = {section.bw[1][0]:.3f} / {section.bw[1][1]} \n'
                   f'di_xu / s_xu = {section.bw[0][0]:.3f} / {section.bw[0][1]} \n'
+                  f'di_yo / s_yo = {section.bw[3][0]:.3f} / {section.bw[3][1]} \n'
+                  f'di_yu / s_yu = {section.bw[2][0]:.3f} / {section.bw[2][1]} \n'
                   f'di_stir / s_stir / n = {section.bw_bg[0]} / {section.bw_bg[1]} / {section.bw_bg[2] }\n'
                   f'c_nom = {100*section.c_nom:.1f} cm \n'
                   f'x/d = {section.x_p/section.d:.2f} \n'
-                  f'GWP = {section.co2:.0f} kg/m^2')
+                  
+                  f'GWP = {section.co2:.2f} kgCO2-eq/m^2')
     elif section.section_type == "wd_rec":  # Rectangular Wooden Cross-Section
         fig, ax, offset = plot_rectangle_with_dimensions(section.b, section.h, 'brown', '/')
         legend = (f'{section.wood_type.mech_prop}, prod_ID:{section.wood_type.prod_id} \n'
