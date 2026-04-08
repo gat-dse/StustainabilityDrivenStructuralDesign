@@ -6,6 +6,7 @@
 import struct_analysis  # file with code for structural analysis
 import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
+import numpy as np
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
 lengths = [ 4, 6, 7, 8, 10, 12]
@@ -127,7 +128,38 @@ for idx, info in enumerate(plotted_data):
     else:
         plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx-1])))
     plt.grid()
+# __________________________________________________________________________________________________________
+# Daten CPC Platten
+class CPC:
+    class Einfeld:
+        span = np.array([4, 6, 7, 8, 10, 10, 12, 12]) # Spannweite
+        h_struct = np.array([0.072, 0.192, 0.272, 0.372, 0.592, 0.392, 0.692, 0.592])  # Höhe der Tragstruktur
+        h_tot = np.array([0.18, 0.30, 0.38, 0.48, 0.70, 0.50, 0.80, 0.70])  # Höhe des gesamten Bodenaufbaus
+        GWP_struct = np.array([38, 44, 50, 56, 67, 79, 89, 100])  # GWP Tragstruktur
+        GWP_tot = np.array([92, 98, 104, 110, 122, 133, 144, 155])  # GWP total
 
+    class Zweifeld:
+        span = np.array([4, 6, 8, 10, 12])
+        h_struct = np.array([0.032, 0.092, 0.172, 0.292, 0.412])
+        h_tot = np.array([0.14, 0.20, 0.28, 0.40, 0.52])
+        GWP_struct = np.array([39, 44, 48, 55, 65])
+        GWP_tot = np.array([94, 98, 102, 109, 119])
+
+# __________________________________________________________________________________________________________
+plt.subplot(2,2,1)
+plt.scatter(CPC.Einfeld.span, CPC.Einfeld.h_struct,marker='o', label='Einfeld')
+plt.scatter(CPC.Zweifeld.span, CPC.Zweifeld.h_struct,marker='D', label='Zweifeld')
+plt.subplot(2,2,2)
+plt.scatter(CPC.Einfeld.span, CPC.Einfeld.h_tot,marker='o', label='Einfeld')
+plt.scatter(CPC.Zweifeld.span, CPC.Zweifeld.h_tot,marker='D', label='Zweifeld')
+plt.subplot(2,2,3)
+plt.scatter(CPC.Einfeld.span, CPC.Einfeld.GWP_struct,marker='o', label='Einfeld')
+plt.scatter(CPC.Zweifeld.span, CPC.Zweifeld.GWP_struct,marker='D', label='Zweifeld')
+plt.subplot(2,2,4)
+plt.scatter(CPC.Einfeld.span, CPC.Einfeld.GWP_tot,marker='o', label='Einfeld')
+plt.scatter(CPC.Zweifeld.span, CPC.Zweifeld.GWP_tot,marker='D', label='Zweifeld')
+
+"""
  # # plot cross-section of members for verification
 for mem_group in vrfctn_members:
      for i, mem in enumerate(mem_group[0]):
@@ -135,7 +167,7 @@ for mem_group in vrfctn_members:
          opt_and_plot.plot_section(section)
          # Show the plot
          plt.title(f'#{mem_group[1][i]}')
-
+"""
 # SHOW FIGURE
 plt.show()
 Test=1
