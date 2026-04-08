@@ -211,7 +211,7 @@ class SupStrucRectangular(Section):
 #........................................................................
 class RectangularWood(SupStrucRectangular, Section):
     # defines properties of rectangular, wooden cross-section
-    def __init__(self, wood_type, b, h, phi=0.6, xi=0.01, ei_b=0.0):  # create a rectangular timber object
+    def __init__(self, wood_type, b, h, phi=0.6, xi=0.01, ei_b=0.0):  # create a rectangular timber object #TODO: phi in Datenbank "material_prop" aufnehmen für FK1, da sich der Wert bei HWS unterscheidet
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
         self.wood_type = wood_type
@@ -280,15 +280,20 @@ class RectangularConcrete(SupStrucRectangular):
         self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight)
-        a_s_stat = self.as_p + self.as_n + self.as_bw  # rebar area without reinforcement joint surcharge
-        self.joint_surcharge = jnt_srch  # joint surcharge
+        #a_s_stat = self.as_p + self.as_n + self.as_bw  # rebar area without reinforcement joint surcharge
+
         #TODO: a_s_tot: Hat erst 1. & 4. Lage drin
-        a_s_tot = a_s_stat * (1 + self.joint_surcharge)  # rebar area without reinforcement joint surcharge
+        as_yu = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
+        as_yo = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
+        self.a_s_stat = self.as_p + self.as_n + as_yo + as_yu + self.as_bw  # rebar area without reinforcement joint surcharge
+        self.joint_surcharge = jnt_srch  # joint surcharge
+
+        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area without reinforcement joint surcharge
         #TODO: Im GWP vom Gesamtquerschnitt müssen alle 4 Bewehrungslagen berücksichtigt werden! Prüfen ob alle 4 Lagen berücksichtigt werden
-        co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
-        co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
+        self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
+        self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
-        self.co2 = (co2_rebar + co2_concrete)
+        self.co2 = (self.co2_rebar + self.co2_concrete)
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
