@@ -388,9 +388,9 @@ def plot_section(section):
               f'GWP = {section.co2:.0f} kg/m^2')
 
     else:
-        print("no plot for specified section_type defined jet")
+        print("no plot for specified section_type defined yet")
         fig, ax = plt.subplots()
-        legend = f'no plot for section_type "{section.section_type}" defined jet'
+        legend = f'no plot for section_type "{section.section_type}" defined yet'
     fig.text(0.01, 0.99, legend, ha='left', va='top', fontsize=9, color='black',
              bbox=dict(facecolor='lightgrey', edgecolor='black', boxstyle='round,pad=0.2'))
 
