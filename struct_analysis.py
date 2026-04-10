@@ -211,7 +211,8 @@ class SupStrucRectangular(Section):
 #........................................................................
 class RectangularWood(SupStrucRectangular, Section):
     # defines properties of rectangular, wooden cross-section
-    def __init__(self, wood_type, b, h, phi=0.6, xi=0.01, ei_b=0.0):  # create a rectangular timber object #TODO: phi in Datenbank "material_prop" aufnehmen für FK1, da sich der Wert bei HWS unterscheidet
+    def __init__(self, wood_type, b, h, phi=0.6, xi=0.01, ei_b=0.0):  # create a rectangular timber object
+        #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
         self.wood_type = wood_type
@@ -261,7 +262,7 @@ class RectangularWood(SupStrucRectangular, Section):
 # ........................................................................
 class RectangularConcrete(SupStrucRectangular):
     # defines properties of rectangular, reinforced concrete cross-section
-    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu=0.01, s_yu=0.15, di_yo=0.01, s_yo=0.15, di_bw=0.0, s_bw=0.15, n_bw=0,
+    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0,
                  phi=2.0, c_nom=0.02, xi=0.02, jnt_srch=0.15):
         # create a rectangular concrete object
         section_type = "rc_rec"
@@ -269,27 +270,39 @@ class RectangularConcrete(SupStrucRectangular):
         self.concrete_type = concrete_type
         self.rebar_type = rebar_type
         self.c_nom = c_nom #Bewehrungsüberdeckung
+
+        #TODO Mindestplattenstärke ergänzen: h > 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
         self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
         mr = self.b * self.h ** 2 / 6 * 1.3 * self.concrete_type.fctm  #cracking moment
+
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
-        #TODO: x und y Richtung Berücksichtigen
+
+        #TODO: x und y berücksichtigen
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
         self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight)
-        #a_s_stat = self.as_p + self.as_n + self.as_bw  # rebar area without reinforcement joint surcharge
 
         #TODO: a_s_tot: Hat erst 1. & 4. Lage drin
-        as_yu = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
-        as_yo = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
-        self.a_s_stat = self.as_p + self.as_n + as_yo + as_yu + self.as_bw  # rebar area without reinforcement joint surcharge
+        #a_s_stat = self.as_p + self.as_n + self.as_bw  # rebar area without reinforcement joint surcharge
+
+        #TODO: a_s_tot: Hat alle 4 Lagen, aber für 2. & 3. Lage die default values
+        #as_yu = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
+        #as_yo = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
+        #self.a_s_stat = self.as_p + self.as_n + as_yo + as_yu + self.as_bw  # rebar area without reinforcement joint surcharge
+
+        #TODO Mindestbewehrung für Vermeidung Sprödversagen (MRd > Mr) ergänzen
+        #TODO Definition Mindestbewehrung? -> Gebrauchstauglichkeit (Anforderungen definieren?) / für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        self.di_min = ((self.as_min * 0.2 * 4) / np.pi) ** 0.5
+        #TODO für 2. & 3. Lage Mindestbewehrung für Asmin
+        self.a_s_stat = self.as_p + self.as_n + 2*self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
 
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area without reinforcement joint surcharge
-        #TODO: Im GWP vom Gesamtquerschnitt müssen alle 4 Bewehrungslagen berücksichtigt werden! Prüfen ob alle 4 Lagen berücksichtigt werden
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
@@ -297,7 +310,7 @@ class RectangularConcrete(SupStrucRectangular):
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
-        self.xi = xi  # XXXXXXX preset value is an assumption. Has to be verified with literature. XXXXXXX
+        self.xi = xi  #TODO XXXXXXX preset value is an assumption. Has to be verified with literature. XXXXXXX
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
 
     def calc_d(self):
