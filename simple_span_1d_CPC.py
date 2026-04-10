@@ -7,9 +7,11 @@ import struct_analysis  # file with code for structural analysis
 import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 import numpy as np
+import class_to_excel
+
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [ 4, 6, 7, 8, 10, 12]
+lengths = [ 4, 12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -85,7 +87,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
 mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
@@ -93,7 +95,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
 #-----------------------------------------------------------------------------------------------------------------------
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED REINFORCED CONCRETE CROSS-SECTIONS
 # define materials for which date is searched in the database (table products, attribute material)
@@ -106,7 +108,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
 
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
@@ -114,7 +116,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
 # DEFINE LABELS OF PLOTS
 plotted_data = [["h$_{struct}$", "[m]"], ["h$_{tot}$", "[m]"], ["GWP$_{struct}$", "[kg-CO$_2$-eq]"], ["GWP$_{tot}$", "[kg-CO$_2$-eq]"]]
 
@@ -170,4 +172,7 @@ for mem_group in vrfctn_members:
 """
 # SHOW FIGURE
 plt.show()
+
+class_to_excel.class_to_excel(CPC, "CPC_Daten.xlsx", folder="Resultate")
+
 Test=1

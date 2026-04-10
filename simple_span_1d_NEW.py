@@ -8,7 +8,7 @@ import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [ 4, 6, 8, 10]
+lengths = [ 4, 6, 8, 10, 12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -102,10 +102,16 @@ mat_names = ["'ready_mixed_concrete'"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc)
+                                                              idx_vrc, system="Simple Beam")
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
+# retrieve data from database, find optimal cross-sections and plot results for solid cross-section
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
+                                                              req, "rc_rec", mat_names, g2k, qk, max_iter,
+                                                              idx_vrc, system="Continuous 1D")
+data_max = max_of_arrays(data_max, data_max_new)
+vrfctn_members.append(vrfctn_members_new)
 
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
@@ -127,7 +133,7 @@ for idx, info in enumerate(plotted_data):
     else:
         plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx-1])))
     plt.grid()
-
+"""
  # # plot cross-section of members for verification
 for mem_group in vrfctn_members:
      for i, mem in enumerate(mem_group[0]):
@@ -135,7 +141,7 @@ for mem_group in vrfctn_members:
          opt_and_plot.plot_section(section)
          # Show the plot
          plt.title(f'#{mem_group[1][i]}')
-
+"""
 # SHOW FIGURE
 plt.show()
 Test=1

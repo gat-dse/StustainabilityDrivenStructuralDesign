@@ -7,12 +7,13 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
+import class_to_excel
 from scipy.spatial import ConvexHull
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam"):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1)
@@ -55,6 +56,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 mech_prop = "'GL28h'"
             if mech_prop in ["'GL32h/c'", "'GL32'"]:
                 mech_prop = "'GL32h'"
+
             if crsec_type == "wd_rec":
                 # create a Wood material object
                 timber = struct_analysis.Wood(mech_prop, database_name, prod_id_str)
@@ -205,7 +207,15 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             for optimum in optima:
                 members = []
                 for length in lengths:
-                    sys = struct_analysis.BeamSimpleSup(length)
+                    if system == "Simple Beam":
+                        sys = struct_analysis.BeamSimpleSup(length)
+                    elif system == "Two span 1D 1D":
+                        sys = struct_analysis.BeamTwoSpan(length)
+                    elif system == "Continuous 1D":
+                        sys =struct_analysis.BeamContinuousSupEl(length)
+                    else:
+                        print("System unknown; Simple Beam used")
+                        sys = struct_analysis.BeamSimpleSup(length)
                     section0 = i[0]
                     floorstruc = i[1]
                     member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
@@ -284,8 +294,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 vrfctn_members[1].append(i)
         sec_typ, mat, cri, opt = legend[i]
         # set line color
-        if sec_typ == "rc_rec":
+        if sec_typ == "rc_rec" and system == "Simple Beam":
             color = 'green'  # color for reinforced concrete
+        elif sec_typ == "rc_rec" and system == "Continuous 1D":
+            color = 'lightgreen'  # color for reinforced concrete
         elif sec_typ == "wd_rec":
             color = 'saddlebrown'  # color for wood
         elif sec_typ == "rc_rib":
@@ -336,6 +348,23 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             #              arrowprops=dict(facecolor='black', shrink=0.2, width=0.2, headwidth=2, headlength=4),
             #              fontsize=9, color='black', va='center')
             plt.plot(lengths, values_mean[idx], color = color, linestyle = linestyle, linewidth = 1.5 )
+    # create Excel sheets
+    members_1d = [
+        member
+        for pair in member_list
+        for member in pair
+    ]
+
+    if crsec_type == "wd_rec":
+        class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
+    elif crsec_type == "rc_rec":
+        class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
+    elif crsec_type == "rc_rib":
+        class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
+    elif crsec_type == "wd_rib":
+        class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
+    else:
+        print("cross-section type is not defined inside function plot_dataset()")
 
 
     return data_max, vrfctn_members
