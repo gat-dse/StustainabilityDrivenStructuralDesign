@@ -282,7 +282,7 @@ class RectangularConcrete(SupStrucRectangular):
         #TODO: x und y berücksichtigen
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
-        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds
+        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight)
 
@@ -294,8 +294,8 @@ class RectangularConcrete(SupStrucRectangular):
         #as_yo = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
         #self.a_s_stat = self.as_p + self.as_n + as_yo + as_yu + self.as_bw  # rebar area without reinforcement joint surcharge
 
-        #TODO Mindestbewehrung für Vermeidung Sprödversagen (MRd > Mr) ergänzen
-        #TODO Definition Mindestbewehrung? -> Gebrauchstauglichkeit (Anforderungen definieren?) / für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        #TODO Mindestbewehrung für Vermeidung Sprödversagen (MRd > Mr) ergänzen -> check fct mit neuer Norm SIA262:2025
+        #TODO für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
         self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
         self.di_min = ((self.as_min * 0.2 * 4) / np.pi) ** 0.5
         #TODO für 2. & 3. Lage Mindestbewehrung für Asmin
@@ -358,7 +358,7 @@ class RectangularConcrete(SupStrucRectangular):
     def calc_shear_resistance(self, d_installation=0.0):
         # in: self
         # out: Querkraftwiderstand positiv vu_p [N], Querkraftwiderstand negativ vu_n [N], Querkraftbewehrung as_bw [m2]
-        #TODO: Anpassung an die SIA 262 (2025)! Ist noch gemäss alter Norm!
+        #TODO: Anpassung an die SIA 262 (2025)! Ist noch gemäss alter Norm! -> was muss angepasst werden?
         di = self.bw_bg[0]      # diameter
         s = self.bw_bg[1]       # spacing
         n = self.bw_bg[2]       # number of stirrups per spacing
@@ -375,10 +375,10 @@ class RectangularConcrete(SupStrucRectangular):
         x_p = self.x_p      #Druckzonenhöhe positives Biegemoment (obere Querschnittsrand)
         x_n = self.x_n      #Druckzonenhöhe negatives Biegemoment (unterer Querschnittsrand)
         as_bw = self.calc_as_bw(di, n, s, d)
-        if d_installation < d / 6:
-            dv_p = d                    #Wirksame statische Höhe für Querkraft
+        if d_installation < d / 6: #SIA262, 4.3.3.2.9
+            dv_p = d                    #Wirksame statische Höhe für Querkraft entspricht statischer Höhe für positives Biegemoment d (untere Lagen), einbetonierte Leitungen, Einlagen, etc. können vernachlässigt werden, wenn kleiner d/6
         else:
-            dv_p = d - d_installation   #Wirksame statische Höhe für Querkraft
+            dv_p = d - d_installation   #Wirksame statische Höhe für Querkraft, , einbetonierte Leitungen, Einlagen, etc. müssen verücksichtigt werden, wenn grösser d/6
         if d_installation < ds / 6:
             dv_n = ds                   #Wirksame statische Höhe für Querkraft
         else:
@@ -392,14 +392,14 @@ class RectangularConcrete(SupStrucRectangular):
         #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
         #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
         as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d #ToDo: muss die Bügelquerschnittsfläche nicht noch mit der Plattenstärke multipliziert werden?
-        return as_bw
+        return as_bw #TODo: Berechnung as_bw falsch? (Einheiten?)
 
     @staticmethod
     def vu_unsigned(bw, di, n, s, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
         rohw = as_bw / min(bw, 0.4)  # SIA 262, Zif. 5.5.2.2
-        rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # SIA 262, Zif. 5.5.2.2
-        s_max = 25*s  # SIA262, Zif. 5.5.2.2
-        if bw < 0.5:  # SIA262, Zif. 5.5.2.3
+        rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # SIA 262, Zif. 5.5.2.2 Mindestbewehrungsgehalt Bügel für Balken
+        s_max = 25*s  # SIA262, Zif. 5.5.2.2 im Balken sind stets Bügel anzuodnen, deren gegenseitiger Abstand 25*dsw (Durchmesser Bewehrungstaebe) nicht übersteigt #TODO Anpassung Formel? 25*d
+        if bw < 0.5:  # SIA262, Zif. 5.5.2.3 für Stegbreiten > 500 mm sind idR mehrschnittige Bügel anzuordnen
             n_min = 2
         else:
             n_min = 4
@@ -411,7 +411,7 @@ class RectangularConcrete(SupStrucRectangular):
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
         else:  # cross-section resistance with vertical stirrups
             z = d - 0.85 * x / 2
-            vrds = as_bw * z * fsd
+            vrds = as_bw * z * fsd #mit alpha = 45° und cot(alpa) = 1.0
             vrdc = bw * z * kc * fcd * np.sin(alpha) * np.cos(alpha)  # unit of alpha: [rad]
             return min(vrds, vrdc) #Querkraftwiderstand MIT Querkraftbewehrung SIA 262
 
@@ -1165,7 +1165,7 @@ class Member1D:
         self.f1 = self.calc_f1()
         # calculation of further vibration criteria for wooden cross-sections
         section_material = self.section.section_type[0:2]
-        if section_material == "wd" or section_material == "rc":  # check for material type
+        if section_material == "wd" or section_material == "rc":  # check for material type #TODO Schwingungsnachweis Betondecken?
             self.ei_b = max(self.section.ei_b,
                             self.floorstruc.ei)  # Berücksichtigung n.t. Bodenaufbau gemäss Beispielsammlung HBT)
             self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.section.ei1) ** 0.25  # HBT Seite 46
