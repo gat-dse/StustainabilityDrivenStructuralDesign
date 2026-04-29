@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # INPUT
 # create dummy-database
-database_name = "database_260126.db"  # define database name
+database_name = "database_260423.db"  # define database name
 #create_dummy_database.create_database(database_name)  # create database
 
 # create material for reinforced concrete cross-section, derive corresponding design values
@@ -49,6 +49,8 @@ system = struct_analysis.BeamSimpleSup(length)
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
 opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
 
+print("Kriechzahl creep_coef= ", opt_section.concrete_type.creep_coef)
+print("Kriechzahl phi= ", opt_section.phi)
 print("QS-Hoehe opt section = ", opt_section.h)
 print("GWP opt section = ", opt_section.co2)
 

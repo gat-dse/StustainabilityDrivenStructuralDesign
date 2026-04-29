@@ -40,11 +40,11 @@ class Wood:
         connection = sqlite3.connect(database)
         cursor = connection.cursor()
         # get mechanical properties from database
-        inquiry = ("SELECT strength_bend, strength_shea, E_modulus, density_load, burn_rate FROM material_prop WHERE"
+        inquiry = ("SELECT strength_bend, strength_shea, E_modulus, density_load, burn_rate, creep_coef FROM material_prop WHERE"
                    " name=" + mech_prop)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate = result[0]
+        self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate, self.creep_coef = result[0]
         # get GWP properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -76,11 +76,11 @@ class ReadyMixedConcrete:
         connection = sqlite3.connect(database)
         cursor = connection.cursor()
         # get mechanical properties from database
-        inquiry = ("SELECT strength_comp, strength_tens, E_modulus, density_load FROM material_prop WHERE name="
+        inquiry = ("SELECT strength_comp, strength_tens, E_modulus, density_load, creep_coef FROM material_prop WHERE name="
                    + mech_prop)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        self.fck, self.fctm, self.Ecm, self.weight = result[0]
+        self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         # get GWP properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -211,8 +211,8 @@ class SupStrucRectangular(Section):
 #........................................................................
 class RectangularWood(SupStrucRectangular, Section):
     # defines properties of rectangular, wooden cross-section
-    def __init__(self, wood_type, b, h, phi=0.6, xi=0.01, ei_b=0.0):  # create a rectangular timber object
-        #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS
+    def __init__(self, wood_type, b, h, phi=0.6, xi=0.03, ei_b=0.0):  # create a rectangular timber object
+        #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS (in Excel ergaenzt -> Im Code noch anpassen)
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
         self.wood_type = wood_type
@@ -262,14 +262,15 @@ class RectangularWood(SupStrucRectangular, Section):
 # ........................................................................
 class RectangularConcrete(SupStrucRectangular):
     # defines properties of rectangular, reinforced concrete cross-section
-    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0,
-                 phi=2.0, c_nom=0.02, xi=0.02, jnt_srch=0.15):
+    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0, phi=2.2,
+                 c_nom=0.02, xi=0.03, jnt_srch=0.15):
         # create a rectangular concrete object
         section_type = "rc_rec"
-        super().__init__(section_type, b, h, phi)
+        super().__init__(section_type, b, h)
         self.concrete_type = concrete_type
         self.rebar_type = rebar_type
         self.c_nom = c_nom #Bewehrungsüberdeckung
+        self.phi = phi
 
         #TODO Mindestplattenstärke ergänzen: h > 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
@@ -310,7 +311,7 @@ class RectangularConcrete(SupStrucRectangular):
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
-        self.xi = xi  #TODO XXXXXXX preset value is an assumption. Has to be verified with literature. XXXXXXX
+        self.xi = xi
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
 
     def calc_d(self):
@@ -417,6 +418,7 @@ class RectangularConcrete(SupStrucRectangular):
 
     @staticmethod
     def f_w_ger(roh, rohs, phi, h, d):
+        # f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
         f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
         #TODO: Prüfen, ob dieser Wert nicht zu konservativ ist! Als Abschätzung für die Vordimensionierung scheint der Wert jedoch schon i.O., ist zumindest nicht komplett willkürlich.
         return f
@@ -516,7 +518,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     #di_x_w, n_x_w = diameter and number of longitudinal reinforcement in rib
     def __init__(self, concrete_type, rebar_type, l0, b, b_w, h, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w,
                  di_pb_bw, s_pb_bw, n_pb_bw=2,
-                 phi=2.0, c_nom=0.03, xi=0.02, jnt_srch=0.15):
+                 phi=2.0, c_nom=0.03, xi=0.03, jnt_srch=0.15):
         section_type = "rc_rib"
         super().__init__(section_type, b, b_w, h, h_f, l0, phi)
         self.concrete_type = concrete_type
@@ -552,7 +554,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB
-        self.xi = xi  # XXXXXXX preset value is an assumption. Has to be verified with literature. XXXXXXX
+        self.xi = xi
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #!!!!!ANPASSEN AUF PB
 
     def calc_d(self):
@@ -816,7 +818,7 @@ class SupStrucRibWood(Section):
 class RibWood(SupStrucRibWood):
     # defines properties of ribbed timber slab = "Hohlkastendecke" → box beam floor or "Ripendecke" = → joist floor
     def __init__(self, wood_type_1, wood_type_2, wood_type_3, l0, b, h, a, t2, t3, phi_1=0.6, phi_2=0.6, phi_3=0.6,
-                 xi=0.01, ei_b=0.0):  # create a rectangular timber object
+                 xi=0.03, ei_b=0.0):  # create a rectangular timber object
         section_type = "wd_rib"
         self.wood_type_1 = wood_type_1
         self.wood_type_2 = wood_type_2
@@ -846,7 +848,7 @@ class RibWood(SupStrucRibWood):
         self.co2 = (self.b*self.h * self.wood_type_1.GWP * self.wood_type_1.density)/self.a +self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m]
         self.cost = self.b * self.h / self.a * self.wood_type_1.cost + (self.t2 + self.t3)  * self.wood_type_2.cost
         self.ei_b = ei_b  # stiffness perpendicular to direction of span
-        self.xi = xi  # damping factor, preset value see: HBT, Page 47 (higher value for some buildups possible)
+        self.xi = xi  # damping factor, preset value for builddup with "Schwimmendem Estrich" see: HBT, Page 47
 
     def calc_n(self):
         ft0d = 8.5 #C24

@@ -8,7 +8,7 @@ import plot_datasets  # file with code for plotting results in a standardized wa
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4, 5, 6]
+lengths = [6]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -73,6 +73,7 @@ vrfctn_members = []
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED WOODEN CROSS-SECTIONS
 # define materials for which date is searched in the database (table products, attribute material)
 #TODO: Achtung 'Glue_laminated_timber_board' heisst jetzt 3- and .....
+#TODO: für Massivholzdecken nur Solid_Structural_Timber (KVH Querschnitt ist maximal 24 cm hoch)
 #mat_names = ["'Glue_laminated_timber'", "'Glue_laminated_timber_board'", "'Solid_structural_timber'"]
 mat_names = ["'Glue_laminated_timber'", "'3- and 5-ply wood'", "'Solid_structural_timber'"]
 
