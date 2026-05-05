@@ -298,9 +298,14 @@ class RectangularConcrete(SupStrucRectangular):
         #TODO Mindestbewehrung für Vermeidung Sprödversagen (MRd > Mr) ergänzen -> check fct mit neuer Norm SIA262:2025
         #TODO für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
         self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-        self.di_min = ((self.as_min * 0.2 * 4) / np.pi) ** 0.5
-        #TODO für 2. & 3. Lage Mindestbewehrung für Asmin
-        self.a_s_stat = self.as_p + self.as_n + 2*self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
+        #Durchmesser Mindestbewehrung für 2. Lage (unten) und 3. Lage (oben)
+        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
+        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
+        #Neue Definition Bewehrung mit Mindestbewehrung
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+
+        #Gesamte Bewehrungsfläche as_tot
+        self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
 
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area without reinforcement joint surcharge
