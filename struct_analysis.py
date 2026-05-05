@@ -273,6 +273,7 @@ class RectangularConcrete(SupStrucRectangular):
         self.phi = phi
 
         #TODO Mindestplattenstärke ergänzen: h > 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        #Definition Bewehrung gemäss Eingabe
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
         self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
         mr = self.b * self.h ** 2 / 6 * 1.3 * self.concrete_type.fctm  #cracking moment
@@ -280,25 +281,22 @@ class RectangularConcrete(SupStrucRectangular):
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
-        #TODO: x und y berücksichtigen
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
         self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight)
 
-        #TODO: a_s_tot: Hat erst 1. & 4. Lage drin
-        #a_s_stat = self.as_p + self.as_n + self.as_bw  # rebar area without reinforcement joint surcharge
-
-        #TODO: a_s_tot: Hat alle 4 Lagen, aber für 2. & 3. Lage die default values
-        #as_yu = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
-        #as_yo = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
-        #self.a_s_stat = self.as_p + self.as_n + as_yo + as_yu + self.as_bw  # rebar area without reinforcement joint surcharge
-
-        #TODO Mindestbewehrung für Vermeidung Sprödversagen (MRd > Mr) ergänzen -> check fct mit neuer Norm SIA262:2025
+        #TODO check fct mit neuer Norm SIA262:2025
         #TODO für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-        #Durchmesser Mindestbewehrung für 2. Lage (unten) und 3. Lage (oben)
+
+        # Durchmesser Mindestbewehrung für 1. & 4. Lage
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+
+        #Durchmesser Mindestbewehrung für 2. & 3. Lage
         di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
         #Neue Definition Bewehrung mit Mindestbewehrung
@@ -307,8 +305,8 @@ class RectangularConcrete(SupStrucRectangular):
         #Gesamte Bewehrungsfläche as_tot
         self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
+        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
 
-        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area without reinforcement joint surcharge
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]

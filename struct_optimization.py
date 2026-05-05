@@ -330,14 +330,15 @@ def rc_rib_rqs(var, add_arg):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
-    pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-    pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
+    #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
+    #pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-    pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
-    if member.f1 < member.requirements.f1:
-        penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
-    else:
-        penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
+    #pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
+    #if member.f1 < member.requirements.f1:
+    #    penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
+    #else:
+    #    penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
+    penalty3 = 0
 
     # define penalty4, if fire resistance is not fulfilled
     member.get_fire_resistance()

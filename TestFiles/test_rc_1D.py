@@ -24,7 +24,7 @@ rebar1.get_design_values()
 # create reinforced concrete rectangular cross-section
 section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.01, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
 
-# create floor structure for solid wooden cross-section
+# create floor structure for solid concrete cross-section
 bodenaufbau = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                                  ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False]]
 bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau, database_name)
@@ -56,7 +56,7 @@ print("GWP opt section = ", opt_section.co2)
 
 print("d =", section.d)
 print("Mindestbewehrung as in m2/m' = ", opt_section.as_min)
-print("Mindestbewehrung für Abstand 0.2m, mit Durchmesser (m) = ", opt_section.di_min)
+
 print("mu_max= ", round(section.mu_max,2))
 print("alpha_m: ",system.alpha_m)
 print("mkd_n, mkd_p = ", member.mkd_n, member.mkd_p)
