@@ -1167,7 +1167,7 @@ class Member1D:
         self.f1 = self.calc_f1()
         # calculation of further vibration criteria for wooden cross-sections
         section_material = self.section.section_type[0:2]
-        if section_material == "wd" #or section_material == "rc":  # check for material type #TODO Schwingungsnachweis Betondecken?
+        if section_material == "wd": #or section_material == "rc":  # check for material type #TODO Schwingungsnachweis Betondecken?
             self.ei_b = max(self.section.ei_b,
                             self.floorstruc.ei)  # Berücksichtigung n.t. Bodenaufbau gemäss Beispielsammlung HBT)
             self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.section.ei1) ** 0.25  # HBT Seite 46
