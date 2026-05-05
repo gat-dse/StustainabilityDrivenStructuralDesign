@@ -197,7 +197,8 @@ def rc_rqs(var, add_arg):
     pen_w = 0  # Kein Schwingungsnachweis für Betondecken
     #pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-    pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
+    pen_v = 0  # Kein Schwingungsnachweis für Betondecken
+    #pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
     if member.f1 < member.requirements.f1:
         penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
     else:
