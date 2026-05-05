@@ -72,12 +72,8 @@ vrfctn_members = []
 #-----------------------------------------------------------------------------------------------------------------------
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED WOODEN CROSS-SECTIONS
 # define materials for which date is searched in the database (table products, attribute material)
-#TODO: Achtung 'Glue_laminated_timber_board' heisst jetzt 3- and .....
-#TODO: für Massivholzdecken nur Solid_Structural_Timber (KVH Querschnitt ist maximal 24 cm hoch)
-#mat_names = ["'Glue_laminated_timber'", "'Glue_laminated_timber_board'", "'Solid_structural_timber'"]
-mat_names = ["'Glue_laminated_timber'", "'3- and 5-ply wood'", "'Solid_structural_timber'"]
-
-#TODO: Glue Laminated Timberboard: 3-Schichtplatten / CLT Platten: Prüfen, sind die mech. Eigenschaften und das Trägheitsmoment richtig berücksichtigt? Also z.B: mit Faktor 2/3?
+#TODO: für Massivholzdecken nur Solid_Structural_Timber und Begrenzung Holzstärke (KVH Querschnitt ist maximal 24 cm hoch)
+mat_names = ["'Solid_structural_timber'"]
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
