@@ -532,8 +532,8 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
         self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
-        mr_slab = self.b * self.h ** 2 / 6 * 1.3 * self.concrete_type.fctm  # cracking moment
-        mr_pb = self.iy / (self.h - self.z_s) * 1.3 * self.concrete_type.fctm  # cracking moment
+        mr_slab = self.b * self.h ** 2 / 6  * self.concrete_type.fctm  # cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
+        mr_pb = self.iy / (self.h - self.z_s) * self.concrete_type.fctm  # cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
         self.mr_p, self.mr_n = mr_slab, -mr_slab
         self.mr_pb_p = mr_pb
         self.mr_pb_n = -mr_pb
