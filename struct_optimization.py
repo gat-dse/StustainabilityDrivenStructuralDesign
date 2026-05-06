@@ -36,7 +36,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xo0]
         # define bounds of variables
-        bh = (0.06, 1.2)  # height between 6 cm and 1.0 m
+        bh = (max(0.06,m.section.hmin_c), 1.2)  # height between 6 cm and 1.0 m
         bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xo]
         # definition of fixed values of cross-section
@@ -53,7 +53,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xu0]
         # define bounds of variables
-        bh = (0.06, 1.2)  # height between 6 cm and 1.0 m
+        bh = (max(0.06,m.section.hmin_c), 1.2)   # height between 6 cm and 1.0 m
         bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xu]
         # definition of fixed values of cross-section
@@ -392,6 +392,8 @@ def opt_gzt_wd_rqs(member, criterion="ULS"):
     bnds = [(0.1, 1.2)]
     minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
     h_opt = minimal_h.x[0]
+    if h_opt >=  0.24:
+        h_opt = 0.0001      #TODO Code anpassen, sodass gar keine Ausgabe mehr für h>24 cm erfolgt.
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
     return section
 
