@@ -105,6 +105,8 @@ print("w_app_ger = ", round(member.w_app_ger,5))
 print("qk_zul_GZT", member.qk_zul_gzt)
 
 
+print("as_stat", member.section.a_s_stat)
+print("as_min", member.section.as_min)
 
 # # # plot cross-section of members for verification
 vrfctn_member = plot_datasets.plot_section(opt_section)

@@ -38,7 +38,7 @@ qk = 2e3  # Nutzlast
 # define service limit state criteria
 req = struct_analysis.Requirements()
 
-length= 2
+length= 5
 
 
 # create slab system
@@ -53,6 +53,12 @@ print("Kriechzahl creep_coef= ", opt_section.concrete_type.creep_coef)
 print("Kriechzahl phi= ", opt_section.phi)
 print("QS-Hoehe opt section = ", opt_section.h)
 print("GWP opt section = ", opt_section.co2)
+print("GWP bodenaufbau = ", bodenaufbau_rc.co2)
+print("GWP bodenaufbau mit amortisationszeit = ", bodenaufbau_rc.co2_a)
+print("GWP QS + Bodenaufbau in kg/m2= ", opt_section.co2 + bodenaufbau_rc.co2)
+
+print("GWP QS + Bodenaufbau pro Lebensdauer inkl. Ersatz in kg/m2 = ", opt_section.co2 + bodenaufbau_rc.co2_a)
+
 
 print("Mindestbewehrung as in m2/m' = ", opt_section.as_min)
 
@@ -91,6 +97,7 @@ print("GWP-Bewehrung für QS pro m2 = ", opt_section.co2_rebar, "kgCO2-eq/m2")
 print("GWP_Bewehrung für Material pro Tonne = ", opt_section.rebar_type.GWP*1e3, "kgCO2-eq/t")
 print("GWP-Beton für QS pro m2 = ", opt_section.co2_concrete, "kgCO2-eq/m2")
 print("GWP-Beton für Material pro Tonne = ", opt_section.concrete_type.GWP*1e3, "kgCO2-eq/t")
+
 
 
 # # # plot cross-section of members for verification

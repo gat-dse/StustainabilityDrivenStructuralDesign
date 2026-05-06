@@ -36,7 +36,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xo0]
         # define bounds of variables
-        bh = (max(0.06,m.section.hmin_c), 1.2)  # height between 6 cm and 1.0 m
+        bh = (max(0.06,m.section.hmin_c), 1.2)  # height between max of (6 cm;hmin_c) and 1.0 m with hmin_c = 2*cnom + 32 + 4*di
         bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xo]
         # definition of fixed values of cross-section
@@ -53,7 +53,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xu0]
         # define bounds of variables
-        bh = (max(0.06,m.section.hmin_c), 1.2)   # height between 6 cm and 1.0 m
+        bh = (max(0.06,m.section.hmin_c), 1.2)   # height between max of (6 cm, hmin_c) and 1.0 m with hmin_c = 2*cnom + 32 + 4*di
         bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xu]
         # definition of fixed values of cross-section
@@ -262,8 +262,8 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     b0 = m.section.b
     var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
 
-    # define bounds of variables
-    bh_f = (0.08, 0.5)  # height between 12 cm and 50 cm
+    # define bounds of variables #TODO adapt boundaries for Mindestplattenstärke für 4 Bewehrungslagen
+    bh_f = (0.08, 0.5)  # height between 8 cm and 50 cm
     bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm

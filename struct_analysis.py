@@ -299,7 +299,7 @@ class RectangularConcrete(SupStrucRectangular):
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
         #Neue Definition Bewehrung mit Mindestbewehrung
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
-        #
+
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min
 
@@ -363,7 +363,7 @@ class RectangularConcrete(SupStrucRectangular):
     def calc_shear_resistance(self, d_installation=0.0):
         # in: self
         # out: Querkraftwiderstand positiv vu_p [N], Querkraftwiderstand negativ vu_n [N], Querkraftbewehrung as_bw [m2]
-        #TODO: Anpassung an die SIA 262 (2025)! Ist noch gemäss alter Norm! -> was muss angepasst werden?
+
         di = self.bw_bg[0]      # diameter
         s = self.bw_bg[1]       # spacing
         n = self.bw_bg[2]       # number of stirrups per spacing
@@ -528,12 +528,12 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.concrete_type = concrete_type
         self.rebar_type = rebar_type
         self.c_nom = c_nom
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung
         self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
         self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
-        mr_slab = self.b * self.h ** 2 / 6  * self.concrete_type.fctm  # cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
-        mr_pb = self.iy / (self.h - self.z_s) * self.concrete_type.fctm  # cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
+        mr_slab = self.b * self.h_f ** 2 / 6  * self.concrete_type.fctm  # Platte (Slab) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
+        mr_pb = self.iy / (self.h - self.z_s) * self.concrete_type.fctm  # Plattenbalken (PB) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
         self.mr_p, self.mr_n = mr_slab, -mr_slab
         self.mr_pb_p = mr_pb
         self.mr_pb_n = -mr_pb
@@ -557,7 +557,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
-        a_s_tot = a_s_stat * (1 + self.joint_surcharge)
+        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)
         co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
@@ -972,10 +972,10 @@ class MatLayer:  # create a material layer
         cursor = connection.cursor()
         # get properties from database
         inquiry = ("""SELECT "h_fix [float, m]", "E [float, N/m^2]", "density [float, kg/m^3]", "weight [float, N/m^3]",
-         "GWP [float, kg/kg]" FROM floor_struc_prop WHERE "name[string]"=""" + mat_name)
+         "GWP [float, kg/kg]", "Amortisations-zeit [Jahre]"  FROM floor_struc_prop WHERE "name[string]"=""" + mat_name)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        h_fix, e, density, weight, self.GWP = result[0]
+        h_fix, e, density, weight, self.GWP, self.lifespan = result[0]
         if h_input is False:
             self.h = h_fix
         else:
@@ -993,6 +993,7 @@ class MatLayer:  # create a material layer
             self.ei = e * i
         self.gk = self.weight * self.h  # weight per area in N/m^2
         self.co2 = self.density * self.h * self.GWP  # CO2-eq per area in kg-C02/m^2
+        self.co2_a = self.density * self.h * self.GWP * (60/self.lifespan) # CO2-eq per area in kg-C02/m^2
 
 
 class FloorStruc:  # create a floor structure
@@ -1002,10 +1003,12 @@ class FloorStruc:  # create a floor structure
         self.gk_area = 0
         self.h = 0
         self.ei = 0
+        self.co2_a = 0
         for mat_name, h_input, roh_input in mat_layers:
             current_layer = MatLayer(mat_name, h_input, roh_input, database_name)
             self.layers.append(current_layer)
             self.co2 += current_layer.co2
+            self.co2_a += current_layer.co2_a
             self.gk_area += current_layer.gk
             self.h += current_layer.h
             self.ei = max(self.ei, current_layer.ei)
@@ -1173,6 +1176,7 @@ class Member1D:
                                                              self.section.h, self.section.d)
             )
         self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
+        self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2)/60
 
         # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
         self.f1 = self.calc_f1()
