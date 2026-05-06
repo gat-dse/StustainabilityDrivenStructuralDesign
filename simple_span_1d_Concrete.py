@@ -4,7 +4,8 @@
 # IMPORT
 # import create_dummy_database  # file for creating a "dummy database", for test propose
 import struct_analysis  # file with code for structural analysis
-import plot_datasets  # file with code for plotting results in a standardized way
+#import plot_datasets  # file with code for plotting results in a standardized way
+import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 
@@ -19,7 +20,7 @@ idx_vrc = 4
 max_iter = 20
 
 #  define content of plot
-criteria = ["ULS"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
+criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
@@ -63,7 +64,7 @@ mat_names = ["'ready_mixed_concrete'"]
 
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
@@ -71,7 +72,7 @@ vrfctn_members.append(vrfctn_members_new)
 
 
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
