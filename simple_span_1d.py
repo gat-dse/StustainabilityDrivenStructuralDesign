@@ -14,14 +14,14 @@ lengths = [4, 5, 6]
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 10
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260126.db"
+database_name = "database_260506.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
@@ -74,7 +74,7 @@ vrfctn_members = []
 # define materials for which date is searched in the database (table products, attribute material)
 #TODO: Achtung 'Glue_laminated_timber_board' heisst jetzt 3- and .....
 #mat_names = ["'Glue_laminated_timber'", "'Glue_laminated_timber_board'", "'Solid_structural_timber'"]
-mat_names = ["'Glue_laminated_timber'", "'3- and 5-ply wood'", "'Solid_structural_timber'"]
+mat_names = ["'Solid_structural_timber'"] #for wd_rec only solid structural timber
 
 #TODO: Glue Laminated Timberboard: 3-Schichtplatten / CLT Platten: Prüfen, sind die mech. Eigenschaften und das Trägheitsmoment richtig berücksichtigt? Also z.B: mit Faktor 2/3?
 
