@@ -547,7 +547,14 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance(
             'Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
         self.g0k = self.calc_weight(concrete_type.weight)
-        a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
+        #a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
+
+        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
+        self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Querlagen in Platte
+        self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
+
+
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
         a_s_tot = a_s_stat * (1 + self.joint_surcharge)
