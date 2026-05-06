@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # INPUT
 # create dummy-database
-database_name = "database_260423.db"  # define database name
+database_name = "database_260506.db"  # define database name
 #create_dummy_database.create_database(database_name)  # create database
 
 # create material for reinforced concrete cross-section, derive corresponding design values
@@ -38,7 +38,7 @@ qk = 2e3  # Nutzlast
 # define service limit state criteria
 req = struct_analysis.Requirements()
 
-length= 4
+length= 2
 
 
 # create slab system
@@ -54,7 +54,6 @@ print("Kriechzahl phi= ", opt_section.phi)
 print("QS-Hoehe opt section = ", opt_section.h)
 print("GWP opt section = ", opt_section.co2)
 
-print("d =", section.d)
 print("Mindestbewehrung as in m2/m' = ", opt_section.as_min)
 
 print("mu_max= ", round(section.mu_max,2))
@@ -68,8 +67,11 @@ print("mu_min= ", round(section.mu_min,2))
 print("Bewehrungslayout = ", opt_section.bw)
 print("Bewehrungs-QS = ", opt_section.a_s_stat)
 
-print("mr_p =", section.mr_p)
-print("x/d =", section.x_p/section.d)
+print("mr_p =", opt_section.mr_p)
+print("x/d =", opt_section.x_p/opt_section.d)
+print("d =", opt_section.d)
+print("hmin =", opt_section.hmin_c)
+
 
 print("qu =", round(member.qu,2))
 print("vu = ", member.section.vu_p, member.section.vu_n)
