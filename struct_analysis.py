@@ -262,7 +262,7 @@ class RectangularWood(SupStrucRectangular, Section):
 # ........................................................................
 class RectangularConcrete(SupStrucRectangular):
     # defines properties of rectangular, reinforced concrete cross-section
-    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0, phi=2.2,
+    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0, phi=2.0,
                  c_nom=0.02, xi=0.03, jnt_srch=0.15):
         # create a rectangular concrete object
         section_type = "rc_rec"
@@ -272,11 +272,10 @@ class RectangularConcrete(SupStrucRectangular):
         self.c_nom = c_nom #Bewehrungsüberdeckung
         self.phi = phi
 
-        #TODO Mindestplattenstärke ergänzen: h > 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         #Definition Bewehrung gemäss Eingabe
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
         self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
-        mr = self.b * self.h ** 2 / 6 * 1.3 * self.concrete_type.fctm  #cracking moment
+        mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
 
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
@@ -287,8 +286,7 @@ class RectangularConcrete(SupStrucRectangular):
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight)
 
-        #TODO check fct mit neuer Norm SIA262:2025
-        #TODO für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        #TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
         #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
 
@@ -301,6 +299,9 @@ class RectangularConcrete(SupStrucRectangular):
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
         #Neue Definition Bewehrung mit Mindestbewehrung
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+        #
+        #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min
 
         #Gesamte Bewehrungsfläche as_tot
         self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
