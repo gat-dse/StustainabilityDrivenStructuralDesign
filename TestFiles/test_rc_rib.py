@@ -3,17 +3,19 @@
 
 # IMPORT
 import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
+import struct_optimization  # file with code for structural optimization
 import struct_analysis  # file with code for structural analysis
-#import struct_optimization  # file with code for structural optimization
-#import matplotlib.pyplot as plt
+import struct_optimization  # file with code for structural optimization
+import plot_datasets  # file with code for structural optimization
+import matplotlib.pyplot as plt
 
 # INPUT
 # create dummy-database
-database_name = "dummy_sustainability_1.db"  # define database name
-create_dummy_database.create_database(database_name)  # create database
+database_name = "database_260506.db"  # define database name
+#create_dummy_database.create_database(database_name)  # create database
 
 # create material for reinforced concrete cross-section, derive corresponding design values
-concrete1 = struct_analysis.ReadyMixedConcrete("'C25/30'", database_name)  # create a Wood material object
+concrete1 = struct_analysis.ReadyMixedConcrete("'C25/30'", database_name)  # create a concrete material object
 concrete1.get_design_values()
 rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create a Wood material object
 rebar1.get_design_values()
@@ -38,13 +40,16 @@ qk = 2e3  # Nutzlast
 req = struct_analysis.Requirements()
 
 # define system length
-length = 16
+length = 8
 
 # create simple supported beam system
 system = struct_analysis.BeamSimpleSup(length)
 
-# create wooden member
+# create rc member
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
+opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
+
+
 print("Querschnittswerte:")
 print("beff = ", round(section.b_eff,5), "m")
 print("zs = ", round(section.z_s,5), "[m]")
@@ -99,8 +104,10 @@ print("w_app_ger = ", round(member.w_app_ger,5))
 
 print("qk_zul_GZT", member.qk_zul_gzt)
 
-print("1. EF = ", member.f1)
-print("a_ed = ", member.a_ed)
-print("wf_ed = ", member.wf_ed)
-print("v_ed = ", member.ve_ed)
 
+
+# # # plot cross-section of members for verification
+vrfctn_member = plot_datasets.plot_section(opt_section)
+
+# SHOW FIGURE
+plt.show()
