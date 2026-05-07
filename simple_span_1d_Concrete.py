@@ -7,6 +7,7 @@ import struct_analysis  # file with code for structural analysis
 #import plot_datasets  # file with code for plotting results in a standardized way
 import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
+import time
 
 
 
@@ -17,14 +18,14 @@ lengths = [4, 5, 6]
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 20
+max_iter = 5
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260423.db"
+database_name = "database_260506.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
@@ -55,6 +56,11 @@ def max_of_arrays(existing_data, new_data):
 
 data_max = [0, 0, 0, 0]
 vrfctn_members = []
+
+
+# Start der Optimierung
+start = time.time()
+
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -102,3 +108,9 @@ for idx, info in enumerate(plotted_data):
 
 # SHOW FIGURE
 plt.show()
+
+#Ende der Optimierung
+ende = time.time()
+dauer = ende - start
+
+print(f"Die Optimierung dauerte {round(dauer, 2)} Sekunden.")

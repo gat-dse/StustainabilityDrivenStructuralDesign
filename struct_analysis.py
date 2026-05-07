@@ -80,7 +80,13 @@ class ReadyMixedConcrete:
                    + mech_prop)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
+        # check, wo fehler entsteht
+        if not result:
+            print(f"DEBUG: Keine Daten gefunden für Materialsuche! Mech_prop war: {mech_prop}")
+            # Hier könnte man einen Standardwert setzen oder das Programm sauber beenden
+        else:
+            self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
+        #self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         # get GWP properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database

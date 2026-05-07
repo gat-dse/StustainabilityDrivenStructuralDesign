@@ -4,11 +4,11 @@
 # IMPORT
 # import create_dummy_database  # file for creating a "dummy database", for test propose
 import struct_analysis  # file with code for structural analysis
-import plot_datasets  # file with code for plotting results in a standardized way
+import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4, 5, 6]
+lengths = [5,6]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -79,7 +79,7 @@ mat_names = ["'Solid_structural_timber'"] #for wd_rec only solid structural timb
 #TODO: Glue Laminated Timberboard: 3-Schichtplatten / CLT Platten: Prüfen, sind die mech. Eigenschaften und das Trägheitsmoment richtig berücksichtigt? Also z.B: mit Faktor 2/3?
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_solid, req, "wd_rec", mat_names,
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
@@ -87,7 +87,7 @@ vrfctn_members.append(vrfctn_members_new)
 
 mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_rib, req, "wd_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
@@ -100,7 +100,7 @@ mat_names = ["'ready_mixed_concrete'"]
 
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
@@ -108,7 +108,7 @@ vrfctn_members.append(vrfctn_members_new)
 
 
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
