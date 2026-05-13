@@ -557,7 +557,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-        # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Querlagen in Platte
+        # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Bewehrung in y-Richtung in Platte
         self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
 
 
@@ -570,9 +570,9 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.co2 = (co2_rebar + co2_concrete)/self.b
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
-        self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB
+        self.ei_b = self.ei1  #TODO!!!!!!!ANPASSEN AUF PB
         self.xi = xi
-        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #!!!!!ANPASSEN AUF PB
+        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #TODO!!!!!ANPASSEN AUF PB
 
     def calc_d(self):
         d = self.h_f - self.c_nom - self.bw[0][0] / 2  # Statische Höhe 1. Lage Platte

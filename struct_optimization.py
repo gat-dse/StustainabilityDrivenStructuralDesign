@@ -611,6 +611,7 @@ def get_opt_sec(section, gwp_budget):
         minimal_h = minimize(wd_rec_crsc, h_0, args=[section, gwp_budget], bounds=bnds, method='Powell')
         h_opt = minimal_h.x[0]
         opt_section = struct_analysis.RectangularWood(section.wood_type, section.b, h_opt)
+
         return opt_section
 
     elif section.section_type == "rc_rec":
@@ -653,7 +654,7 @@ def get_opt_sec(section, gwp_budget):
         var0 = [h_0, di_xu0, b_w0, b0]
 
         # define bounds of variables
-        bh = (0.3, 2)  # height between 6 cm and 1.0 m
+        bh = (0.3, 2)  # height between 6 cm and 1.0 m #TODO Bounds anpassen!!
         bdi_x_w = (0.01, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bb_w = (0.12, 0.4)  # rib width between 12 and 60 cm
         bb = (1, 1.5)  # rib spacing between 0.5 and 2.5 m
