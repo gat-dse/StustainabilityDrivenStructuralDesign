@@ -363,10 +363,12 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
     elif crsec_type == "rc_rec":
         class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
 
     elif crsec_type == "rc_rib":
         class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_2.xlsx", folder="Results")
+
     elif crsec_type == "wd_rib":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
     else:

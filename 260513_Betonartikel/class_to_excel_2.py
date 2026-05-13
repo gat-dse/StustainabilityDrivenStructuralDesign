@@ -3,6 +3,8 @@ import pandas as pd
 import os
 from pathlib import Path
 
+
+
 def class_to_excel(cls, filename, folder="Resultate"):
     """
     Exportiert eine Klassenstruktur nach Excel.
@@ -122,6 +124,5 @@ def member1d_to_dataframe(member):
         flatten(value, level=0, rows=rows, key=attr)
 
     return pd.DataFrame(rows)
-
 
 

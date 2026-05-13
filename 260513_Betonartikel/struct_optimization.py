@@ -3,6 +3,7 @@ import struct_analysis
 from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion aus dem SyiPy-Paket
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
+import class_to_excel_2
 
 class RandomDisplacementBounds(object):
     # random displacement with bounds for basinhopping optimization
@@ -28,6 +29,9 @@ class RandomDisplacementBounds(object):
 #OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
 def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_inter = 100
+    #Leere Liste zum Speichern der Rechenschritte
+    optimization_history = []
+
     # definition of initial values for variables, which are going to be optimized
     h0 = m.section.h  # start value for height corresponds to 1/20 of system length
 
@@ -68,7 +72,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
 
     # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
+    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,optimization_history), "bounds": bounds,
                                                                             "method": "Powell"}, take_step=bounded_step)
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
         h, di_xo = opt.x
@@ -80,7 +84,18 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw,
                                                                 n_bw,
                                                                 phi, c_nom, xi, jnt_srch)
+    #Das Endergebnis zur Optimization-History hinzufügen
+    optimization_history.append(optimized_section)
+
+    # --- Excel Export ---
+    crsec_type = "rc_rec"
+    filename = f"Optimierung_Verlauf_{crsec_type}.xlsx"
+    #class_to_excel_2.members_to_excel2(optimization_history, filename, folder="Results")
+
+
+
     return optimized_section
+
 
 
 #Possible Alternative Optimization (not correct yet)
@@ -142,7 +157,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
 
 
 # inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
-def rc_rqs(var, add_arg):
+def rc_rqs(var, add_arg, history_list):
     # input: variables, which have to be optimized, additional info about cross-section and system, optimizing option
     # output: if criterion == GWP -> co2 of cross-section, punished by delta 10*(qk_zul-qk)
     # output: if criterion == h -> height of cross-section, punished by delta 1*(qk_zul-qk)
@@ -174,6 +189,8 @@ def rc_rqs(var, add_arg):
 
     # create member
     member = struct_analysis.Member1D(section, system, floorstruc, criteria, g2k, qk)
+    #Member als aktueller Rechenschritt in Excel speichern
+    history_list.append(member)
     member.calc_qk_zul_gzt()  # calculate admissible live load
 
     # define penalty1, if ULS is not fulfilled
