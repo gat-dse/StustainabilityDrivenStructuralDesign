@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 # create dummy-database
 database_name = "dummy_database.db"  # define database name
-create_dummy_database.create_database(database_name)  # create database
+#create_dummy_database.create_database(database_name)  # create database
 
 #  define content of plot
 gwp_budget = 50  # kg Co2-eq/m2

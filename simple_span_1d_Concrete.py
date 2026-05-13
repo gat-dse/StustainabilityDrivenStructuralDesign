@@ -114,3 +114,5 @@ ende = time.time()
 dauer = ende - start
 
 print(f"Die Optimierung dauerte {round(dauer, 2)} Sekunden.")
+
+#Save Data in database:

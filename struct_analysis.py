@@ -217,7 +217,7 @@ class SupStrucRectangular(Section):
 #........................................................................
 class RectangularWood(SupStrucRectangular, Section):
     # defines properties of rectangular, wooden cross-section
-    def __init__(self, wood_type, b, h, phi=0.6, xi=0.03, ei_b=0.0):  # create a rectangular timber object
+    def __init__(self, wood_type, b, h, phi=0.6, xi=0.02, ei_b=0.0):  # create a rectangular timber object
         #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS (in Excel ergaenzt -> Im Code noch anpassen)
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
@@ -269,7 +269,7 @@ class RectangularWood(SupStrucRectangular, Section):
 class RectangularConcrete(SupStrucRectangular):
     # defines properties of rectangular, reinforced concrete cross-section
     def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0, phi=2.0,
-                 c_nom=0.02, xi=0.03, jnt_srch=0.15):
+                 c_nom=0.02, xi=0.0, jnt_srch=0.15):
         # create a rectangular concrete object
         section_type = "rc_rec"
         super().__init__(section_type, b, h)

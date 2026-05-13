@@ -7,6 +7,7 @@ import struct_optimization  # file with code for structural optimization
 import struct_analysis  # file with code for structural analysis
 import struct_optimization  # file with code for structural optimization
 import plot_datasets  # file with code for structural optimization
+import opt_and_plot
 import matplotlib.pyplot as plt
 
 # INPUT
