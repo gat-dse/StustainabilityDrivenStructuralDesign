@@ -89,7 +89,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
 
     # --- Excel Export ---
     crsec_type = "rc_rec"
-    filename = f"Optimierung_Verlauf_{crsec_type}.xlsx"
+    #filename = f"Optimierung_Verlauf_{crsec_type}.xlsx"
     #class_to_excel_2.members_to_excel2(optimization_history, filename, folder="Results")
 
 

@@ -1,6 +1,6 @@
+import sqlite3  # import modul for SQLite
 import struct_analysis  # file with code for structural analysis
 import struct_optimization  # file with code for structural optimization
-import sqlite3  # import modul for SQLite
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,6 +9,7 @@ from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
 import class_to_excel
 import class_to_excel_2
+import pandas as pd
 from scipy.spatial import ConvexHull
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
@@ -33,7 +34,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
                 AND MECH_PROP IS NOT NULL
                 AND MECH_PROP NOT LIKE '%GL30%'
-                AND ValidEPD = 1 
+                AND ValidEPD = 1
+                AND  MIN_MAX = 1
                 AND "MATERIAL" LIKE """ + mat_name
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
@@ -72,7 +74,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
-                # search database for rebar material of type B500B with lowest and highes emissions
+                # search database for rebar material of type B500B with lowest and highest emissions
                 # exclude not epd sources from the data.
                 # only take values, which are inside an 80% confidence interval
                 inquiry = ("""
@@ -80,12 +82,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                             WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
-                                                AND MECH_PROP IS NOT NULL
+                                                AND MECH_PROP = 'B500B'
+                                                AND MIN_MAX = 1
                                                 AND Statistik = 1)
                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
-                                                AND MECH_PROP IS NOT NULL
+                                                AND MECH_PROP = 'B500B'
+                                                AND MIN_MAX = 1
                                                 AND Statistik = 1)
                             """
                            )
@@ -276,10 +280,16 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     values_max = [h_max, h_tot_max, co2_max, co2_tot_max]
     values_mean = [h_mean, h_tot_mean, co2_mean, co2_tot_mean]
 
+    # CREATE DATASET
+
+
+
     # PLOT DATASET TO FIGURE
     plt.rcParams.update({
         'font.family': 'Times New Roman'
     })
+
+
     plt.figure(1)
     data_max = [0, 0, 0, 0]
     vrfctn_members = [[], []]
@@ -287,6 +297,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         plotdata = [[], [], [], []]
         for j, mem in enumerate(members):
             plotdata[0].append(mem.section.h)
+
             plotdata[1].append(mem.section.h + mem.floorstruc.h)
             plotdata[2].append(mem.section.co2)
             plotdata[3].append(mem.section.co2 + mem.floorstruc.co2)

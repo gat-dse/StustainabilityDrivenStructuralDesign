@@ -9,6 +9,7 @@ import struct_optimization  # file with code for structural optimization
 #import matplotlib.pyplot as plt
 import plot_datasets  # file with code for structural optimization
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # INPUT
 # create dummy-database
@@ -50,6 +51,26 @@ member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements,
 
 opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
 
+# Import the function from your module
+from class_to_excel_2 import member1d_to_dataframe
+
+# Convert the single optimized section to the vertical DataFrame format
+df_vertical = member1d_to_dataframe(opt_section)
+
+print(df_vertical)
+
+data = {
+    "Height": [opt_section.h],
+    "GWP": [opt_section.co2],
+    "Material": [opt_section.co2_concrete],
+    "Reinforcement_Layout": [ opt_section.bw],
+}
+
+df_summary = pd.DataFrame(data)
+
+print(data)
+
+
 #print("Kriechzahl creep_coef= ", opt_section.concrete_type.creep_coef)
 #print("Kriechzahl phi= ", opt_section.phi)
 #print("QS-Hoehe opt section = ", opt_section.h)
@@ -71,7 +92,7 @@ opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50
 #print("mu_min= ", round(section.mu_min,2))
 
 
-#print("Bewehrungslayout = ", opt_section.bw)
+#print("Bewehrungslayout = ", opt_section.bw[0][0])
 #print("Bewehrungs-QS = ", opt_section.a_s_stat)
 
 #print("mr_p =", opt_section.mr_p)
