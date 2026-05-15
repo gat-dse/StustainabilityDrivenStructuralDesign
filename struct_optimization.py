@@ -192,6 +192,7 @@ def rc_rqs(var, add_arg):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
+    #TODO haben wir nicht gesagt, dass wir die Vibrationen bei der Flachdecke ganz weglassen?
     pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
     pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
@@ -327,6 +328,7 @@ def rc_rib_rqs(var, add_arg):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
+    #TODO wie umgehen bei der Rippendecke mit den Vibrationen? Nachweisen oder nicht?
     pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
     pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
