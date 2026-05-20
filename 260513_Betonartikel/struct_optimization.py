@@ -299,7 +299,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
         co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, l0, di_xu, s_xu, di_x_w, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+        add_arg = [m.system, co, st, l0, di_xu, s_xu, di_x_w, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk, optimise]
 
         # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
         bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
@@ -338,7 +338,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
         co, st = m.section.concrete_type, m.section.rebar_type
         add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc,
-                   m.requirements, to_opt, criterion, m.g2k, m.qk]
+                   m.requirements, to_opt, criterion, m.g2k, m.qk, optimise]
 
         # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
         bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
@@ -359,13 +359,18 @@ def rc_rib_rqs(var, add_arg):
     # input: variables, which have to be optimized, additional info about cross-section and system, optimizing option
     # output: if criterion == GWP -> co2 of cross-section, punished by delta 10*(qk_zul-qk)
     # output: if criterion == h -> height of cross-section, punished by delta 1*(qk_zul-qk)
-    h_w, h_f, di_x_w, b_w, b = var
+    optimise = add_arg[18]
+    if optimise == "oben":
+        h_w, h_f, di_xo, b_w, b = var
+        di_xu, s_xu, di_x_w, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw = add_arg[4:12]
+    elif optimise == "unten":
+        h_w, h_f, di_x_w, b_w, b = var
+        di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw = add_arg[4:12]
+
     system = add_arg[0]
     concrete = add_arg[1]
     reinfsteel = add_arg[2]
     l0 = add_arg[3]
-    #h_f = add_arg[4]
-    di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw = add_arg[4:12]
     floorstruc = add_arg[12]
     criteria = add_arg[13]
     to_opt = add_arg[14]
@@ -374,7 +379,8 @@ def rc_rib_rqs(var, add_arg):
     qk = add_arg[17]
 
     # create section
-    section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
+    section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
+                                             di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
 
      # create member
     member = struct_analysis.Member1D(section, system, floorstruc, criteria, g2k, qk)
