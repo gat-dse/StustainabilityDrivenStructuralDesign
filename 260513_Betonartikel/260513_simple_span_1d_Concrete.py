@@ -12,7 +12,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,5,6,7,8,9,10,11,12]
+lengths = [6,7,8]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -25,7 +25,7 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1,
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260506_min_max.db"
+database_name = "database_260506.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
