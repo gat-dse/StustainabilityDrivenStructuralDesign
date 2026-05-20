@@ -8,6 +8,7 @@ import matplotlib.patches as patches
 from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
 import class_to_excel
+import class_to_excel_2
 from scipy.spatial import ConvexHull
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
@@ -348,6 +349,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             #              arrowprops=dict(facecolor='black', shrink=0.2, width=0.2, headwidth=2, headlength=4),
             #              fontsize=9, color='black', va='center')
             plt.plot(lengths, values_mean[idx], color = color, linestyle = linestyle, linewidth = 1.5 )
+
+
     # create Excel sheets
     members_1d = [
         member
@@ -357,8 +360,11 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
     if crsec_type == "wd_rec":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
+
     elif crsec_type == "rc_rec":
         class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Resultate")
+
     elif crsec_type == "rc_rib":
         class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
     elif crsec_type == "wd_rib":
@@ -370,6 +376,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     return data_max, vrfctn_members
 
 
+    return data_max, vrfctn_members
 
 
 

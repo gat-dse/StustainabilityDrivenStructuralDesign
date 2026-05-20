@@ -6,18 +6,19 @@ import create_dummy_database  # file for creating a "dummy database", as long as
 import struct_analysis  # file with code for structural analysis
 import struct_optimization  # file with code for structural optimization
 import matplotlib.pyplot as plt
+import opt_and_plot
 
 # INPUT
 # create dummy-database
-database_name = "dummy_sustainability.db"  # define database name
-create_dummy_database.create_database(database_name)  # create database
+database_name = "database_260506.db"  # define database name
+
 
 # create material for wooden cross-section, derive corresponding design values
-timber1 = struct_analysis.Wood("'GL24h'", database_name)  # create a Wood material object
+timber1 = struct_analysis.Wood("'C24'", database_name)  # create a Wood material object
 timber1.get_design_values()
 
 # create wooden rectangular cross-section
-section = struct_analysis.RectangularWood(timber1, 1.0, 0.24, xi=0.02)
+section = struct_analysis.RectangularWood(timber1, 1.0, 0.2, xi=0.03)
 
 
 # create floor structure for solid wooden cross-section
@@ -36,7 +37,7 @@ qk = 2e3  # Nutzlast
 req = struct_analysis.Requirements()
 
 # define system length
-length = 5.8
+length = 20
 
 # create simple supported beam system
 system = struct_analysis.BeamSimpleSup(length)
@@ -54,3 +55,16 @@ print("Feuerwiderstand:")
 member.get_fire_resistance()
 print(member.fire_resistance)
 print(" ")
+
+opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
+
+
+
+# # # plot cross-section of members for verification
+
+
+vrfctn_member = opt_and_plot.plot_section(opt_section)
+
+# SHOW FIGURE
+plt.show()
+

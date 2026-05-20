@@ -377,6 +377,7 @@ def plot_section(section):
                   f'di_stir / s_stir / n = {section.bw_bg[0]} / {section.bw_bg[1]} / {section.bw_bg[2] }\n'
                   f'c_nom = {100*section.c_nom:.1f} cm \n'
                   f'x/d = {section.x_p/section.d:.2f} \n'
+                  f'd = {section.d:.2f} \n'
                   
                   f'GWP = {section.co2:.2f} kgCO2-eq/m^2')
     elif section.section_type == "wd_rec":  # Rectangular Wooden Cross-Section

@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 
 # INPUT
 # create dummy-database
-database_name = "database_260126.db"  # define database name
+database_name = "database_260506.db"  # define database name
 #create_dummy_database.create_database(database_name)  # create database
 
 # create material for reinforced concrete cross-section, derive corresponding design values
@@ -24,7 +24,7 @@ rebar1.get_design_values()
 # create reinforced concrete rectangular cross-section
 section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.01, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
 
-# create floor structure for solid wooden cross-section
+# create floor structure for solid concrete cross-section
 bodenaufbau = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                                  ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False]]
 bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau, database_name)
@@ -38,7 +38,7 @@ qk = 2e3  # Nutzlast
 # define service limit state criteria
 req = struct_analysis.Requirements()
 
-length= 4
+length= 5
 
 
 # create slab system
@@ -49,12 +49,19 @@ system = struct_analysis.BeamSimpleSup(length)
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
 opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
 
+print("Kriechzahl creep_coef= ", opt_section.concrete_type.creep_coef)
+print("Kriechzahl phi= ", opt_section.phi)
 print("QS-Hoehe opt section = ", opt_section.h)
 print("GWP opt section = ", opt_section.co2)
+print("GWP bodenaufbau = ", bodenaufbau_rc.co2)
+print("GWP bodenaufbau mit amortisationszeit = ", bodenaufbau_rc.co2_a)
+print("GWP QS + Bodenaufbau in kg/m2= ", opt_section.co2 + bodenaufbau_rc.co2)
 
-print("d =", section.d)
+print("GWP QS + Bodenaufbau pro Lebensdauer inkl. Ersatz in kg/m2 = ", opt_section.co2 + bodenaufbau_rc.co2_a)
+
+
 print("Mindestbewehrung as in m2/m' = ", opt_section.as_min)
-print("Mindestbewehrung für Abstand 0.2m, mit Durchmesser (m) = ", opt_section.di_min)
+
 print("mu_max= ", round(section.mu_max,2))
 print("alpha_m: ",system.alpha_m)
 print("mkd_n, mkd_p = ", member.mkd_n, member.mkd_p)
@@ -66,8 +73,11 @@ print("mu_min= ", round(section.mu_min,2))
 print("Bewehrungslayout = ", opt_section.bw)
 print("Bewehrungs-QS = ", opt_section.a_s_stat)
 
-print("mr_p =", section.mr_p)
-print("x/d =", section.x_p/section.d)
+print("mr_p =", opt_section.mr_p)
+print("x/d =", opt_section.x_p/opt_section.d)
+print("d =", opt_section.d)
+print("hmin =", opt_section.hmin_c)
+
 
 print("qu =", round(member.qu,2))
 print("vu = ", member.section.vu_p, member.section.vu_n)
@@ -87,6 +97,7 @@ print("GWP-Bewehrung für QS pro m2 = ", opt_section.co2_rebar, "kgCO2-eq/m2")
 print("GWP_Bewehrung für Material pro Tonne = ", opt_section.rebar_type.GWP*1e3, "kgCO2-eq/t")
 print("GWP-Beton für QS pro m2 = ", opt_section.co2_concrete, "kgCO2-eq/m2")
 print("GWP-Beton für Material pro Tonne = ", opt_section.concrete_type.GWP*1e3, "kgCO2-eq/t")
+
 
 
 # # # plot cross-section of members for verification

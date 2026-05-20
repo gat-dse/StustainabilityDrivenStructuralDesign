@@ -40,11 +40,11 @@ class Wood:
         connection = sqlite3.connect(database)
         cursor = connection.cursor()
         # get mechanical properties from database
-        inquiry = ("SELECT strength_bend, strength_shea, E_modulus, density_load, burn_rate FROM material_prop WHERE"
+        inquiry = ("SELECT strength_bend, strength_shea, E_modulus, density_load, burn_rate, creep_coef FROM material_prop WHERE"
                    " name=" + mech_prop)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate = result[0]
+        self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate, self.creep_coef = result[0]
         # get GWP properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -76,11 +76,17 @@ class ReadyMixedConcrete:
         connection = sqlite3.connect(database)
         cursor = connection.cursor()
         # get mechanical properties from database
-        inquiry = ("SELECT strength_comp, strength_tens, E_modulus, density_load FROM material_prop WHERE name="
+        inquiry = ("SELECT strength_comp, strength_tens, E_modulus, density_load, creep_coef FROM material_prop WHERE name="
                    + mech_prop)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        self.fck, self.fctm, self.Ecm, self.weight = result[0]
+        # check, wo fehler entsteht
+        if not result:
+            print(f"DEBUG: Keine Daten gefunden für Materialsuche! Mech_prop war: {mech_prop}")
+            # Hier könnte man einen Standardwert setzen oder das Programm sauber beenden
+        else:
+            self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
+        #self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         # get GWP properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -211,8 +217,8 @@ class SupStrucRectangular(Section):
 #........................................................................
 class RectangularWood(SupStrucRectangular, Section):
     # defines properties of rectangular, wooden cross-section
-    def __init__(self, wood_type, b, h, phi=0.6, xi=0.01, ei_b=0.0):  # create a rectangular timber object
-        #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS
+    def __init__(self, wood_type, b, h, phi=0.6, xi=0.02, ei_b=0.0):  # create a rectangular timber object
+        #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS (in Excel ergaenzt -> Im Code noch anpassen)
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
         self.wood_type = wood_type
@@ -262,47 +268,52 @@ class RectangularWood(SupStrucRectangular, Section):
 # ........................................................................
 class RectangularConcrete(SupStrucRectangular):
     # defines properties of rectangular, reinforced concrete cross-section
-    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0,
-                 phi=2.0, c_nom=0.02, xi=0.02, jnt_srch=0.15):
+    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0, phi=2.0,
+                 c_nom=0.02, xi=0.0, jnt_srch=0.15):
         # create a rectangular concrete object
         section_type = "rc_rec"
-        super().__init__(section_type, b, h, phi)
+        super().__init__(section_type, b, h)
         self.concrete_type = concrete_type
         self.rebar_type = rebar_type
         self.c_nom = c_nom #Bewehrungsüberdeckung
+        self.phi = phi
 
-        #TODO Mindestplattenstärke ergänzen: h > 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        #Definition Bewehrung gemäss Eingabe
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
         self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
-        mr = self.b * self.h ** 2 / 6 * 1.3 * self.concrete_type.fctm  #cracking moment
+        mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
 
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
-        #TODO: x und y berücksichtigen
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
-        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds
+        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight)
 
-        #TODO: a_s_tot: Hat erst 1. & 4. Lage drin
-        #a_s_stat = self.as_p + self.as_n + self.as_bw  # rebar area without reinforcement joint surcharge
-
-        #TODO: a_s_tot: Hat alle 4 Lagen, aber für 2. & 3. Lage die default values
-        #as_yu = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
-        #as_yo = np.pi * self.bw[2][0] ** 2 / (4 * self.bw[2][1]) * b   # [m^2]
-        #self.a_s_stat = self.as_p + self.as_n + as_yo + as_yu + self.as_bw  # rebar area without reinforcement joint surcharge
-
-        #TODO Mindestbewehrung für Vermeidung Sprödversagen (MRd > Mr) ergänzen
-        #TODO Definition Mindestbewehrung? -> Gebrauchstauglichkeit (Anforderungen definieren?) / für Platten gilt: Querberwehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        #TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-        self.di_min = ((self.as_min * 0.2 * 4) / np.pi) ** 0.5
-        #TODO für 2. & 3. Lage Mindestbewehrung für Asmin
-        self.a_s_stat = self.as_p + self.as_n + 2*self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
-        self.joint_surcharge = jnt_srch  # joint surcharge
 
-        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area without reinforcement joint surcharge
+        # Durchmesser Mindestbewehrung für 1. & 4. Lage
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+
+        #Durchmesser Mindestbewehrung für 2. & 3. Lage
+        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
+        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
+        #Neue Definition Bewehrung mit Mindestbewehrung
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+
+        #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min
+
+        #Gesamte Bewehrungsfläche as_tot
+        self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
+        self.joint_surcharge = jnt_srch  # joint surcharge
+        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
+
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
@@ -310,7 +321,7 @@ class RectangularConcrete(SupStrucRectangular):
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
-        self.xi = xi  #TODO XXXXXXX preset value is an assumption. Has to be verified with literature. XXXXXXX
+        self.xi = xi
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
 
     def calc_d(self):
@@ -358,7 +369,7 @@ class RectangularConcrete(SupStrucRectangular):
     def calc_shear_resistance(self, d_installation=0.0):
         # in: self
         # out: Querkraftwiderstand positiv vu_p [N], Querkraftwiderstand negativ vu_n [N], Querkraftbewehrung as_bw [m2]
-        #TODO: Anpassung an die SIA 262 (2025)! Ist noch gemäss alter Norm!
+
         di = self.bw_bg[0]      # diameter
         s = self.bw_bg[1]       # spacing
         n = self.bw_bg[2]       # number of stirrups per spacing
@@ -375,10 +386,10 @@ class RectangularConcrete(SupStrucRectangular):
         x_p = self.x_p      #Druckzonenhöhe positives Biegemoment (obere Querschnittsrand)
         x_n = self.x_n      #Druckzonenhöhe negatives Biegemoment (unterer Querschnittsrand)
         as_bw = self.calc_as_bw(di, n, s, d)
-        if d_installation < d / 6:
-            dv_p = d                    #Wirksame statische Höhe für Querkraft
+        if d_installation < d / 6: #SIA262, 4.3.3.2.9
+            dv_p = d                    #Wirksame statische Höhe für Querkraft entspricht statischer Höhe für positives Biegemoment d (untere Lagen), einbetonierte Leitungen, Einlagen, etc. können vernachlässigt werden, wenn kleiner d/6
         else:
-            dv_p = d - d_installation   #Wirksame statische Höhe für Querkraft
+            dv_p = d - d_installation   #Wirksame statische Höhe für Querkraft, , einbetonierte Leitungen, Einlagen, etc. müssen verücksichtigt werden, wenn grösser d/6
         if d_installation < ds / 6:
             dv_n = ds                   #Wirksame statische Höhe für Querkraft
         else:
@@ -392,14 +403,14 @@ class RectangularConcrete(SupStrucRectangular):
         #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
         #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
         as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d #ToDo: muss die Bügelquerschnittsfläche nicht noch mit der Plattenstärke multipliziert werden?
-        return as_bw
+        return as_bw #TODo: Berechnung as_bw falsch? (Einheiten?)
 
     @staticmethod
     def vu_unsigned(bw, di, n, s, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
         rohw = as_bw / min(bw, 0.4)  # SIA 262, Zif. 5.5.2.2
-        rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # SIA 262, Zif. 5.5.2.2
-        s_max = 25*s  # SIA262, Zif. 5.5.2.2
-        if bw < 0.5:  # SIA262, Zif. 5.5.2.3
+        rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # SIA 262, Zif. 5.5.2.2 Mindestbewehrungsgehalt Bügel für Balken
+        s_max = 25*s  # SIA262, Zif. 5.5.2.2 im Balken sind stets Bügel anzuodnen, deren gegenseitiger Abstand 25*dsw (Durchmesser Bewehrungstaebe) nicht übersteigt #TODO Anpassung Formel? 25*d
+        if bw < 0.5:  # SIA262, Zif. 5.5.2.3 für Stegbreiten > 500 mm sind idR mehrschnittige Bügel anzuordnen
             n_min = 2
         else:
             n_min = 4
@@ -411,12 +422,13 @@ class RectangularConcrete(SupStrucRectangular):
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
         else:  # cross-section resistance with vertical stirrups
             z = d - 0.85 * x / 2
-            vrds = as_bw * z * fsd
+            vrds = as_bw * z * fsd #mit alpha = 45° und cot(alpa) = 1.0
             vrdc = bw * z * kc * fcd * np.sin(alpha) * np.cos(alpha)  # unit of alpha: [rad]
             return min(vrds, vrdc) #Querkraftwiderstand MIT Querkraftbewehrung SIA 262
 
     @staticmethod
     def f_w_ger(roh, rohs, phi, h, d):
+        # f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
         f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
         #TODO: Prüfen, ob dieser Wert nicht zu konservativ ist! Als Abschätzung für die Vordimensionierung scheint der Wert jedoch schon i.O., ist zumindest nicht komplett willkürlich.
         return f
@@ -516,18 +528,18 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     #di_x_w, n_x_w = diameter and number of longitudinal reinforcement in rib
     def __init__(self, concrete_type, rebar_type, l0, b, b_w, h, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w,
                  di_pb_bw, s_pb_bw, n_pb_bw=2,
-                 phi=2.0, c_nom=0.03, xi=0.02, jnt_srch=0.15):
+                 phi=2.0, c_nom=0.03, xi=0.03, jnt_srch=0.15):
         section_type = "rc_rib"
         super().__init__(section_type, b, b_w, h, h_f, l0, phi)
         self.concrete_type = concrete_type
         self.rebar_type = rebar_type
         self.c_nom = c_nom
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung
         self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
         self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
-        mr_slab = self.b * self.h ** 2 / 6 * 1.3 * self.concrete_type.fctm  # cracking moment
-        mr_pb = self.iy / (self.h - self.z_s) * 1.3 * self.concrete_type.fctm  # cracking moment
+        mr_slab = self.b * self.h_f ** 2 / 6  * self.concrete_type.fctm  # Platte (Slab) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
+        mr_pb = self.iy / (self.h - self.z_s) * self.concrete_type.fctm  # Plattenbalken (PB) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
         self.mr_p, self.mr_n = mr_slab, -mr_slab
         self.mr_pb_p = mr_pb
         self.mr_pb_n = -mr_pb
@@ -541,19 +553,26 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance(
             'Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
         self.g0k = self.calc_weight(concrete_type.weight)
-        a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
+        #a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
+
+        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
+        self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Bewehrung in y-Richtung in Platte
+        self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
+
+
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
-        a_s_tot = a_s_stat * (1 + self.joint_surcharge)
+        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)
         co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (co2_rebar + co2_concrete)/self.b
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
-        self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB
-        self.xi = xi  # XXXXXXX preset value is an assumption. Has to be verified with literature. XXXXXXX
-        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #!!!!!ANPASSEN AUF PB
+        self.ei_b = self.ei1  #TODO!!!!!!!ANPASSEN AUF PB
+        self.xi = xi
+        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #TODO!!!!!ANPASSEN AUF PB
 
     def calc_d(self):
         d = self.h_f - self.c_nom - self.bw[0][0] / 2  # Statische Höhe 1. Lage Platte
@@ -816,7 +835,7 @@ class SupStrucRibWood(Section):
 class RibWood(SupStrucRibWood):
     # defines properties of ribbed timber slab = "Hohlkastendecke" → box beam floor or "Ripendecke" = → joist floor
     def __init__(self, wood_type_1, wood_type_2, wood_type_3, l0, b, h, a, t2, t3, phi_1=0.6, phi_2=0.6, phi_3=0.6,
-                 xi=0.01, ei_b=0.0):  # create a rectangular timber object
+                 xi=0.03, ei_b=0.0):  # create a rectangular timber object
         section_type = "wd_rib"
         self.wood_type_1 = wood_type_1
         self.wood_type_2 = wood_type_2
@@ -846,7 +865,7 @@ class RibWood(SupStrucRibWood):
         self.co2 = (self.b*self.h * self.wood_type_1.GWP * self.wood_type_1.density)/self.a +self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m]
         self.cost = self.b * self.h / self.a * self.wood_type_1.cost + (self.t2 + self.t3)  * self.wood_type_2.cost
         self.ei_b = ei_b  # stiffness perpendicular to direction of span
-        self.xi = xi  # damping factor, preset value see: HBT, Page 47 (higher value for some buildups possible)
+        self.xi = xi  # damping factor, preset value for builddup with "Schwimmendem Estrich" see: HBT, Page 47
 
     def calc_n(self):
         ft0d = 8.5 #C24
@@ -959,10 +978,10 @@ class MatLayer:  # create a material layer
         cursor = connection.cursor()
         # get properties from database
         inquiry = ("""SELECT "h_fix [float, m]", "E [float, N/m^2]", "density [float, kg/m^3]", "weight [float, N/m^3]",
-         "GWP [float, kg/kg]" FROM floor_struc_prop WHERE "name[string]"=""" + mat_name)
+         "GWP [float, kg/kg]", "Amortisations-zeit [Jahre]"  FROM floor_struc_prop WHERE "name[string]"=""" + mat_name)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        h_fix, e, density, weight, self.GWP = result[0]
+        h_fix, e, density, weight, self.GWP, self.lifespan = result[0]
         if h_input is False:
             self.h = h_fix
         else:
@@ -980,6 +999,7 @@ class MatLayer:  # create a material layer
             self.ei = e * i
         self.gk = self.weight * self.h  # weight per area in N/m^2
         self.co2 = self.density * self.h * self.GWP  # CO2-eq per area in kg-C02/m^2
+        self.co2_a = self.density * self.h * self.GWP * (60/self.lifespan) # CO2-eq per area in kg-C02/m^2
 
 
 class FloorStruc:  # create a floor structure
@@ -989,10 +1009,12 @@ class FloorStruc:  # create a floor structure
         self.gk_area = 0
         self.h = 0
         self.ei = 0
+        self.co2_a = 0
         for mat_name, h_input, roh_input in mat_layers:
             current_layer = MatLayer(mat_name, h_input, roh_input, database_name)
             self.layers.append(current_layer)
             self.co2 += current_layer.co2
+            self.co2_a += current_layer.co2_a
             self.gk_area += current_layer.gk
             self.h += current_layer.h
             self.ei = max(self.ei, current_layer.ei)
@@ -1160,12 +1182,13 @@ class Member1D:
                                                              self.section.h, self.section.d)
             )
         self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
+        self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2)/60
 
         # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
         self.f1 = self.calc_f1()
         # calculation of further vibration criteria for wooden cross-sections
         section_material = self.section.section_type[0:2]
-        if section_material == "wd" or section_material == "rc":  # check for material type
+        if section_material == "wd": #or section_material == "rc":  # check for material type #TODO Schwingungsnachweis Betondecken?
             self.ei_b = max(self.section.ei_b,
                             self.floorstruc.ei)  # Berücksichtigung n.t. Bodenaufbau gemäss Beispielsammlung HBT)
             self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.section.ei1) ** 0.25  # HBT Seite 46

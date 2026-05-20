@@ -36,7 +36,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xo0]
         # define bounds of variables
-        bh = (0.06, 1.2)  # height between 6 cm and 1.0 m
+        bh = (max(0.06,m.section.hmin_c), 1.2)  # height between max of (6 cm;hmin_c) and 1.0 m with hmin_c = 2*cnom + 32 + 4*di
         bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xo]
         # definition of fixed values of cross-section
@@ -53,7 +53,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xu0]
         # define bounds of variables
-        bh = (0.06, 1.2)  # height between 6 cm and 1.0 m
+        bh = (max(0.06,m.section.hmin_c), 1.2)   # height between max of (6 cm, hmin_c) and 1.0 m with hmin_c = 2*cnom + 32 + 4*di
         bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xu]
         # definition of fixed values of cross-section
@@ -192,11 +192,13 @@ def rc_rqs(var, add_arg):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
-    #TODO haben wir nicht gesagt, dass wir die Vibrationen bei der Flachdecke ganz weglassen?
-    pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-    pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
+    pen_a = 0 #Kein Schwingungsnachweis für Betondecken
+    #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
+    pen_w = 0  # Kein Schwingungsnachweis für Betondecken
+    #pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-    pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
+    pen_v = 0  # Kein Schwingungsnachweis für Betondecken
+    #pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
     if member.f1 < member.requirements.f1:
         penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
     else:
@@ -260,8 +262,8 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     b0 = m.section.b
     var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
 
-    # define bounds of variables
-    bh_f = (0.08, 0.5)  # height between 12 cm and 50 cm
+    # define bounds of variables #TODO adapt boundaries for Mindestplattenstärke für 4 Bewehrungslagen
+    bh_f = (0.08, 0.5)  # height between 8 cm and 50 cm
     bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
@@ -328,15 +330,15 @@ def rc_rib_rqs(var, add_arg):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
-    #TODO wie umgehen bei der Rippendecke mit den Vibrationen? Nachweisen oder nicht?
-    pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-    pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
+    #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
+    #pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-    pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
-    if member.f1 < member.requirements.f1:
-        penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
-    else:
-        penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
+    #pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
+    #if member.f1 < member.requirements.f1:
+    #    penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
+    #else:
+    #    penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
+    penalty3 = 0
 
     # define penalty4, if fire resistance is not fulfilled
     member.get_fire_resistance()
@@ -390,6 +392,8 @@ def opt_gzt_wd_rqs(member, criterion="ULS"):
     bnds = [(0.1, 1.2)]
     minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
     h_opt = minimal_h.x[0]
+    if h_opt >=  0.24:
+        h_opt = 0.0001      #TODO Code anpassen, sodass gar keine Ausgabe mehr für h>24 cm erfolgt.
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
     return section
 
@@ -607,6 +611,7 @@ def get_opt_sec(section, gwp_budget):
         minimal_h = minimize(wd_rec_crsc, h_0, args=[section, gwp_budget], bounds=bnds, method='Powell')
         h_opt = minimal_h.x[0]
         opt_section = struct_analysis.RectangularWood(section.wood_type, section.b, h_opt)
+
         return opt_section
 
     elif section.section_type == "rc_rec":
@@ -649,7 +654,7 @@ def get_opt_sec(section, gwp_budget):
         var0 = [h_0, di_xu0, b_w0, b0]
 
         # define bounds of variables
-        bh = (0.3, 2)  # height between 6 cm and 1.0 m
+        bh = (0.3, 2)  # height between 6 cm and 1.0 m #TODO Bounds anpassen!!
         bdi_x_w = (0.01, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bb_w = (0.12, 0.4)  # rib width between 12 and 60 cm
         bb = (1, 1.5)  # rib spacing between 0.5 and 2.5 m
