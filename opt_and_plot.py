@@ -222,19 +222,21 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
                     opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter)
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
+
+                    #Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
                     # search for an alternative solution for rectangular concrete section with lower minimal h and fill in floorstructure
-                    if section0.section_type == "rc_rec":
+                    #if section0.section_type == "rc_rec":
                         # create floor structure for slim reinforced concrete cross-section
-                        bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                        #bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                                                     ["'Unterlagsboden Zement, 85 mm'", False, False],
                                                     ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
-                        floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
-                        member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
-                        opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
-                        opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
+                        #floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
+                        #member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
+                        #opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
+                        #opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
                         # update opt_member, if alternative solution has lower GWP
-                        if opt_member_alt.co2 < opt_member.co2:
-                            opt_member = opt_member_alt
+                        #if opt_member_alt.co2 < opt_member.co2:
+                        #    opt_member = opt_member_alt
                     members.append(opt_member)
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
