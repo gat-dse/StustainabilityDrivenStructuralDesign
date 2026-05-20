@@ -274,6 +274,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
         # Fall negative Biegung wird massgebend und obere Bewehrung wird optimiert
         optimise = "oben"
+        print("oben")
         # definition of initial values for variables, which are going to be optimized
         h_w0 = m.section.h-m.section.h_f  # start value for height corresponds to 1/20 of system length
         h_f0 = m.section.h_f
@@ -313,6 +314,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     else:
         # Fall positive Biegung wird massgebend und untere Bewehrung wird optimiert
         optimise = "unten"
+        print("unten")
         # definition of initial values for variables, which are going to be optimized
         h_w0 = m.section.h - m.section.h_f  # start value for height corresponds to 1/20 of system length
         h_f0 = m.section.h_f
@@ -389,14 +391,15 @@ def rc_rib_rqs(var, add_arg):
     penalty1 = max(member.qk - member.qk_zul_gzt, 0)
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if member.mkd_p < member.section.mr_p and member.mkd_n < member.section.mr_n:
+    if optimise == "oben" and member.mkd_n < member.section.mr_n:
+        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
+                      member.w_app - member.w_app_adm]
+    elif optimise == "unten" and member.mkd_p < member.section.mr_p:
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
     else:
-        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
-        #d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
-        #              member.w_app_ger - member.w_app_adm]
+        d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
+                      member.w_app_ger - member.w_app_adm]
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled

@@ -9,6 +9,7 @@ from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
 import class_to_excel
 import class_to_excel_2
+
 import pandas as pd
 from scipy.spatial import ConvexHull
 
@@ -374,14 +375,19 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     if crsec_type == "wd_rec":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
 
-    elif crsec_type == "rc_rec":
+    elif crsec_type == "rc_rec"and system == "Simple Beam":
         class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
         class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
 
-    elif crsec_type == "rc_rib":
+    elif crsec_type == "rc_rib" and system == "Simple Beam":
         class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
         class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_2.xlsx", folder="Results")
-
+    elif crsec_type == "rc_rec"and system == "Continuous 1D":
+        class_to_excel.members_to_excel(members_1d, "Members_rc_rec_cont.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_cont_2.xlsx", folder="Results")
+    elif crsec_type == "rc_rib" and system == "Continuous 1D":
+        class_to_excel.members_to_excel(members_1d, "Members_rc_rib_cont.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_cont_2.xlsx", folder="Results")
     elif crsec_type == "wd_rib":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
     else:
@@ -426,6 +432,8 @@ def plot_section(section):
               f'di_r = {section.bw_r[0]:.3f} \n'
               f'di_xu / s_xu = {section.bw[0][0]:.3f} / {section.bw[0][1]} \n'
               #f'di_stir / s_stir / n = {section.bw_bg[0]} / {section.bw_bg[1]} / {section.bw_bg[2]}\n'
+              f'di_xo / s_xo / n = {section.bw[1][0]:.3f} / {section.bw[1][1]} \n'
+              f'di_x_w / n_x_w / n = {section.bw_r[0]:.3f} / {section.bw_r[1]} \n'
               f'c_nom = {100 * section.c_nom:.1f} cm \n'
               f'x/d = {section.x_p / section.d:.2f} \n'
               f'h, hf, hw, b, bw = {section.h:.2f}, {section.h_f:.2f}, {section.h_w:.2f}, {section.b:.2f}, {section.b_w:.2f} \n'
