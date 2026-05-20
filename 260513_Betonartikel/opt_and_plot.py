@@ -146,9 +146,9 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
 
                 # create initial cross-sections
-                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
+                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.018, 2, 0.01, 0.15, 2)
                 section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15,
-                                                            0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
+                                                            0.01, 0.15, 0.018, 2, 0.01, 0.15, 2)
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
                 line_i1 = [section_01, floorstruc]
@@ -312,8 +312,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             color = 'lightgreen'  # color for reinforced concrete
         elif sec_typ == "wd_rec":
             color = 'saddlebrown'  # color for wood
-        elif sec_typ == "rc_rib":
+        elif sec_typ == "rc_rib"and system == "Simple Beam":
             color = 'limegreen'  # color for reinforced concrete
+        elif sec_typ == "rc_rib"and system == "Continuous 1D":
+            color = 'yellow'  # color for reinforced concrete
         elif sec_typ == "wd_rib":
             color = 'sandybrown'  # color for wood
 

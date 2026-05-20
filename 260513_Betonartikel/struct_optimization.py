@@ -271,39 +271,86 @@ def rc_rqs(var, add_arg, history_list):
 #OPTIMIZATION OF RIB CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
 def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
-    # definition of initial values for variables, which are going to be optimized
-    h_w0 = m.section.h-m.section.h_f  # start value for height corresponds to 1/20 of system length
-    h_f0 = m.section.h_f
-    di_x_w0 = m.section.bw_r[0]  # start value for rebar diameter 40 mm
-    b_w0 = m.section.b_w
-    b0 = m.section.b
-    var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
+    if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
+        # Fall negative Biegung wird massgebend und obere Bewehrung wird optimiert
+        optimise = "oben"
+        # definition of initial values for variables, which are going to be optimized
+        h_w0 = m.section.h-m.section.h_f  # start value for height corresponds to 1/20 of system length
+        h_f0 = m.section.h_f
+        di_xo0 = m.section.bw[1][0]
+        b_w0 = m.section.b_w
+        b0 = m.section.b
+        var0 = [h_w0, h_f0, di_xo0, b_w0, b0]
 
-    # define bounds of variables #TODO adapt boundaries for Mindestplattenstärke für 4 Bewehrungslagen
-    bh_f = (0.08, 0.5)  # height between 8 cm and 50 cm
-    bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
-    bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
-    bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
-    bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
-    bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
+        # define bounds of variables
+        bh_f = (0.08, 0.5)  # height between 12 cm and 50 cm
+        bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
+        bdi_xo = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+        bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
+        bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
+        bounds = [bh_w, bh_f, bdi_xo, bb_w, bb]
 
-    # definition of fixed values of cross-section
-    l0 = m.li_max
-    di_xu, s_xu, di_xo, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
-    di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-    n_x_w = m.section.bw_r[1]
-    phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+        # definition of fixed values of cross-section
+        l0 = m.li_max
+        di_x_w = m.section.bw_r[0]  # start value for rebar diameter 18 mm
+        di_xu, s_xu, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][1]
+        di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+        n_x_w = m.section.bw_r[1]
+        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
-    co, st = m.section.concrete_type, m.section.rebar_type
-    add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+        co, st = m.section.concrete_type, m.section.rebar_type
+        add_arg = [m.system, co, st, l0, di_xu, s_xu, di_x_w, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
 
-    # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
-    bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
-                                                                            "method": "Powell"}, take_step=bounded_step)
-    h_w, h_f, di_x_w, b_w, b = opt.x
-    optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi, jnt_srch)
-    #print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+        # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
+        bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
+        opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
+                                                                                "method": "Powell"}, take_step=bounded_step)
+        h_w, h_f, di_xo, b_w, b = opt.x
+        optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo,
+                                                           di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi,
+                                                           jnt_srch)
+        #print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+    else:
+        # Fall positive Biegung wird massgebend und untere Bewehrung wird optimiert
+        optimise = "unten"
+        # definition of initial values for variables, which are going to be optimized
+        h_w0 = m.section.h - m.section.h_f  # start value for height corresponds to 1/20 of system length
+        h_f0 = m.section.h_f
+        di_x_w0 = m.section.bw_r[0]  # start value for rebar diameter 18 mm
+        b_w0 = m.section.b_w
+        b0 = m.section.b
+        var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
+
+        # define bounds of variables
+        bh_f = (0.08, 0.5)  # height between 12 cm and 50 cm
+        bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
+        bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+        bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
+        bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
+        bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
+
+        # definition of fixed values of cross-section
+        l0 = m.li_max
+        di_xu, s_xu, di_xo, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
+        di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+        n_x_w = m.section.bw_r[1]
+        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+
+        co, st = m.section.concrete_type, m.section.rebar_type
+        add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc,
+                   m.requirements, to_opt, criterion, m.g2k, m.qk]
+
+        # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
+        bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
+        opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1,
+                           minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
+                                             "method": "Powell"}, take_step=bounded_step)
+        h_w, h_f, di_x_w, b_w, b = opt.x
+        optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
+                                                           di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi,
+                                                           jnt_srch)
+        # print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+
 
     return optimized_section
 
