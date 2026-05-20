@@ -310,6 +310,7 @@ class RectangularConcrete(SupStrucRectangular):
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min
+        self.h = max(self.hmin_c, self.h) #Die Plattenstärke muss immer grösser sein als die erforderliche Stärke für die Bewehrung
 
         #Gesamte Bewehrungsfläche as_tot
         self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
@@ -559,8 +560,14 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5 #1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xu
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Bewehrung in y-Richtung in Platte
         self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
+
+        # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_xu_min + di_xo_min
+        self.h_f = max(self.hmin_c, self.h_f) #Die Plattenstärke muss immer grösser sein als die erforderliche Stärke für die Bewehrung
 
 
         #TODO: Achtung - es fehlt die Spreizbewehrung

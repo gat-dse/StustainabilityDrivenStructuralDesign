@@ -1,21 +1,19 @@
-import sqlite3  # import modul for SQLite
 import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
+import struct_optimization_2D  # file with code for structural optimization
+import sqlite3  # import modul for SQLite
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
-import class_to_excel
-import class_to_excel_2
-import pandas as pd
 from scipy.spatial import ConvexHull
+
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam"):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1)
@@ -27,16 +25,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
     for mat_name in mat_names:
-        # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL
-                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
                 AND MECH_PROP IS NOT NULL
-                AND MECH_PROP NOT LIKE '%GL30%'
-                AND ValidEPD = 1
-                AND  MIN_MAX = 1
-                AND Man_Ausschluss = 1
+                AND Statistik = 1
+                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                AND "SOURCE" NOT LIKE '%KBOB%'
                 AND "MATERIAL" LIKE """ + mat_name
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
@@ -54,13 +50,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             cursor.execute(inquiry)
             result = cursor.fetchall()
             mech_prop = "'" + result[0][0] + "'"
-            if mech_prop in ["'GL24'", "'GL24h/c'"]:
-                mech_prop = "'GL24h'"
-            if mech_prop in ["'GL28h/c'", "'GL28'"]:
-                mech_prop = "'GL28h'"
-            if mech_prop in ["'GL32h/c'", "'GL32'"]:
-                mech_prop = "'GL32h'"
-
             if crsec_type == "wd_rec":
                 # create a Wood material object
                 timber = struct_analysis.Wood(mech_prop, database_name, prod_id_str)
@@ -75,7 +64,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
-                # search database for rebar material of type B500B with lowest and highest emissions
+                # search database for rebar material of type B500B with lowest and highes emissions
                 # exclude not epd sources from the data.
                 # only take values, which are inside an 80% confidence interval
                 inquiry = ("""
@@ -83,17 +72,19 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                             WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
-                                                AND MECH_PROP = 'B500B'
-                                                AND MIN_MAX = 1
-                                                AND Man_Ausschluss = 1
-                                                AND Statistik = 1)
+                                                AND MECH_PROP IS NOT NULL
+                                                AND Statistik = 1
+                                                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                                                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                                                AND "SOURCE" NOT LIKE '%KBOB%')
                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
-                                                AND MECH_PROP = 'B500B'
-                                                AND MIN_MAX = 1
-                                                AND Man_Ausschluss = 1
-                                                AND Statistik = 1)
+                                                AND MECH_PROP IS NOT NULL
+                                                AND Statistik = 1
+                                                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                                                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                                                AND "SOURCE" NOT LIKE '%KBOB%')
                             """
                            )
                 cursor.execute(inquiry)
@@ -107,12 +98,11 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
                 # create initial cross-sections
                 section_00 = struct_analysis.RectangularConcrete(concrete, rebar_low_em, 1.0, 0.20,
-                                                                0.014, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
+                                                                0.014, 0.15, 0.01, 0.15,
                                                                 0, 0.15, 2)
                 section_01 = struct_analysis.RectangularConcrete(concrete, rebar_high_em, 1.0, 0.20,
-                                                                 0.014, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
+                                                                 0.014, 0.15, 0.01, 0.15,
                                                                  0, 0.15, 2)
-
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
                 line_i1 = [section_01, floorstruc]
@@ -129,14 +119,18 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                                 AND DENSITY IS NOT NULL
                                                                 AND MECH_PROP IS NOT NULL
-                                                                AND Man_Ausschluss = 1
-                                                                AND Statistik = 1)
+                                                                AND Statistik = 1
+                                                                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                                                                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                                                                AND "SOURCE" NOT LIKE '%KBOB%')
                                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                                 AND DENSITY IS NOT NULL
                                                                 AND MECH_PROP IS NOT NULL
-                                                                AND Man_Ausschluss = 1
-                                                                AND Statistik = 1)
+                                                                AND Statistik = 1
+                                                                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                                                                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                                                                AND "SOURCE" NOT LIKE '%KBOB%')
                                             """
                            )
                 cursor.execute(inquiry)
@@ -151,8 +145,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
 
                 # create initial cross-sections
-                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
-                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15,
+                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.14, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
+                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.14, 0.3, 0.18, 0.01, 0.15,
                                                             0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
@@ -166,18 +160,24 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
                 # search database for timber board material (CLT) with lowest and highes emissions
                 inquiry = ("""
-                                SELECT PRO_ID FROM products
-                                WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
-                                                    WHERE "MATERIAL" LIKE '%3_and_5_plywood%'
-                                                    AND DENSITY IS NOT NULL
-                                                    AND MECH_PROP IS NOT NULL
-                                                    AND ValidEPD = 1)
-                                OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
-                                                    WHERE "MATERIAL" LIKE '%3_and_5_plywood%'
-                                                    AND DENSITY IS NOT NULL
-                                                    AND MECH_PROP IS NOT NULL
-                                                    AND ValidEPD = 1)
-                                """
+                                                            SELECT PRO_ID FROM products
+                                                            WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
+                                                                                WHERE "MATERIAL" LIKE '%Glue_laminated_timber_board%'
+                                                                                AND DENSITY IS NOT NULL
+                                                                                AND MECH_PROP IS NOT NULL
+                                                                                AND Statistik = 1
+                                                                                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                                                                                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                                                                                AND "SOURCE" NOT LIKE '%KBOB%')
+                                                            OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
+                                                                                WHERE "MATERIAL" LIKE '%Glue_laminated_timber_board%'
+                                                                                AND DENSITY IS NOT NULL
+                                                                                AND MECH_PROP IS NOT NULL
+                                                                                AND Statistik = 1
+                                                                                AND "SOURCE" NOT LIKE '%Betonsortenrechner%'
+                                                                                AND "SOURCE" NOT LIKE '%Ecoinvent%'
+                                                                                AND "SOURCE" NOT LIKE '%KBOB%')
+                                                            """
                            )
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
@@ -217,34 +217,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             for optimum in optima:
                 members = []
                 for length in lengths:
-                    if system == "Simple Beam":
-                        sys = struct_analysis.BeamSimpleSup(length)
-                    elif system == "Two span 1D 1D":
-                        sys = struct_analysis.BeamTwoSpan(length)
-                    elif system == "Continuous 1D":
-                        sys =struct_analysis.BeamContinuousSupEl(length)
-                    else:
-                        print("System unknown; Simple Beam used")
-                        sys = struct_analysis.BeamSimpleSup(length)
-                    section0 = i[0]
-                    floorstruc = i[1]
-                    member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
-                    opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter)
-                    opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
-                    # Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
-                    # search for an alternative solution for rectangular concrete section with lower minimal h and fill in floorstructure
-                    #if section0.section_type == "rc_rec":
-                        # create floor structure for slim reinforced concrete cross-section
-                    #    bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                    #                                ["'Unterlagsboden Zement, 85 mm'", False, False],
-                    #                                ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
-                    #    floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
-                    #    member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
-                    #    opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
-                    #    opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
-                    #    # update opt_member, if alternative solution has lower GWP
-                    #    if opt_member_alt.co2 < opt_member.co2:
-                    #        opt_member = opt_member_alt
+                    sys = struct_analysis.Slab(length,length,"LL-frei")
+                    member0 = struct_analysis.Member2D(i[0], sys, i[1], requirements, g2k, qk)
+                    opt_section = struct_optimization_2D.get_optimized_section(member0, criterion, optimum, max_iter)
+                    opt_member = struct_analysis.Member2D(opt_section, sys, i[1], requirements, g2k, qk)
                     members.append(opt_member)
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
@@ -262,40 +238,26 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     h = [[mem.section.h for mem in sublist] for sublist in member_list]
     h_min = [min(values) for values in zip(*h)]
     h_max = [max(values) for values in zip(*h)]
-    h_mean = [sum(values) / len(values) for values in list(zip(*h))]
 
     # create data of envelope area for subplot 2: total height
     h_tot = [[mem.section.h+mem.floorstruc.h for mem in sublist] for sublist in member_list]
     h_tot_min = [min(values) for values in zip(*h_tot)]
     h_tot_max = [max(values) for values in zip(*h_tot)]
-    h_tot_mean = [sum(values) / len(values) for values in list(zip(*h_tot))]
 
     # create data of envelope area data subplot 3: co2 of structure
     co2 = [[mem.section.co2 for mem in sublist] for sublist in member_list]
     co2_min = [min(values) for values in zip(*co2)]
     co2_max = [max(values) for values in zip(*co2)]
-    co2_mean = [sum(values) / len(values) for values in list(zip(*co2))]
 
     # create data of envelope area for subplot 4: total co2
     co2_tot = [[mem.section.co2+mem.floorstruc.co2 for mem in sublist] for sublist in member_list]
     co2_tot_min = [min(values) for values in zip(*co2_tot)]
     co2_tot_max = [max(values) for values in zip(*co2_tot)]
-    co2_tot_mean = [sum(values) / len(values) for values in list(zip(*co2_tot))]
 
     values_min = [h_min, h_tot_min, co2_min, co2_tot_min]
     values_max = [h_max, h_tot_max, co2_max, co2_tot_max]
-    values_mean = [h_mean, h_tot_mean, co2_mean, co2_tot_mean]
-
-    # CREATE DATASET
-
-
 
     # PLOT DATASET TO FIGURE
-    plt.rcParams.update({
-        'font.family': 'Times New Roman'
-    })
-
-
     plt.figure(1)
     data_max = [0, 0, 0, 0]
     vrfctn_members = [[], []]
@@ -303,7 +265,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         plotdata = [[], [], [], []]
         for j, mem in enumerate(members):
             plotdata[0].append(mem.section.h)
-
             plotdata[1].append(mem.section.h + mem.floorstruc.h)
             plotdata[2].append(mem.section.co2)
             plotdata[3].append(mem.section.co2 + mem.floorstruc.co2)
@@ -312,12 +273,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 vrfctn_members[1].append(i)
         sec_typ, mat, cri, opt = legend[i]
         # set line color
-        if sec_typ == "rc_rec" and system == "Simple Beam":
-            color = 'darkgreen'  # color for reinforced concrete
-
-        elif sec_typ == "rc_rec" and system == "Continuous 1D":
-            color = 'lightgreen'  # color for reinforced concrete
-
+        if sec_typ == "rc_rec":
+            color = 'green'  # color for reinforced concrete
         elif sec_typ == "wd_rec":
             color = 'saddlebrown'  # color for wood
         elif sec_typ == "rc_rib":
@@ -356,9 +313,9 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             # extract the x and y coordinates for plotting
             x, y = polygon.exterior.xy
             # plot area
-            plt.fill(x, y, alpha=0.05, facecolor=color, edgecolor = color, linewidth = 1.5)
+            plt.fill(x, y, alpha=0.05, facecolor=color)
             # plot lines
-            #plt.plot(lengths, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
+            plt.plot(lengths, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
             data_max[idx] = max(data_max[idx], max(data))
             # # plot points of verification into graph
             # ver_x, ver_y = lengths[idx_vrfctn], data[idx_vrfctn]
@@ -367,39 +324,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             #              xytext=(ver_x + 0.05*lengths[-1], ver_y),
             #              arrowprops=dict(facecolor='black', shrink=0.2, width=0.2, headwidth=2, headlength=4),
             #              fontsize=9, color='black', va='center')
-            plt.plot(lengths, values_mean[idx], color = color, linestyle = linestyle, linewidth = 1.5 )
-
-
-    # create Excel sheets
-    members_1d = [
-        member
-        for pair in member_list
-        for member in pair
-    ]
-
-    if crsec_type == "wd_rec":
-        class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
-
-    elif crsec_type == "rc_rec":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
-
-    elif crsec_type == "rc_rib":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_2.xlsx", folder="Results")
-
-    elif crsec_type == "wd_rib":
-        class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
-    else:
-        print("cross-section type is not defined inside function plot_dataset()")
-
 
     return data_max, vrfctn_members
-
-
-    return data_max, vrfctn_members
-
-
 
 # PLOT GEOMETRY OF SECTIONS
 # ----------------------------------------------------------------------------------------------------------------------
@@ -445,9 +371,9 @@ def plot_section(section):
               f'GWP = {section.co2:.0f} kg/m^2')
 
     else:
-        print("no plot for specified section_type defined yet")
+        print("no plot for specified section_type defined jet")
         fig, ax = plt.subplots()
-        legend = f'no plot for section_type "{section.section_type}" defined yet'
+        legend = f'no plot for section_type "{section.section_type}" defined jet'
     fig.text(0.01, 0.99, legend, ha='left', va='top', fontsize=9, color='black',
              bbox=dict(facecolor='lightgrey', edgecolor='black', boxstyle='round,pad=0.2'))
 

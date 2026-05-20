@@ -3,7 +3,6 @@ import struct_analysis
 from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion aus dem SyiPy-Paket
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
-import class_to_excel_2
 
 class RandomDisplacementBounds(object):
     # random displacement with bounds for basinhopping optimization
@@ -28,179 +27,70 @@ class RandomDisplacementBounds(object):
 
 #OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
-def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_inter = 100
-    #Leere Liste zum Speichern der Rechenschritte
-    optimization_history = []
-
+def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     # definition of initial values for variables, which are going to be optimized
     h0 = m.section.h  # start value for height corresponds to 1/20 of system length
+    di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
+    di_xo0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
+    var0 = [h0, di_xu0,di_xo0]
 
-    if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
-        optimise = "oben"
-        di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
-        var0 = [h0, di_xo0]
-        # define bounds of variables
-        bh = (0.08, 0.8)  # height between 8 cm and 80 cm
-        bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
-        bounds = [bh, bdi_xo]
-        # definition of fixed values of cross-section
-        b = m.section.b
-        s_xu, di_xu, s_xo = m.section.bw[0][1], m.section.bw[0][0], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
-        di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-        co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, b, s_xu, di_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,
-                   optimise]
-    else:
-        optimise = "unten"
-        di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
-        var0 = [h0, di_xu0]
-        # define bounds of variables
-        bh = (0.08, 0.8)   # height between 8 cm and 80 cm
-        bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
-        bounds = [bh, bdi_xu]
-        # definition of fixed values of cross-section
-        b = m.section.b
-        s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
-        di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-        co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, b, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,
-                   optimise]
+    #ToDo: Add optimization for upper reinforcement
+
+    # define bounds of variables
+    bh = (h_min, 1.2)  # height between h_min and 1.2 m
+    bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bounds = [bh, bdi_xu, bdi_xo]
+
+    # definition of fixed values of cross-section
+    b = m.section.b
+    s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
+    di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
+    di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+    phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+
+    co, st = m.section.concrete_type, m.section.rebar_type
+    add_arg = [m.system, co, st, b, s_xu, s_xo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
 
     # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,optimization_history), "bounds": bounds,
+    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
                                                                             "method": "Powell"}, take_step=bounded_step)
-    if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
-        h, di_xo = opt.x
-        optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw,
-                                                                n_bw,
-                                                                phi, c_nom, xi, jnt_srch)
-    else:
-        h, di_xu = opt.x
-        optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw,
-                                                                n_bw,
-                                                                phi, c_nom, xi, jnt_srch)
-    #Das Endergebnis zur Optimization-History hinzufügen
-    optimization_history.append(optimized_section)
-
-    # --- Excel Export ---
-    crsec_type = "rc_rec"
-    #filename = f"Optimierung_Verlauf_{crsec_type}.xlsx"
-    #class_to_excel_2.members_to_excel2(optimization_history, filename, folder="Results")
-
-
-
+    h, di_xu, di_xo = opt.x
+    optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw, n_bw,
+                                                            phi, c_nom, xi, jnt_srch)
     return optimized_section
 
-
-
-#Possible Alternative Optimization (not correct yet)
-# from scipy.optimize import basinhopping
-# from basinhopping import RandomDisplacementBounds
-# import numpy as np
-#
-# def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
-#     # Allowed diameters in mm and meters
-#     allowed_diams_mm = [6,8,10,12,14,16,18,20,22,26,30,36,40]
-#     allowed_diams_m = [d / 1000.0 for d in allowed_diams_mm]
-#
-#     # Initial guess and bounds for h
-#     h0 = m.section.h
-#     bh = (max(0.06, h_min), 1.2)
-#
-#     # Fixed section parameters
-#     b = m.section.b
-#     s_xu, di_xu, s_xo = m.section.bw[0][1], m.section.bw[0][0], m.section.bw[1][1]
-#     di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
-#     di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-#     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-#     co, st = m.section.concrete_type, m.section.rebar_type
-#     optimise = "oben" if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m) else "unten"
-#
-#     add_arg_base = [m.system, co, st, b, s_xu, di_xu, s_xo, di_yu, s_yu, di_yo, s_yo,
-#                     m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk, optimise]
-#
-#     best = {"obj": float("inf"), "h": None, "di_xo": None}
-#
-#     # Loop over discrete diameters
-#     for di_xo in allowed_diams_m:
-#         var0 = [h0]
-#
-#         def rc_rqs_h(vars, *args):
-#             h = vars[0]
-#             return compute_objective([h, di_xo], *args)
-#
-#         bounds = [(bh[0], bh[1])]
-#         bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]),
-#                                                 np.array([b[1] for b in bounds]))
-#
-#         opt = basinhopping(rc_rqs_h, var0, niter=max_iter, T=1,
-#                            minimizer_kwargs={"args": (add_arg_base,), "bounds": bounds, "method": "Powell"},
-#                            take_step=bounded_step)
-#
-#         h_opt = opt.x[0]
-#         obj_val = opt.fun
-#
-#         if obj_val < best["obj"]:
-#             best.update({"obj": obj_val, "h": h_opt, "di_xo": di_xo})
-#
-#     # Build optimized section
-#     optimized_section = struct_analysis.RectangularConcrete(co, st, b, best["h"], di_xu, s_xu, best["di_xo"], s_xo,
-#                                                              di_yu, s_yu, di_yo, s_yo, di_bw, s_bw,
-#                                                              n_bw, phi, c_nom, xi, jnt_srch)
-#     return optimized_section
-
-
-
 # inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
-def rc_rqs(var, add_arg, history_list):
+def rc_rqs(var, add_arg):
     # input: variables, which have to be optimized, additional info about cross-section and system, optimizing option
     # output: if criterion == GWP -> co2 of cross-section, punished by delta 10*(qk_zul-qk)
     # output: if criterion == h -> height of cross-section, punished by delta 1*(qk_zul-qk)
-    optimise = add_arg[17]
-    if optimise == "oben":
-        h, di_xo = var
-        di_xu = s_xu = add_arg[5]
-    elif optimise == "unten":
-        h, di_xu = var
-        di_xo = s_xu = add_arg[5]
-
+    h, di_xu, di_xo = var
     system = add_arg[0]
     concrete = add_arg[1]
     reinfsteel = add_arg[2]
     b = add_arg[3]
-    s_xu = add_arg[4]
-    s_xo = add_arg[6]
-    di_yu, s_yu = add_arg[7:9]
-    di_yo, s_yo = add_arg[9:11]
-    floorstruc = add_arg[11]
-    criteria = add_arg[12]
-    to_opt = add_arg[13]
-    criterion = add_arg[14]
-    g2k = add_arg[15]
-    qk = add_arg[16]
+    s_xu, s_xo = add_arg[4:6]
+    floorstruc = add_arg[6]
+    criteria = add_arg[7]
+    to_opt = add_arg[8]
+    criterion = add_arg[9]
+    g2k = add_arg[10]
+    qk = add_arg[11]
 
     # create section
-    section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo)
+    section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo)
 
     # create member
-    member = struct_analysis.Member1D(section, system, floorstruc, criteria, g2k, qk)
-    #Member als aktueller Rechenschritt in Excel speichern
-    history_list.append(member)
+    member = struct_analysis.Member2D(section, system, floorstruc, criteria, g2k, qk)
     member.calc_qk_zul_gzt()  # calculate admissible live load
 
     # define penalty1, if ULS is not fulfilled
     penalty1 = max(member.qk - member.qk_zul_gzt, 0)
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if optimise == "oben" and member.mkd_n < member.section.mr_n:
-        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
-    elif optimise == "unten" and member.mkd_p < member.section.mr_p:
+    if member.mkd_p < member.section.mr_p and member.mkd_n < member.section.mr_n:
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
     else:
@@ -209,13 +99,10 @@ def rc_rqs(var, add_arg, history_list):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
-    pen_a = 0 #Kein Schwingungsnachweis für Betondecken
-    #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-    pen_w = 0  # Kein Schwingungsnachweis für Betondecken
-    #pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
+    pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
+    pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-    pen_v = 0  # Kein Schwingungsnachweis für Betondecken
-    #pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
+    pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
     if member.f1 < member.requirements.f1:
         penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
     else:
@@ -243,10 +130,8 @@ def rc_rqs(var, add_arg, history_list):
     elif criterion == "SLS2":
         if to_opt == "GWP":
             to_minimize = member.section.co2*(1+penalty3)
-            return to_minimize
         elif to_opt == "h":
             to_minimize = member.section.h*(1+penalty3)
-            return to_minimize
 
     # optimize fire resistance only
     elif criterion == "FIRE":
@@ -279,11 +164,10 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     b0 = m.section.b
     var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
 
-    # define bounds of variables #TODO adapt boundaries for Mindestplattenstärke für 4 Bewehrungslagen
-    #bh_f = (0.08, 0.5)  # height between 8 cm and 50 cm
-    bh_f = (0.08, 0.5)  # height between max of 8 cm and 50 cm
+    # define bounds of variables
+    bh_f = (0.12, 0.5)  # height between 12 cm and 50 cm
     bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
-    bdi_x_w = (0.006, 0.04)  # diameter of rebars between 8 mm and 40 mm
+    bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
     bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
@@ -348,15 +232,14 @@ def rc_rib_rqs(var, add_arg):
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
-    #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-    #pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
+    pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
+    pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
     # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-    #pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
-    #if member.f1 < member.requirements.f1:
-    #    penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
-    #else:
-    #    penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
-    penalty3 = 0
+    pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
+    if member.f1 < member.requirements.f1:
+        penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
+    else:
+        penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
 
     # define penalty4, if fire resistance is not fulfilled
     member.get_fire_resistance()
@@ -410,8 +293,6 @@ def opt_gzt_wd_rqs(member, criterion="ULS"):
     bnds = [(0.1, 1.2)]
     minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
     h_opt = minimal_h.x[0]
-    if h_opt >=  0.24:
-        h_opt = 0.0001      #TODO Code anpassen, sodass gar keine Ausgabe mehr für h>24 cm erfolgt.
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
     return section
 
@@ -475,8 +356,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     var0 = [b0, h0, t20, t30]
 
     # define bounds of variables
-    # TODO: Stimmen die Randbedingungen der Schichtdicken so gemäss Lignum? Ist zu verifizieren!
-    # TODO: Ev. Fallunterscheidung -> Falls unten GFP vorhanden, gem. aktuellem Stand, falls nicht, dann 2. Fall definieren.
     bh = (0.22, 2.0)  # height of rib between 22 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
     # Column G) and 200 cm
     bb = (0.1, 0.52)  # width of rib between 10 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
@@ -488,7 +367,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     bounds = [bb, bh, bt2, bt3]
 
     # definition of fixed values of cross-section
-    #TODO: Rippenabstand sollte als Variabel einfliessen. Achtung: gem. Tab. 433-2 darf der Abstand jedoch max. 700 mm sein! Grenzen entsprechend wählen.
     l0 = m.li_max
     a = m.section.a
     # t2 = m.section.t2
@@ -596,7 +474,7 @@ def wd_rib_rqs(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.2):
+def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.16):
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
@@ -629,7 +507,6 @@ def get_opt_sec(section, gwp_budget):
         minimal_h = minimize(wd_rec_crsc, h_0, args=[section, gwp_budget], bounds=bnds, method='Powell')
         h_opt = minimal_h.x[0]
         opt_section = struct_analysis.RectangularWood(section.wood_type, section.b, h_opt)
-
         return opt_section
 
     elif section.section_type == "rc_rec":
@@ -672,7 +549,7 @@ def get_opt_sec(section, gwp_budget):
         var0 = [h_0, di_xu0, b_w0, b0]
 
         # define bounds of variables
-        bh = (0.3, 2)  # height between 6 cm and 1.0 m #TODO Bounds anpassen!!
+        bh = (0.3, 2)  # height between 6 cm and 1.0 m
         bdi_x_w = (0.01, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bb_w = (0.12, 0.4)  # rib width between 12 and 60 cm
         bb = (1, 1.5)  # rib spacing between 0.5 and 2.5 m
