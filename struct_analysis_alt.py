@@ -303,11 +303,14 @@ class RectangularConcrete(SupStrucRectangular):
         #Durchmesser Mindestbewehrung für 2. & 3. Lage
         di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
+
+
         #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+        self.bw = [[di_xu, s_xu], [max(di_xo, di_xo_min), s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min
+        self.h = max(self.hmin_c, self.h) #Die Plattenstärke muss immer grösser sein als die erforderliche Stärke für die Bewehrung
 
         #Gesamte Bewehrungsfläche as_tot
         self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
@@ -528,7 +531,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     #di_x_w, n_x_w = diameter and number of longitudinal reinforcement in rib
     def __init__(self, concrete_type, rebar_type, l0, b, b_w, h, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w,
                  di_pb_bw, s_pb_bw, n_pb_bw=2,
-                 phi=2.0, c_nom=0.03, xi=0.03, jnt_srch=0.15):
+                 phi=2.0, c_nom=0.02, xi=0.03, jnt_srch=0.15):
         section_type = "rc_rib"
         super().__init__(section_type, b, b_w, h, h_f, l0, phi)
         self.concrete_type = concrete_type
@@ -557,8 +560,14 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5 #1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xu
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Bewehrung in y-Richtung in Platte
         self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
+
+        # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_xu_min + di_xo_min
+        self.h_f = max(self.hmin_c, self.h_f) #Die Plattenstärke muss immer grösser sein als die erforderliche Stärke für die Bewehrung
 
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
@@ -567,12 +576,12 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
-        self.co2 = (co2_rebar + co2_concrete)/self.b
+        self.co2 = (co2_rebar + co2_concrete)/self.b #[kgCO2_eq/m2]
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
-        self.ei_b = self.ei1  #TODO!!!!!!!ANPASSEN AUF PB
+        self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB
         self.xi = xi
-        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #TODO!!!!!ANPASSEN AUF PB
+        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #!!!!!ANPASSEN AUF PB
 
     def calc_d(self):
         d = self.h_f - self.c_nom - self.bw[0][0] / 2  # Statische Höhe 1. Lage Platte
@@ -999,7 +1008,7 @@ class MatLayer:  # create a material layer
             self.ei = e * i
         self.gk = self.weight * self.h  # weight per area in N/m^2
         self.co2 = self.density * self.h * self.GWP  # CO2-eq per area in kg-C02/m^2
-        self.co2_a = self.density * self.h * self.GWP * (60 / self.lifespan) # CO2-eq per area in kg-C02/m^2
+        #self.co2_a = self.density * self.h * self.GWP * (60/self.lifespan) # CO2-eq per area in kg-C02/m^2
 
 
 class FloorStruc:  # create a floor structure
@@ -1009,12 +1018,12 @@ class FloorStruc:  # create a floor structure
         self.gk_area = 0
         self.h = 0
         self.ei = 0
-        self.co2_a = 0
+        #self.co2_a = 0
         for mat_name, h_input, roh_input in mat_layers:
             current_layer = MatLayer(mat_name, h_input, roh_input, database_name)
             self.layers.append(current_layer)
             self.co2 += current_layer.co2
-            self.co2_a += current_layer.co2_a
+            #self.co2_a += current_layer.co2_a
             self.gk_area += current_layer.gk
             self.h += current_layer.h
             self.ei = max(self.ei, current_layer.ei)
@@ -1182,7 +1191,7 @@ class Member1D:
                                                              self.section.h, self.section.d)
             )
         self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
-        self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2)/60
+        #self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2)/60
 
         # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
         self.f1 = self.calc_f1()

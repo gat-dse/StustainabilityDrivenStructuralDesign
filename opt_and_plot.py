@@ -228,8 +228,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     #if section0.section_type == "rc_rec":
                         # create floor structure for slim reinforced concrete cross-section
                         #bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                                                    ["'Unterlagsboden Zement, 85 mm'", False, False],
-                                                    ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
+                     #                               ["'Unterlagsboden Zement, 85 mm'", False, False],
+                     #                               ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
                         #floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
                         #member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
                         #opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)

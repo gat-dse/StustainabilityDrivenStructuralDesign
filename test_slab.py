@@ -10,17 +10,21 @@ import struct_optimization  # file with code for structural optimization
 
 # INPUT
 # create dummy-database
-database_name = "database_250702.db"  # define database name
+database_name = "database_260423.db"  # define database name
 #create_dummy_database.create_database(database_name)  # create database
 
 # create material for reinforced concrete cross-section, derive corresponding design values
-concrete1 = struct_analysis.ReadyMixedConcrete("'C25/30'", database_name)  # create a Wood material object
+concrete1 = struct_analysis.ReadyMixedConcrete("'C25/30'", database_name)  # create a concrete material object
 concrete1.get_design_values()
-rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create a Wood material object
+rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create a concrete material object
 rebar1.get_design_values()
 
 # create reinforced concrete rectangular cross-section
 section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.012, 0.15, 0.0, 0.15, 0)
+
+# create reinforced concrete rectangular cross-section
+#section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.01, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
+
 
 # create floor structure for solid wooden cross-section
 bodenaufbau = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],

@@ -14,33 +14,18 @@ lengths = [3,5,6,7,8,10]
 idx_vrc = 1
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 25
+max_iter = 10
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_250702.db"
+database_name = "database_260506_Hochbau.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
-# # create floor structure for solid wooden cross-section
-# bodenaufbau_vollholzdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-#                                  ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False],
-#                                  ["'Kies gebrochen'", 0.12, False]]
-# bodenaufbau_wd_solid = struct_analysis.FloorStruc(bodenaufbau_vollholzdecke, database_name)
-#
-# # create floor structure for ribbed wooden cross-section
-# # For reaching REI60, Lignum 4.1, Table 433-2, Column G is applied. Thus, Gipsfaserplatte (2x15 mm) and Steinwolle
-# # (180 mm) are required as non load bearing layers.
-# h_ins = 0.18
-# bodenaufbau_hohlkastendecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-#                                  ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Gipsfaserplatte'", 0.03, False], ["'Glaswolle'", 0.03, False],
-#                                  ["'Kies gebrochen'", 0.12, False], ["'Steinwolle'", h_ins, False],]
-# bodenaufbau_wd_rib = struct_analysis.FloorStruc(bodenaufbau_hohlkastendecke, database_name)
-# # correct the total height of the floor structure by the height of the insulation within the element
-# bodenaufbau_wd_rib.h = bodenaufbau_wd_rib.h - h_ins
+
 
 # create floor structure for solid reinforced concrete cross-section
 bodenaufbau_rcdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
