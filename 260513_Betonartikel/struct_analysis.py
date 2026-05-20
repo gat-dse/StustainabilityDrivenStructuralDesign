@@ -303,8 +303,10 @@ class RectangularConcrete(SupStrucRectangular):
         #Durchmesser Mindestbewehrung für 2. & 3. Lage
         di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
+
+
         #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+        self.bw = [[di_xu, s_xu], [max(di_xo, di_xo_min), s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min
@@ -528,7 +530,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     #di_x_w, n_x_w = diameter and number of longitudinal reinforcement in rib
     def __init__(self, concrete_type, rebar_type, l0, b, b_w, h, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w,
                  di_pb_bw, s_pb_bw, n_pb_bw=2,
-                 phi=2.0, c_nom=0.03, xi=0.03, jnt_srch=0.15):
+                 phi=2.0, c_nom=0.02, xi=0.03, jnt_srch=0.15):
         section_type = "rc_rib"
         super().__init__(section_type, b, b_w, h, h_f, l0, phi)
         self.concrete_type = concrete_type

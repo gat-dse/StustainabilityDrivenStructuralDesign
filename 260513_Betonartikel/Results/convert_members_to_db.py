@@ -10,7 +10,7 @@ import seaborn as sns
 
 #1. Excel File einlesen:
 # 1.1. Load the Excel file
-excel_file = "Members_rc_rib_2.xlsx"
+excel_file = "Members_rc_rec_2.xlsx"
 df = pd.read_excel(excel_file)
 # 1. Den Namen dynamisch generieren
 file_name_base = os.path.splitext(excel_file)[0]
@@ -93,7 +93,7 @@ g = sns.relplot(
     data=df_final,
     x='l_tot [m]',
     y='co2 Total [kgCO2eq / m2]',
-    hue='section_type',      # Farbe nach Betongüte
+    hue='mech_prop',      # Farbe nach Betongüte
     kind='line',          # Linien statt Regression
     marker='o',           # Fügt Punkte auf der Linie hinzu
     errorbar = ("pi", 100), #pi steht für Percentile Interval, 100 für Min bis Max
