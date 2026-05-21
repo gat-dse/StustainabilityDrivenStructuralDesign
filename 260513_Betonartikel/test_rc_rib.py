@@ -41,7 +41,7 @@ qk = 2e3  # Nutzlast
 req = struct_analysis.Requirements()
 
 # define system length
-length = 10
+length = 8
 
 # create simple supported beam system
 system = struct_analysis.BeamSimpleSup(length)
@@ -109,7 +109,16 @@ print("qk_zul_GZT", member.qk_zul_gzt)
 print("as_stat", member.section.a_s_stat)
 print("as_min", member.section.as_min)
 
-print("GWP", opt_section.co2)
+print("total co2 [kg/m2]", opt_section.co2)
+print("co2 rebar [kg/m2]", opt_section.co2_rebar)
+print("co2 concrete [kg/m2]", opt_section.co2_concrete)
+print("Bew.-Fläche Bügel [m2/]", opt_section.as_PB_bw)
+print("Bew.-Fläche Bügel [m2/]", opt_section.as_bw)
+print("Bew.-Fläche Längsbew. Rippe mm2/]", opt_section.as_PB_p)
+print("Bew.-Fläche Platte [m2/]", opt_section.as_min)
+print("Bew.-Fläche Platte [m2/]", opt_section.a_s_stat)
+print("Brutto-Fläche Beton [m2/]", opt_section.a_brutt)
+
 
 # # # plot cross-section of members for verification
 vrfctn_member = plot_datasets.plot_section(opt_section)

@@ -559,7 +559,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.g0k = self.calc_weight(concrete_type.weight)
         #a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
 
-        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
+        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr für Platte
         self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
         di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5 #1. Lage mit Abstand s_xu
         di_xo_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xu
@@ -574,10 +574,10 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)
-        co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
-        co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
+        self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density/self.b  # [kg_CO2_eq/m2]
+        self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
-        self.co2 = (co2_rebar + co2_concrete)/self.b #[kgCO2_eq/m2]
+        self.co2 = (self.co2_rebar + self.co2_concrete) #[kgCO2_eq/m2]
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB

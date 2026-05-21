@@ -78,22 +78,32 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highest emissions
                 # exclude not epd sources from the data.
-                inquiry = ("""
-                            SELECT PRO_ID FROM products
-                            WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
-                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                AND DENSITY IS NOT NULL
-                                                AND MECH_PROP = 'B500B'
-                                                AND ValidEPD = 1
-                                                AND Man_Ausschluss = 1)
-                            OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
-                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                AND DENSITY IS NOT NULL
-                                                AND MECH_PROP = 'B500B'
-                                                AND ValidEPD = 1
-                                                AND Man_Ausschluss = 1)
-                            """
-                           )
+                inquiry = """
+                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
+                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
+                  AND DENSITY IS NOT NULL
+                  AND MECH_PROP = 'B500B'
+                  AND ValidEPD = 1
+                  AND Man_Ausschluss = 1
+                  AND CAST(Total_GWP AS REAL) IN (
+                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+
+                      UNION
+
+                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+                  )
+                """
+
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
                 prod_id_low = result[0]
@@ -121,21 +131,31 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highes emissions
-                inquiry = ("""
-                                            SELECT PRO_ID FROM products
-                                            WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
-                                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                                AND DENSITY IS NOT NULL
-                                                                AND MECH_PROP IS NOT NULL
-                                                                AND Man_Ausschluss = 1)
-                                                                
-                                            OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
-                                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                                AND DENSITY IS NOT NULL
-                                                                AND MECH_PROP IS NOT NULL
-                                                                AND Man_Ausschluss = 1) 
-                                            """
-                           )
+                inquiry = """
+                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
+                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
+                  AND DENSITY IS NOT NULL
+                  AND MECH_PROP = 'B500B'
+                  AND ValidEPD = 1
+                  AND Man_Ausschluss = 1
+                  AND CAST(Total_GWP AS REAL) IN (
+                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+
+                      UNION
+
+                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+                  )
+                """
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
                 prod_id_low = result[0]
