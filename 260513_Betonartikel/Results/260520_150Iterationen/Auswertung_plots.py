@@ -14,7 +14,7 @@ print(df.columns.tolist())
 print("="*60)
 # ------------------------------------------------------------------
 
-# 2. Daten bereinigen und konvertieren (Namen basierend auf deinem 1. Prompt)
+# 2. Daten bereinigen und konvertieren
 x_achse = 'l_tot [m]'
 y_achse = 'co2 Total [kgCO2eq / m2]'
 kategorie_1 = 'plot_label'
@@ -38,8 +38,8 @@ sns.lineplot(
     data=df,
     x=x_achse,
     y=y_achse,
-    hue=kategorie_1,      # Farbe nach Festigkeit
-    style=kategorie_2,    # Linienstil (durchgezogen/gestrichelt) nach Bewehrung
+    hue=kategorie_1,      # Farbe
+    style=kategorie_2,    # Linienstil
     marker='o',
     errorbar=("pi", 100),
     estimator='mean',
@@ -70,8 +70,6 @@ kategorie_1 = 'plot_label'
 kategorie_2 = 'mech_prop'
 
 
-# --- HIER WEITERE Y-WERTE AUS DEINER EXCEL ERGÄNZEN ---
-
 # Gesamtes CO2 berechnen (Struktur + Bodenaufbau)
 df['co2 Total_berechnet [kgCO2eq/m2]'] = df['co2 Struktur [kgCO2eq/m2]'] + df['co2 Bodenaufbau [kgCO2eq/m2]']
 
@@ -97,7 +95,7 @@ df = df.dropna(subset=pflicht_spalten)
 # Sortieren für eine saubere Linienführung
 df = df.sort_values(x_achse)
 
-# 4. Subplots im quadratischen 2x2 Raster erstellen
+# 4. Subplots im n x 2 Raster erstellen
 fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(16, 10))
 
 sns.set_theme(style="whitegrid")
@@ -121,7 +119,7 @@ for i, aktueller_y_wert in enumerate(ziel_werte):
         ax=ax
     )
 
-    # Hier nutzen wir direkt den originalen Spaltennamen für die Beschriftung
+    # Achsenbeschirftung mit originalem Spaltennamen
     ax.set_ylabel(aktueller_y_wert, fontsize=11, fontweight='bold')
     ax.set_xlabel("Spannweite [m]", fontsize=10)
     ax.grid(True, linestyle='--', alpha=0.5)
