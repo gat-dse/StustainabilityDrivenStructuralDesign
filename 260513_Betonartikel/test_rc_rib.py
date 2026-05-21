@@ -5,7 +5,7 @@
 import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
 #import struct_optimization  # file with code for structural optimization
 import struct_analysis  # file with code for structural analysis
-import struct_optimization_RCrib_simple  # file with code for structural optimization
+import struct_optimization  # file with code for structural optimization
 import plot_datasets  # file with code for structural optimization
 import opt_and_plot
 import matplotlib.pyplot as plt
@@ -41,14 +41,14 @@ qk = 2e3  # Nutzlast
 req = struct_analysis.Requirements()
 
 # define system length
-length = 8
+length = 10
 
 # create simple supported beam system
 system = struct_analysis.BeamSimpleSup(length)
 
 # create rc member
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
-opt_section = struct_optimization_RCrib_simple.get_optimized_section(member, "ENV", "GWP", 50)
+opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
 
 
 print("Querschnittswerte:")
@@ -108,6 +108,8 @@ print("qk_zul_GZT", member.qk_zul_gzt)
 
 print("as_stat", member.section.a_s_stat)
 print("as_min", member.section.as_min)
+
+print("GWP", opt_section.co2)
 
 # # # plot cross-section of members for verification
 vrfctn_member = plot_datasets.plot_section(opt_section)
