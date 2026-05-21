@@ -145,7 +145,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 # create a rebar material objects with mech prop B500B and low rsp high emission values
                 rebar_low_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_low_str)
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
-
+    #TODO eventuell sind 3 d 16 eine bessere Startbewehrung im Sten (di_x_w und n_x_w), weil nur der Durchmesser, nicht aber die Anzahl Stäbe optimiert wird, oder wir nehmen noch die anzahl Stäbe in die Optimierung rein.
                 # create initial cross-sections
                 section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.018, 2, 0.01, 0.15, 2)
                 section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15,
