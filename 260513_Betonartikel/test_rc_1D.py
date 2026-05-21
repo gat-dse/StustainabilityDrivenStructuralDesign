@@ -9,11 +9,10 @@ import struct_optimization  # file with code for structural optimization
 #import matplotlib.pyplot as plt
 import plot_datasets  # file with code for structural optimization
 import matplotlib.pyplot as plt
-import pandas as pd
 
 # INPUT
 # create dummy-database
-database_name = "database_260506.db"  # define database name
+database_name = "database_260506_Hochbau.db"  # define database name
 #create_dummy_database.create_database(database_name)  # create database
 
 # create material for reinforced concrete cross-section, derive corresponding design values
@@ -48,64 +47,7 @@ system = struct_analysis.BeamSimpleSup(length)
 
 # create rc member
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
-
 opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
-
-# Import the function from your module
-from class_to_excel_2 import member1d_to_dataframe
-
-# Convert the single optimized section to the vertical DataFrame format
-df_vertical = member1d_to_dataframe(opt_section)
-
-print(df_vertical)
-
-data = {
-    "Height": [opt_section.h],
-    "GWP": [opt_section.co2],
-    "Material": [opt_section.co2_concrete],
-    "Reinforcement_Layout": [ opt_section.bw],
-}
-
-df_summary = pd.DataFrame(data)
-
-print(data)
-
-
-#print("Kriechzahl creep_coef= ", opt_section.concrete_type.creep_coef)
-#print("Kriechzahl phi= ", opt_section.phi)
-#print("QS-Hoehe opt section = ", opt_section.h)
-#print("GWP opt section = ", opt_section.co2)
-#print("GWP bodenaufbau = ", bodenaufbau_rc.co2)
-#print("GWP bodenaufbau mit amortisationszeit = ", bodenaufbau_rc.co2_a)
-#print("GWP QS + Bodenaufbau in kg/m2= ", opt_section.co2 + bodenaufbau_rc.co2)
-
-#print("GWP QS + Bodenaufbau pro Lebensdauer inkl. Ersatz in kg/m2 = ", opt_section.co2 + bodenaufbau_rc.co2_a)
-
-
-#print("Mindestbewehrung as in m2/m' = ", opt_section.as_min)
-
-#print("mu_max= ", round(section.mu_max,2))
-#print("alpha_m: ",system.alpha_m)
-#print("mkd_n, mkd_p = ", member.mkd_n, member.mkd_p)
-
-
-#print("mu_min= ", round(section.mu_min,2))
-
-
-#print("Bewehrungslayout = ", opt_section.bw[0][0])
-#print("Bewehrungs-QS = ", opt_section.a_s_stat)
-
-#print("mr_p =", opt_section.mr_p)
-#print("x/d =", opt_section.x_p/opt_section.d)
-#print("d =", opt_section.d)
-#print("hmin =", opt_section.hmin_c)
-
-
-#print("GWP-Bewehrung für QS pro m2 = ", opt_section.co2_rebar, "kgCO2-eq/m2")
-#print("GWP_Bewehrung für Material pro Tonne = ", opt_section.rebar_type.GWP*1e3, "kgCO2-eq/t")
-#print("GWP-Beton für QS pro m2 = ", opt_section.co2_concrete, "kgCO2-eq/m2")
-#print("GWP-Beton für Material pro Tonne = ", opt_section.concrete_type.GWP*1e3, "kgCO2-eq/t")
-
 
 
 # # # plot cross-section of members for verification
@@ -113,5 +55,3 @@ vrfctn_member = plot_datasets.plot_section(opt_section)
 
 # SHOW FIGURE
 plt.show()
-
-print()

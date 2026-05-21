@@ -37,6 +37,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 AND MECH_PROP NOT LIKE '%GL30%'
                 AND ValidEPD = 1
                 AND  MIN_MAX = 1
+                AND Man_Ausschluss = 1
                 AND "MATERIAL" LIKE """ + mat_name
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
@@ -85,12 +86,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                                                 AND DENSITY IS NOT NULL
                                                 AND MECH_PROP = 'B500B'
                                                 AND MIN_MAX = 1
+                                                AND Man_Ausschluss = 1
                                                 AND Statistik = 1)
                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
                                                 AND MECH_PROP = 'B500B'
                                                 AND MIN_MAX = 1
+                                                AND Man_Ausschluss = 1
                                                 AND Statistik = 1)
                             """
                            )
@@ -105,10 +108,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
                 # create initial cross-sections
                 section_00 = struct_analysis.RectangularConcrete(concrete, rebar_low_em, 1.0, 0.20,
-                                                                0.014, 0.15, 0.01, 0.15, 0.01, 0.15, 0.01, 0.15,
+                                                                0.014, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
                                                                 0, 0.15, 2)
                 section_01 = struct_analysis.RectangularConcrete(concrete, rebar_high_em, 1.0, 0.20,
-                                                                 0.014, 0.15, 0.01, 0.15, 0.01, 0.15, 0.01, 0.15,
+                                                                 0.014, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
                                                                  0, 0.15, 2)
 
                 # add sections to content-definition of plot-line
@@ -127,11 +130,13 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                                 AND DENSITY IS NOT NULL
                                                                 AND MECH_PROP IS NOT NULL
+                                                                AND Man_Ausschluss = 1
                                                                 AND Statistik = 1)
                                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                                 AND DENSITY IS NOT NULL
                                                                 AND MECH_PROP IS NOT NULL
+                                                                AND Man_Ausschluss = 1
                                                                 AND Statistik = 1)
                                             """
                            )
@@ -227,19 +232,20 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
                     opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter)
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
+                    # Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
                     # search for an alternative solution for rectangular concrete section with lower minimal h and fill in floorstructure
-                    if section0.section_type == "rc_rec":
+                    #if section0.section_type == "rc_rec":
                         # create floor structure for slim reinforced concrete cross-section
-                        bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                                                    ["'Unterlagsboden Zement, 85 mm'", False, False],
-                                                    ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
-                        floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
-                        member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
-                        opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
-                        opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
-                        # update opt_member, if alternative solution has lower GWP
-                        if opt_member_alt.co2 < opt_member.co2:
-                            opt_member = opt_member_alt
+                    #    bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                    #                                ["'Unterlagsboden Zement, 85 mm'", False, False],
+                    #                                ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
+                    #    floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
+                    #    member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
+                    #    opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
+                    #    opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
+                    #    # update opt_member, if alternative solution has lower GWP
+                    #    if opt_member_alt.co2 < opt_member.co2:
+                    #        opt_member = opt_member_alt
                     members.append(opt_member)
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
@@ -308,9 +314,11 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         sec_typ, mat, cri, opt = legend[i]
         # set line color
         if sec_typ == "rc_rec" and system == "Simple Beam":
-            color = 'green'  # color for reinforced concrete
+            color = 'darkgreen'  # color for reinforced concrete
+
         elif sec_typ == "rc_rec" and system == "Continuous 1D":
             color = 'lightgreen'  # color for reinforced concrete
+
         elif sec_typ == "wd_rec":
             color = 'saddlebrown'  # color for wood
         elif sec_typ == "rc_rib"and system == "Simple Beam":

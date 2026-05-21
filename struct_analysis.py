@@ -999,7 +999,7 @@ class MatLayer:  # create a material layer
             self.ei = e * i
         self.gk = self.weight * self.h  # weight per area in N/m^2
         self.co2 = self.density * self.h * self.GWP  # CO2-eq per area in kg-C02/m^2
-        self.co2_a = self.density * self.h * self.GWP * (60/self.lifespan) # CO2-eq per area in kg-C02/m^2
+        self.co2_a = self.density * self.h * self.GWP * (60 / self.lifespan) # CO2-eq per area in kg-C02/m^2
 
 
 class FloorStruc:  # create a floor structure

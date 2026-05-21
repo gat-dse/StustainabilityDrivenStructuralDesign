@@ -10,7 +10,7 @@ import seaborn as sns
 
 #1. Excel File einlesen:
 # 1.1. Load the Excel file
-excel_file = "Members_rc_rib_2.xlsx"
+excel_file = "Members_simple_rc_rib_150.xlsx"
 df = pd.read_excel(excel_file)
 # 1. Den Namen dynamisch generieren
 file_name_base = os.path.splitext(excel_file)[0]
@@ -37,26 +37,28 @@ df_clean.columns = cols
 if 'rc_rec' in df_clean['section_type'].values:
     spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                      'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1', 'co2_rebar', 'co2_concrete', 'co2',
-                     'system',
+                     'system', 'lifespan_1',
                      'h_4', 'co2_4', 'co2_a_3', 'g0k_1', 'g1k', 'co2_5', 'co2_a_4']
     Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]', 'concrete_type', 'mech_prop',
-                   'prod_id', 'GWP', 'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1 [kgCO2eq / t]',
+                   'prod_id', 'GWP concrete [kgCO2eq / t]', 'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
-                   'system',
+                   'Statisches System', 'lifespan Estrich [a]',
                    'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]',
                    'Last Struktur [kN/m2]', 'Last Bodenaufbau [kN/m2]', 'co2 Total [kgCO2eq / m2]',
                    'co2 Total pro Jahr [kgCO2eq / m2a]']
 
 if 'rc_rib' in df_clean['section_type'].values:
-    spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'b_w', 'hf_' 
+    spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'b_w', 'h_f',
                      'concrete_type', 'mech_prop', 'prod_id', 'GWP',
-                     'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1', 'co2_rebar', 'co2_concrete', 'co2',
-                     'system',
+                     'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1',
+                     'co2_rebar', 'co2_concrete', 'co2',
+                     'system', 'lifespan_1',
                      'h_5', 'co2_5', 'co2_a_4', 'g0k_1', 'g1k', 'co2_6', 'co2_a_5']
-    Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]' ,'b_w [m]', 'h_f [m]'
-                   'concrete_type', 'mech_prop', 'prod_id', 'GWP', 'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1 [kgCO2eq / t]',
+    Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]' ,'b_w [m]', 'h_f [m]',
+                   'concrete_type', 'mech_prop', 'prod_id', 'GWP concrete [kgCO2eq / t]',
+                   'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
-                   'Statisches System',
+                   'Statisches System', 'lifespan Estrich [a]',
                    'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]',
                    'Last Struktur [kN/m2]', 'Last Bodenaufbau [kN/m2]', 'co2 Total [kgCO2eq / m2]',
                    'co2 Total pro Jahr [kgCO2eq / m2a]']
@@ -76,6 +78,13 @@ df_final = df_final.rename(columns=rename_dict)
 # Wir filtern hier noch einmal nach den neuen Namen
 df_final = df_final[[n for n in Spalten_Neu if n in df_final.columns]]
 
+#6.1 Spalte ergänzen für Criteria
+df_final.insert(1, 'criteria', 'ENV')
+
+#6.2 Spalte ergänzen für Bodenaufbau
+df_final.insert(18, 'Bodenaufbau', 'RC_slim')
+
+
 # Als Excel speichern
 df_final.to_excel(output_file, index=False)
 
@@ -93,7 +102,7 @@ g = sns.relplot(
     data=df_final,
     x='l_tot [m]',
     y='co2 Total [kgCO2eq / m2]',
-    hue='section_type',      # Farbe nach Betongüte
+    hue='mech_prop',      # Farbe nach Betongüte
     kind='line',          # Linien statt Regression
     marker='o',           # Fügt Punkte auf der Linie hinzu
     errorbar = ("pi", 100), #pi steht für Percentile Interval, 100 für Min bis Max

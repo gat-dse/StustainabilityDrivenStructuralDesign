@@ -18,14 +18,14 @@ lengths = [4,5,6,7,8,9,10,11,12]
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 150
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260506_min_max.db"
+database_name = "database_260506_Hochbau.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
@@ -70,7 +70,7 @@ mat_names = ["'ready_mixed_concrete'"]
 
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc_rib,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
@@ -78,11 +78,11 @@ vrfctn_members.append(vrfctn_members_new)
 
 
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
-                                                              bodenaufbau_rc_rib, req, "rc_rib", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc)
-data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)
+#data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
+#                                                              bodenaufbau_rc_rib, req, "rc_rib", mat_names,
+#                                                              g2k, qk, max_iter, idx_vrc)
+#data_max = max_of_arrays(data_max, data_max_new)
+#vrfctn_members.append(vrfctn_members_new)
 
 # DEFINE LABELS OF PLOTS
 plotted_data = [["h$_{struct}$", "[m]"], ["h$_{tot}$", "[m]"], ["GWP$_{struct}$", "[kg-CO$_2$-eq]"], ["GWP$_{tot}$", "[kg-CO$_2$-eq]"]]

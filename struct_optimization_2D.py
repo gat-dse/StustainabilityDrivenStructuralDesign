@@ -80,7 +80,7 @@ def rc_rqs(var, add_arg):
     qk = add_arg[11]
 
     # create section
-    section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo)
+    section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo,s_yo)
 
     # create member
     member = struct_analysis.Member2D(section, system, floorstruc, criteria, g2k, qk)
