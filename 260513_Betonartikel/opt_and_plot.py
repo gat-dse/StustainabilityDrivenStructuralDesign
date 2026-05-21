@@ -78,23 +78,20 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highest emissions
                 # exclude not epd sources from the data.
-                # only take values, which are inside an 80% confidence interval
                 inquiry = ("""
                             SELECT PRO_ID FROM products
                             WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
                                                 AND MECH_PROP = 'B500B'
-                                                AND MIN_MAX = 1
-                                                AND Man_Ausschluss = 1
-                                                AND Statistik = 1)
+                                                AND ValidEPD = 1
+                                                AND Man_Ausschluss = 1)
                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                 AND DENSITY IS NOT NULL
                                                 AND MECH_PROP = 'B500B'
-                                                AND MIN_MAX = 1
-                                                AND Man_Ausschluss = 1
-                                                AND Statistik = 1)
+                                                AND ValidEPD = 1
+                                                AND Man_Ausschluss = 1)
                             """
                            )
                 cursor.execute(inquiry)
@@ -108,10 +105,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
                 # create initial cross-sections
                 section_00 = struct_analysis.RectangularConcrete(concrete, rebar_low_em, 1.0, 0.20,
-                                                                0.014, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
+                                                                0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                                 0, 0.15, 2)
                 section_01 = struct_analysis.RectangularConcrete(concrete, rebar_high_em, 1.0, 0.20,
-                                                                 0.014, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
+                                                                 0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                                  0, 0.15, 2)
 
                 # add sections to content-definition of plot-line
@@ -130,14 +127,13 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                                 AND DENSITY IS NOT NULL
                                                                 AND MECH_PROP IS NOT NULL
-                                                                AND Man_Ausschluss = 1
-                                                                AND Statistik = 1)
+                                                                AND Man_Ausschluss = 1)
+                                                                
                                             OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
                                                                 WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
                                                                 AND DENSITY IS NOT NULL
                                                                 AND MECH_PROP IS NOT NULL
-                                                                AND Man_Ausschluss = 1
-                                                                AND Statistik = 1)
+                                                                AND Man_Ausschluss = 1) 
                                             """
                            )
                 cursor.execute(inquiry)
@@ -154,7 +150,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 # create initial cross-sections
                 section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.018, 2, 0.01, 0.15, 2)
                 section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15,
-                                                            0.01, 0.15, 0.018, 2, 0.01, 0.15, 2)
+                                                            0.01, 0.15, 0.018, 3, 0.01, 0.15, 2)
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
                 line_i1 = [section_01, floorstruc]

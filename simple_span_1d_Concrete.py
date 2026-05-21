@@ -25,7 +25,7 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1,
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260506.db"
+database_name = "database_260506_Hochbau.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 

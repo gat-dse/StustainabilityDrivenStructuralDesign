@@ -10,7 +10,7 @@ import seaborn as sns
 
 #1. Excel File einlesen:
 # 1.1. Load the Excel file
-excel_file = "Members_simple_rc_rib_150.xlsx"
+excel_file = "Members_rc_rib_cont_2.xlsx"
 df = pd.read_excel(excel_file)
 # 1. Den Namen dynamisch generieren
 file_name_base = os.path.splitext(excel_file)[0]

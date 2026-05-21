@@ -3,9 +3,9 @@
 
 # IMPORT
 import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
-import struct_optimization  # file with code for structural optimization
+#import struct_optimization  # file with code for structural optimization
 import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
+import struct_optimization_RCrib_simple  # file with code for structural optimization
 import plot_datasets  # file with code for structural optimization
 import opt_and_plot
 import matplotlib.pyplot as plt
@@ -22,7 +22,7 @@ rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create
 rebar1.get_design_values()
 
 # create reinforced concrete rectangular cross-section
-section = struct_analysis.RibbedConcrete(concrete1, rebar1, 16, 0.5, 0.40, 1.5, 0.3, 0.010, 0.15, 0.010, 0.15, 0.018, 4, 0.01, 0.15, 2, 2, 0.03 )
+section = struct_analysis.RibbedConcrete(concrete1, rebar1, 16, 0.5, 0.40, 1.5, 0.3, 0.010, 0.15, 0.010, 0.15, 0.04, 4, 0.01, 0.15, 2, 2, 0.03 )
 
 # create floor structure for solid wooden cross-section
 bodenaufbau = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
@@ -44,12 +44,11 @@ req = struct_analysis.Requirements()
 length = 8
 
 # create simple supported beam system
-#system = struct_analysis.BeamContinuousSupEl(length)
 system = struct_analysis.BeamSimpleSup(length)
 
 # create rc member
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
-opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
+opt_section = struct_optimization_RCrib_simple.get_optimized_section(member, "ENV", "GWP", 50)
 
 
 print("Querschnittswerte:")
@@ -111,7 +110,7 @@ print("as_stat", member.section.a_s_stat)
 print("as_min", member.section.as_min)
 
 # # # plot cross-section of members for verification
-vrfctn_member = opt_and_plot.plot_section(opt_section)
+vrfctn_member = plot_datasets.plot_section(opt_section)
 
 # SHOW FIGURE
 plt.show()
