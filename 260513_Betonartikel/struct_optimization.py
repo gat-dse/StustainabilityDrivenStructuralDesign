@@ -267,7 +267,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
-    bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
+    bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m #TODO bb nicht in Optimierung sondern als bb in struct analyxis
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
 
     # definition of fixed values of cross-section

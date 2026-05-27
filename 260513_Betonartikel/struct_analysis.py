@@ -229,6 +229,7 @@ class RectangularWood(SupStrucRectangular, Section):
         self.vu_p, self.vu_n = vu_el, vu_el
         self.qs_class_n, self.qs_class_p = [3, 3]  # Required cross-section class: 1:PP, 2:EP, 3:EE
         self.g0k = self.calc_weight(wood_type.weight) # dead weight of cross section [N/m]
+        self.g0k_b = self.g0k / self.b  # dead weight of cross section [N/m]
         self.ei1 = self.wood_type.Emmean * self.iy  # elastic stiffness [Nm^2]
         self.co2 = self.a_brutt * self.wood_type.GWP * self.wood_type.density  # [kg_CO2_eq/m]
         self.cost = self.a_brutt * self.wood_type.cost # [CHF] #TODO: Not implemented yet!
@@ -290,7 +291,8 @@ class RectangularConcrete(SupStrucRectangular):
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
         self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
-        self.g0k = self.calc_weight(concrete_type.weight)
+        self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
+        self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
 
         #TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
         #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
@@ -311,7 +313,7 @@ class RectangularConcrete(SupStrucRectangular):
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
         h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
-        self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
+        #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
         #Gesamte Bewehrungsfläche as_tot
         self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
@@ -473,7 +475,7 @@ class SupStrucRibbedConcrete(Section):
         self.a_brutt = self.calc_area()             #Bruttoquerschnittsfläche [m2]
         self.z_s = self.calc_center_of_gravity()    #center of gravity [m]
         self.iy = self.calc_moment_of_inertia()     #moment of inertia [m4]
-        self.w = self.calc_weight()                 #Eigengewicht [n/m]
+        self.w = self.calc_weight()                 #Eigengenlast QS pro Laufmeter [N/m]
         self.phi = phi                              #Kriechzahl
 
     def calc_area(self):
@@ -556,7 +558,8 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance(
             'Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
-        self.g0k = self.calc_weight(concrete_type.weight)
+        self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
+        self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
         #a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
 
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr für Platte
@@ -789,7 +792,7 @@ class SupStrucRibWood(Section):
         self.n_inf = n_inf
         self.z_s = self.calc_center_of_gravity()
         self.iy, self.iy_inf = self.calc_moment_of_inertia()
-        self.w = self.calc_weight()
+        self.w = self.calc_weight #Eigenlast QS pro Laufmeter [N/m]
 
     def calc_area(self):
         # in: width b and bw [m], height h and h_f[m]
@@ -884,6 +887,7 @@ class RibWood(SupStrucRibWood):
 
         self.qs_class_n, self.qs_class_p = [3, 3]  # Required cross-section class: 1:=PP, 2:EP, 3:EE
         self.g0k = self.calc_weight(wood_type_1.weight)
+        self.g0k_b = self.g0k / self.b  # Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
         self.ei1 = self.wood_type_1.Emmean * self.iy  # elastic stiffness [Nm^2], Zeitpunkt t = 0
 
         self.co2 = (self.b*self.h * self.wood_type_1.GWP * self.wood_type_1.density)/self.a +self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m]
@@ -1141,6 +1145,7 @@ class Member1D:
         self.requirements = requirements
         self.li_max = self.system.li_max
         self.g0k = self.section.g0k
+        self.g0k_b = self.section.g0k_b
         self.g1k = self.floorstruc.gk_area
         self.g2k = g2k
         self.gk = self.g0k + self.g1k + self.g2k
@@ -1363,6 +1368,7 @@ class Member2D:
         self.li_min = min(self.system.lx, self.system.ly)
         self.li_max = self.system.li_max
         self.g0k = self.section.g0k
+        self.g0k_b = self.section.g0k_b
         self.g1k = self.floorstruc.gk_area
         self.g2k = g2k
         self.gk = self.g0k + self.g1k + self.g2k
