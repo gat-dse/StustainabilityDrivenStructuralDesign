@@ -308,11 +308,10 @@ class RectangularConcrete(SupStrucRectangular):
 
 
         #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[di_xu, s_xu], [max(di_xo, di_xo_min), s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+        self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
-        h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
         #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
         #Gesamte Bewehrungsfläche as_tot
@@ -1031,7 +1030,8 @@ class MatLayer:  # create a material layer
 
 
 class FloorStruc:  # create a floor structure
-    def __init__(self, mat_layers, database_name):
+    def __init__(self, mat_layers, database_name, name = ""):
+        self.name = name
         self.layers = []
         self.co2 = 0
         self.gk_area = 0

@@ -4,6 +4,8 @@ from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion a
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
 
+
+
 class RandomDisplacementBounds(object):
     # random displacement with bounds for basinhopping optimization
     def __init__(self, xmin, xmax, stepsize=0.1):
@@ -35,9 +37,23 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         optimise = "oben"
         di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xo0]
+
         # define bounds of variables
-        bh = (max(0.06,m.section.hmin_c), 1.2)  # height between max of (6 cm;hmin_c) and 1.0 m with hmin_c = 2*cnom + 32 + 4*di
-        bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
+
+        # Mindestplattenstärke abhängig vom Bodenaufbau
+        if m.floorstruc.name == 'massiv':
+            h_min_schall = 0.16
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # height between max of (8 cm, hmin_c, h_min_schall) and 80 cm with hmin_c = 2*cnom + 32 + 4*di
+
+        elif m.floorstruc.name == "Schuettung":
+            bh = (max(0.08, m.section.hmin_c), 0.8)
+
+        else:
+            # falls mal ein anderer Name reinkommt
+            bh = (max(0.08, m.section.hmin_c), 0.8)
+
+        #bh = (max(0.08, m.section.hmin_c, 0.8))
+        bdi_xo = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
         bounds = [bh, bdi_xo]
         # definition of fixed values of cross-section
         b = m.section.b
@@ -53,8 +69,22 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
         var0 = [h0, di_xu0]
         # define bounds of variables
-        bh = (max(0.06,m.section.hmin_c), 1.2)   # height between max of (6 cm, hmin_c) and 1.0 m with hmin_c = 2*cnom + 32 + 4*di
-        bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
+
+        # Mindestplattenstärke abhängig vom Bodenaufbau
+        if m.floorstruc.name == 'massiv':
+            h_min_schall = 0.16
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) #height between max of (8 cm, hmin_c, h_min_schall) and 80 cm with hmin_c = 2*cnom + 32 + 4*di
+
+        elif m.floorstruc.name == "Schuettung":
+            bh = (max(0.08, m.section.hmin_c), 0.8)
+
+        else:
+            #falls mal ein anderer Name reinkommt
+            bh = (max(0.08, m.section.hmin_c), 0.8)
+
+
+        #bh = (max(0.06,m.section.hmin_c), 0.8)   # height between max of (6 cm, hmin_c) and 80 cm with hmin_c = 2*cnom + 32 + 4*di
+        bdi_xu = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
         bounds = [bh, bdi_xu]
         # definition of fixed values of cross-section
         b = m.section.b
