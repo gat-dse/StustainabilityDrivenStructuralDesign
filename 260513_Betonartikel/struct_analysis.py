@@ -622,6 +622,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
             [mus_PB, x, a_s, qs_klasse] = self.mu_unsigned(self.bw[1][0], self.bw[1][1], self.ds_PB, self.b_w, fsd, fcd,
                                                            self.mr_pb_n)
             mu_PB = - mus_PB
+            #TODO bei der negativen Biegung kann man die auch noch die 1. Bewehrungsplage in der Platte ansetzen
         else:
             [mu_PB, x, a_s, qs_klasse] = [0, 0, 0, 0]
             print("sign of moment resistance has to be 'neg' or 'pos'")
@@ -630,6 +631,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
     @staticmethod
     def mu_unsigned(di, s, d, b, fsd, fcd, mr):
+        # TODO bei der negativen Biegung kann man die auch noch die 1. Bewehrungsplage in der Platte ansetzen
         # units input: [m, m, m, m, N/m^2, N/m^2]
         a_s = np.pi * di ** 2 / (4 * s) * b  # [m^2]
         omega = a_s * fsd / (d * b * fcd) # [-]

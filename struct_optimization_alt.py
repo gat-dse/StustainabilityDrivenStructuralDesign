@@ -149,10 +149,10 @@ def rc_rqs(var, add_arg):
     optimise = add_arg[17]
     if optimise == "oben":
         h, di_xo = var
-        di_xu = add_arg[5]
+        di_xu = s_xu = add_arg[5]
     elif optimise == "unten":
         h, di_xu = var
-        di_xo = add_arg[5]
+        di_xo = s_xu = add_arg[5]
 
     system = add_arg[0]
     concrete = add_arg[1]

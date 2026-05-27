@@ -3,7 +3,7 @@
 # IMPORT
 import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
 import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
+import struct_optimization_alt  # file with code for structural optimization
 import matplotlib.pyplot as plt
 
 # INPUT

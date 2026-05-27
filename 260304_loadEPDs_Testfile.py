@@ -3,7 +3,7 @@
 database_name = "database_260304.db"
 #import functions
 import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
+import struct_optimization_alt  # file with code for structural optimization
 import sqlite3  # import modul for SQLite
 import random
 import numpy as np
