@@ -26,6 +26,7 @@ class RandomDisplacementBounds(object):
 # OPTIMIZATION OF CROSS-SECTIONS FOR DEFINED MEMBERS
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 #OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
 def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_inter = 100
@@ -607,11 +608,11 @@ def wd_rib_rqs(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter):
+def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.2):
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rec(member, to_opt, criterion, max_iter)
+        return opt_rc_rec(member, to_opt, criterion, max_iter, h_min)
     elif member.section.section_type == "wd_rec":
         # available criterion arguments: "ULS", "SLS1", "SLS2"
         return opt_gzt_wd_rqs(member, criterion=criterion)

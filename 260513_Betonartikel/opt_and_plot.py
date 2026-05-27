@@ -336,13 +336,13 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         sec_typ, mat, cri, opt, floor_name = legend[i]
         # set line color
         if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
-            color = 'darkgreen'  # Massivdecke wird blau
+            color = 'darkgreen'
 
         elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "Schuettung":
-            color = 'darkolivegreen'  # Massivdecke wird blau
+            color = 'darkolivegreen'
 
         elif sec_typ == "rc_rec" and system == "Continuous 1D" and floor_name == "Schuettung":
-            color = 'olivedrab'  # Schüttung kontinuierlich wird hellblau
+            color = 'olivedrab'
 
         elif sec_typ == "rc_rec" and system == "Simple Beam":
             color = 'darkgreen'
@@ -354,7 +354,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             color = 'saddlebrown'
 
         elif sec_typ == "rc_rib" and system == "Simple Beam":
-            color = 'limegreen'  # <--- Sobald das Hauptskript "rc_rib" übergibt, wird es giftgrün!
+            color = 'limegreen'
 
         elif sec_typ == "rc_rib" and system == "Continuous 1D":
             color = 'yellow'
