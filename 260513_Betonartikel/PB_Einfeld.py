@@ -5,17 +5,16 @@
 # import create_dummy_database  # file for creating a "dummy database", for test propose
 import struct_analysis  # file with code for structural analysis
 import opt_and_plot  # file with code for plotting results in a standardized way
-import opt_and_plotContPB # file with code for plotting results in a standardized way specifically Plattenbalken Durchlaufwirkung
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-# lengths = [4,5, 6, 8, 10, 12]
-lengths = [4,8]
+lengths = [4,8,12]
+
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 20
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
@@ -62,28 +61,27 @@ mat_names = ["'ready_mixed_concrete'"]
 
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-
+"""
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc, system="Continuous 1D")
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
-
-# retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
-                                                              bodenaufbau_rc_rib, req, "rc_rib", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc, system="Continuous 1D")
-data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)
-
+"""
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
+# retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
+                                                              bodenaufbau_rc_rib, req, "rc_rib", mat_names,
+                                                              g2k, qk, max_iter, idx_vrc, system="Continuous 1D")
+data_max = max_of_arrays(data_max, data_max_new)
+vrfctn_members.append(vrfctn_members_new)
+"""
 # DEFINE LABELS OF PLOTS
 plotted_data = [["h$_{struct}$", "[m]"], ["h$_{tot}$", "[m]"], ["GWP$_{struct}$", "[kg-CO$_2$-eq]"], ["GWP$_{tot}$", "[kg-CO$_2$-eq]"]]
 

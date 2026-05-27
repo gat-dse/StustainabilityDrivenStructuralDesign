@@ -589,7 +589,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         ds = self.h_f - self.c_nom - self.bw[1][0] / 2  # Statische Höhe 4. Lage Platte
         d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[
             0] / 2  # Nur eine Lage Längsbewehrung implementiert. ACHTUNG: Check implementieren, ob genug Platz für Längsbewehrung vorhanden!!
-        ds_PB = self.h - self.c_nom - self.bw[1][0]  # Mittlere statische Höhe 3./4. Lage Platte
+        ds_PB = self.h - self.h_f/2   # Mittlere statische Höhe azûf Mitte Platte
         return d, ds, d_PB, ds_PB
 
     #Slab = Platte in Querrichtung. ACHTUNG: DURCHLAUFWIRKUNG MUSS NOCH IMPLEMENTIERT WERDEN!
@@ -619,10 +619,9 @@ class RibbedConcrete(SupStrucRibbedConcrete):
             [mu_PB, x, a_s, qs_klasse] = self.mu_unsigned_PB(self.bw_r[0], self.bw_r[1], self.d_PB, self.b_eff,
                                                              self.h_f, fsd, fcd, self.mr_pb_p)
         elif sign == 'neg':
-            [mus_PB, x, a_s, qs_klasse] = self.mu_unsigned(self.bw[1][0], self.bw[1][1], self.ds_PB, self.b_w, fsd, fcd,
+            [mus_PB, x, a_s, qs_klasse] = self.mu_unsigned_4l(self.bw[1][0], self.bw[1][1],self.bw[0][0],self.bw[0][1], self.ds_PB, self.b_w, fsd, fcd,
                                                            self.mr_pb_n)
             mu_PB = - mus_PB
-            #TODO bei der negativen Biegung kann man die auch noch die 1. Bewehrungsplage in der Platte ansetzen
         else:
             [mu_PB, x, a_s, qs_klasse] = [0, 0, 0, 0]
             print("sign of moment resistance has to be 'neg' or 'pos'")
@@ -630,10 +629,23 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         return mu_PB, x, a_s, qs_klasse
 
     @staticmethod
-    def mu_unsigned(di, s, d, b, fsd, fcd, mr):
-        # TODO bei der negativen Biegung kann man die auch noch die 1. Bewehrungsplage in der Platte ansetzen
+    def mu_unsigned(di, s,  d, b, fsd, fcd, mr):
         # units input: [m, m, m, m, N/m^2, N/m^2]
         a_s = np.pi * di ** 2 / (4 * s) * b  # [m^2]
+        omega = a_s * fsd / (d * b * fcd)  # [-]
+        mu = a_s * fsd * d * (1 - omega / 2)  # [Nm]
+        x = omega * d / 0.85  # [m]
+        if x / d <= 0.35 and mu >= mr:
+            return mu, x, a_s, 1
+        elif x / d <= 0.5 and mu >= mr:
+            return mu, x, a_s, 2
+        else:
+            return mu, x, a_s, 99  # Querschnitt hat ungenügendes Verformungsvermögen
+
+    @staticmethod
+    def mu_unsigned_4l(diO, sO, diU, sU, d, b, fsd, fcd, mr):
+        # units input: [m, m, m, m, N/m^2, N/m^2]
+        a_s = np.pi * diO ** 2 / (4 * sO) * b +  np.pi * diU ** 2 / (4 * sU) * b # [m^2]
         omega = a_s * fsd / (d * b * fcd) # [-]
         mu = a_s * fsd * d * (1 - omega / 2)  # [Nm]
         x = omega * d / 0.85  # [m]

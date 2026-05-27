@@ -247,9 +247,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     section0 = i[0]
                     floorstruc = i[1]
                     member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
-                    if system == "Continuous 1D" and crsec_type == "rc_rib":
-                        opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
-                                                                                           max_iter)
+                    if system == "Continuous 1D" and crsec_type ==  "rc_rib":
+                        opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum, max_iter)
                     else:
                         opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter)
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
