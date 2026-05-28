@@ -23,42 +23,27 @@ class RandomDisplacementBounds(object):
 
         return xnew
 
-
-# ----------------------------------------------------------------------------------------------------------------------
-# OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
-# .......................................................................................................................
-def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
-    # Definition des stabilen, spanweitenabhängigen Startwerts L/25
-    l0 = m.li_max
-    h0 = l0 / 25
-
     # =========================================================================
-    # FALL 1: DURCHLAUFTRÄGER (Zweistufige sequentielle Optimierung)
+    # FALL 1: SYSTEME MIT NEGATIVEM MOMENT (z. B. Durchlaufträger) -> Zweistufig
     # =========================================================================
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
         # --- STUFE 1: Erst Geometrie (h) und Feldbewehrung (di_xu) im Feld optimieren ---
         optimise_stufe1 = "feld"
-
-        # Statisch solider Schätzwert für die Stütze, gekoppelt an die Spannweite
-        di_xo_schätzwert = max(0.012, min(0.032, 0.008 + (l0 - 4.0) * 0.002))
+        di_xo_init = m.section.bw[1][0]  # Obere Bewehrung bleibt in Stufe 1 eingefroren
         di_xu0 = m.section.bw[0][0]
 
         var0_stufe1 = [h0, di_xu0]
 
-        # DYNAMISCHER DECKEL (Wichtig gegen den Peak!):
-        # Verhindert unphysikalische Dickenschübe bei mittleren Spannweiten
-        h_max_dynamisch = max(0.35, l0 / 12)
-
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
         else:
-            bh = (max(0.08, m.section.hmin_c), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c), 0.8)
 
         bdi_xu = (0.008, 0.04)
         bounds_stufe1 = [bh, bdi_xu]
 
-        # Fixe Werte aus dem Querschnitt auslesen
+        # Fixe Werte auslesen
         b = m.section.b
         s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
         di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
@@ -66,55 +51,53 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
 
-        # Übergabe-Argumente für Stufe 1
-        add_arg_stufe1 = [m.system, co, st, b, s_xu, di_xo_schätzwert, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
+        # add_arg für Stufe 1 (di_xo_init sitzt an Position 5)
+        add_arg_stufe1 = [m.system, co, st, b, s_xu, di_xo_init, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
                           m.requirements, to_opt, criterion, m.g2k, m.qk, optimise_stufe1]
 
         bounded_step_1 = RandomDisplacementBounds(np.array([b[0] for b in bounds_stufe1]),
                                                   np.array([b[1] for b in bounds_stufe1]))
 
-        # T=0.1 zwingt das Basinhopping, nahe an der physikalisch sinnvollen Vordimensionierung zu suchen
-        opt_1 = basinhopping(rc_rqs, var0_stufe1, niter=max_iter, T=0.1,
+        opt_1 = basinhopping(rc_rqs, var0_stufe1, niter=max_iter, T=1,
                              minimizer_kwargs={"args": (add_arg_stufe1,), "bounds": bounds_stufe1, "method": "Powell"},
                              take_step=bounded_step_1)
 
         h_opt, di_xu_opt = opt_1.x
 
-        # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Jetzt Stützenbewehrung (di_xo) ermitteln ---
+        # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Jetzt Stützenbewehrung (di_xo) optimieren ---
         optimise_stufe2 = "stuetze_fix_h"
-        var0_stufe2 = [di_xo_schätzwert]
+        var0_stufe2 = [di_xo_init]  # Nur noch 1 aktive Variable (die Stütze)
         bounds_stufe2 = [(0.008, 0.04)]
 
+        # Wir hängen h_opt und di_xu_opt als fixe Parameter ganz hinten an add_arg an
         add_arg_stufe2 = [m.system, co, st, b, s_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
                           m.requirements, to_opt, criterion, m.g2k, m.qk, h_opt, di_xu_opt, optimise_stufe2]
 
         bounded_step_2 = RandomDisplacementBounds(np.array([b[0] for b in bounds_stufe2]),
                                                   np.array([b[1] for b in bounds_stufe2]))
 
-        opt_2 = basinhopping(rc_rqs, var0_stufe2, niter=max_iter, T=0.1,
+        opt_2 = basinhopping(rc_rqs, var0_stufe2, niter=max_iter, T=1,
                              minimizer_kwargs={"args": (add_arg_stufe2,), "bounds": bounds_stufe2, "method": "Powell"},
                              take_step=bounded_step_2)
 
-        # Resultate stabil zusammenführen
+        # Resultate zusammenführen
         h = h_opt
         di_xu = di_xu_opt
         di_xo = opt_2.x[0]
 
     # =========================================================================
-    # FALL 2: SIMPLE BEAM / EINFELDTRÄGER (Unverändert)
+    # FALL 2: SIMPLE BEAM / EINFELDTRÄGER (Einstufig: Nur unten optimieren)
     # =========================================================================
     else:
         optimise = "unten"
         di_xu0 = m.section.bw[0][0]
         var0 = [h0, di_xu0]
 
-        h_max_dynamisch = max(0.35, l0 / 12)
-
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
         else:
-            bh = (max(0.08, m.section.hmin_c), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c), 0.8)
 
         bdi_xu = (0.008, 0.04)
         bounds = [bh, bdi_xu]
@@ -130,13 +113,13 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
                    to_opt, criterion, m.g2k, m.qk, optimise]
 
         bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-        opt = basinhopping(rc_rqs, var0, niter=max_iter, T=0.1,
+        opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1,
                            minimizer_kwargs={"args": (add_arg,), "bounds": bounds, "method": "Powell"},
                            take_step=bounded_step)
 
         h, di_xu = opt.x
 
-    # Generierung des optimierten End-Querschnitts
+    # Generierung des optimierten Querschnittsobjekts
     optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo,
                                                             s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch)
     return optimized_section
@@ -199,7 +182,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 #     return optimized_section
 
 
-# inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
+Python
 def rc_rqs(var, add_arg):
     optimise = add_arg[-1]
 
@@ -216,7 +199,7 @@ def rc_rqs(var, add_arg):
     elif optimise == "unten":
         # Klassischer Einfeldträger: h und di_xu veränderlich
         h, di_xu = var
-        di_xo = add_arg[5]  # Keine Stützenbewehrung benötigt
+        di_xo = add_arg[5]  # di_xo ist fixiert (wird hier nicht gebraucht)
     else:
         h, di_xu = var[0], var[1]
         di_xo = add_arg[5]
@@ -249,7 +232,8 @@ def rc_rqs(var, add_arg):
         g2k = add_arg[15]
         qk = add_arg[16]
 
-    # Querschnitt erzeugen
+        # TODO: nicht alle Inputs für RectangularConcrete sind hier übertragen
+    # create section
     section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu,
                                                   di_yo, s_yo)
 
@@ -278,7 +262,7 @@ def rc_rqs(var, add_arg):
     else:
         d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
                       member.w_app_ger - member.w_app_adm]
-    penalty2 = 1e5 * max(d1, d2, d3, 0)
+    penalty2 = 1e10 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
     pen_a = 0

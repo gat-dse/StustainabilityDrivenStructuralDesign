@@ -1,6 +1,6 @@
 import sqlite3  # import modul for SQLite
 import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
+import struct_optimization # file with code for structural optimization
 import struct_optimization_RCrib_cont  # file with code for structural optimization
 import random
 import numpy as np
@@ -419,18 +419,24 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
 
     elif crsec_type == "rc_rec"and system == "Simple Beam":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
         class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
 
     elif crsec_type == "rc_rib" and system == "Simple Beam":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
         class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_2.xlsx", folder="Results")
     elif crsec_type == "rc_rec"and system == "Continuous 1D":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rec_cont.xlsx", folder="Resultate")
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec_cont.xlsx", folder="Resultate")
         class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_cont_2.xlsx", folder="Results")
     elif crsec_type == "rc_rib" and system == "Continuous 1D":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rib_cont.xlsx", folder="Resultate")
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rib_cont.xlsx", folder="Resultate")
         class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_cont_2.xlsx", folder="Results")
+
+    elif crsec_type == "rc_rec"and system == "Two span 1D 1D":
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec_2span.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2span_2.xlsx", folder="Results")
+
+
     elif crsec_type == "wd_rib":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
     else:

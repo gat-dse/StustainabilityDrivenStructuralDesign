@@ -18,7 +18,7 @@ lengths = [4,6,8,10,12]
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 20
+max_iter = 50
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
@@ -91,13 +91,13 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
-'''
+
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
-                                                              bodenaufbau_rc_rib, req, "rc_rec", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc, system="Continuous 1D")
+                                                              bodenaufbau_rc, req, "rc_rec", mat_names,
+                                                              g2k, qk, max_iter, idx_vrc, system="Two span 1D 1D")
 data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)'''
+vrfctn_members.append(vrfctn_members_new)
 
 
 # DEFINE LABELS OF PLOTS

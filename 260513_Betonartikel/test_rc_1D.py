@@ -5,7 +5,7 @@
 import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
 import struct_analysis  # file with code for structural analysis
 import struct_optimization_2D
-import struct_optimization_test  # file with code for structural optimization
+import struct_optimization  # file with code for structural optimization
 #import matplotlib.pyplot as plt
 import plot_datasets  # file with code for structural optimization
 import matplotlib.pyplot as plt
@@ -22,7 +22,7 @@ rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create
 rebar1.get_design_values()
 
 # create reinforced concrete rectangular cross-section
-section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.01, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
+section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.008, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
 
 # create floor structure for solid concrete cross-section
 bodenaufbau = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
@@ -38,7 +38,7 @@ qk = 2e3  # Nutzlast
 # define service limit state criteria
 req = struct_analysis.Requirements()
 
-length= 5
+length= 12
 
 
 # create slab system
@@ -49,9 +49,20 @@ system = struct_analysis.BeamSimpleSup(length)
 member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
 opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
 
+print('Faktor für gerissen', opt_section.f_faktor)
+print('BEew.-Gehalt unten', opt_section.roh)
+print('BEew.-Gehalt oben', opt_section.rohs)
+print("d =", opt_section.d)
+print("hmin =", opt_section.hmin_c)
+print('Hoehe QS', opt_section.h)
+
+print("w_install=", round(member.w_install,5))
+print("w_install_ger=", round(member.w_install_ger,5))
+
 
 # # # plot cross-section of members for verification
 vrfctn_member = plot_datasets.plot_section(opt_section)
 
 # SHOW FIGURE
 plt.show()
+

@@ -3,4 +3,5 @@ __pycache__
 .env
 .venv
 .db
+.xlsx
 *.xlsx
