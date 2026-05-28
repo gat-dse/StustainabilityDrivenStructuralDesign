@@ -81,7 +81,7 @@ vrfctn_members.append(vrfctn_members_new)
 #                                                               g2k, qk, max_iter, idx_vrc)
 # data_max = max_of_arrays(data_max, data_max_new)
 # vrfctn_members.append(vrfctn_members_new)
-#test
+
 # DEFINE LABELS OF PLOTS
 plotted_data = [["h_struct", "[m]"], ["h_tot", "[m]"], ["GWP_struct", "[kg-CO2-eq]"], ["GWP_tot", "[kg-CO2-eq]"]]
 
