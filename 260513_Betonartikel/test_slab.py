@@ -3,12 +3,14 @@
 
 # IMPORT
 import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
-import struct_analysis_alt  # file with code for structural analysis
+import struct_analysis # file with code for structural analysis
 import struct_optimization_2D
 import struct_optimization  # file with code for structural optimization
 #import matplotlib.pyplot as plt
 
 # INPUT
+# max. number of iterations per optimization. Higher value leads to better results
+max_iter = 25
 # create dummy-database
 database_name = "database_260506_Hochbau.db"  # define database name
 #create_dummy_database.create_database(database_name)  # create database
@@ -20,7 +22,7 @@ rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create
 rebar1.get_design_values()
 
 # create reinforced concrete rectangular cross-section
-section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.01, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
+section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.012, 0.15, 0.012, 0.15, 0.012, 0.150, 0.012, 0.15,0.0,2,0.02,0, 0.15)
 
 
 # create reinforced concrete rectangular cross-section
@@ -38,20 +40,17 @@ requirements = struct_analysis.Requirements()
 g2k = 0.75e3  # n.t. Einbauten
 qk = 2e3  # Nutzlast
 
-# define service limit state criteria
-req = struct_analysis.Requirements()
 
+# create slab system
 length_x = 8
 length_y = 8
 support = "LL-frei"
-
-# create slab system
 system = struct_analysis.Slab(length_x,length_y,support)
 
 
 # create rc member
 member = struct_analysis.Member2D(section, system, bodenaufbau_rc, requirements, g2k, qk)
-opt_section = struct_optimization_2D.get_optimized_section(member, "ENV", "GWP", 25)
+opt_section = struct_optimization_2D.get_optimized_section(member, "ENV", "GWP", max_iter)
 print("opt section = ", opt_section.h)
 
 print("d =", section.d)

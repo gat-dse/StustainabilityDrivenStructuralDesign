@@ -168,7 +168,7 @@ def rc_rqs(var, add_arg):
     criterion = add_arg[14]
     g2k = add_arg[15]
     qk = add_arg[16]
-
+    # TODO: nicht alle Inputs für RectangularConcrete sind hier übertragen
     # create section
     section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo)
 
@@ -308,7 +308,7 @@ def rc_rib_rqs(var, add_arg):
     criterion = add_arg[15]
     g2k = add_arg[16]
     qk = add_arg[17]
-
+    #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
     # create section
     section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
 

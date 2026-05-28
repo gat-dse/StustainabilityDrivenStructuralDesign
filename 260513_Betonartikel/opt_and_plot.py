@@ -426,9 +426,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     return data_max, vrfctn_members
 
 
-    return data_max, vrfctn_members
-
-
 
 # PLOT GEOMETRY OF SECTIONS
 # ----------------------------------------------------------------------------------------------------------------------

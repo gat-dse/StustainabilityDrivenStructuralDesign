@@ -6,15 +6,15 @@
 import struct_analysis  # file with code for structural analysis
 import plot_datasets_2D  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
+import struct_optimization_2D
 
-# define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [3,5,6,7,8,10]
+
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 1
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 10
+max_iter = 100
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
@@ -33,11 +33,6 @@ bodenaufbau_rcdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, Fals
                        ["'Glaswolle'", 0.03, False]]
 bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau_rcdecke, database_name)
 
-# # create floor structure for ribbed reinforced concrete cross-section
-# bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-#                        ["'Unterlagsboden Zement, 85 mm'", False, False],
-#                        ["'Glaswolle'", 0.03, False],["'Kies gebrochen'", 0.06, False]]
-# bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
 
 # define loads on member
 g2k = 0.75e3  # n.t. Einbauten
@@ -54,39 +49,32 @@ def max_of_arrays(existing_data, new_data):
 data_max = [0, 0, 0, 0]
 vrfctn_members = []
 
-# #-----------------------------------------------------------------------------------------------------------------------
-# # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED WOODEN CROSS-SECTIONS
-# # define materials for which date is searched in the database (table products, attribute material)
-# mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'", "'Glue_laminated_timber_board'"]
-#
-# # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-# data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
-#                                                               bodenaufbau_wd_solid, req, "wd_rec", mat_names,
-#                                                               g2k, qk, max_iter, idx_vrc)
-# data_max = max_of_arrays(data_max, data_max_new)
-# vrfctn_members.append(vrfctn_members_new)
-#
-# mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'"]
-# # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-# data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
-#                                                               bodenaufbau_wd_rib, req, "wd_rib", mat_names,
-#                                                               g2k, qk, max_iter, idx_vrc)
-# data_max = max_of_arrays(data_max, data_max_new)
-# vrfctn_members.append(vrfctn_members_new)
 
 #-----------------------------------------------------------------------------------------------------------------------
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED REINFORCED CONCRETE CROSS-SECTIONS
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names = ["'ready_mixed_concrete'"]
-
+length_x = [3.0, 6.0, 8.0, 12.0]
+length_y = [3.0, 6.0, 8.0, 12.0]
+support = ["LL-frei"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
+data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
-
+# define materials for which date is searched in the database (table products, attribute material)
+mat_names = ["'ready_mixed_concrete'"]
+length_x = [3.0, 6.0, 8.0, 12.0]
+length_y = [3.0, 6.0, 8.0, 12.0]
+support = ["LL-eingespannt"]
+# retrieve data from database, find optimal cross-sections and plot results for solid cross-section
+data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
+                                                              req, "rc_rec", mat_names, g2k, qk, max_iter,
+                                                              idx_vrc)
+data_max = max_of_arrays(data_max, data_max_new)
+vrfctn_members.append(vrfctn_members_new)
 # # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 # data_max_new, vrfctn_members_new = plot_datasets.plot_dataset(lengths, database_name, criteria, optima,
 #                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
@@ -103,9 +91,9 @@ for idx, info in enumerate(plotted_data):
     plt.xlabel('l [m]')
     plt.ylabel(info[0] + " " + info[1])
     if idx % 2 == 0:
-        plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx+1])))
+        plt.axis((min(length_x), max(length_x), 0, max(data_max[idx], data_max[idx+1])))
     else:
-        plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx-1])))
+        plt.axis((min(length_x), max(length_x), 0, max(data_max[idx], data_max[idx-1])))
     plt.grid()
 
 # plot cross-section of members for verification

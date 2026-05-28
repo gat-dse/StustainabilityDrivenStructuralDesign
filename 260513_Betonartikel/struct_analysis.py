@@ -285,11 +285,11 @@ class RectangularConcrete(SupStrucRectangular):
         mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
 
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
-        [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
+        [self.d, self.ds, self.dy, self.dsy] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
-        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
+        self.roh, self.rohs, self.rohy, self.rohsy = self.as_p / self.d, self.as_n / self.ds, self.as_p_y / self.dy, self.as_n_y / self.dsy  #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
@@ -308,15 +308,15 @@ class RectangularConcrete(SupStrucRectangular):
 
 
         #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[di_xu, s_xu], [max(di_xo, di_xo_min), s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+        self.bw = [[max(di_xu, di_xu_min), s_xu], [max(di_xo, di_xo_min), s_xo], [max(di_yu, di_yu_min), s_yu], [max(di_yo,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
+        self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
         h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
         #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
         #Gesamte Bewehrungsfläche as_tot
-        self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
+        self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
 
@@ -331,13 +331,15 @@ class RectangularConcrete(SupStrucRectangular):
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
 
     def calc_d(self):
-        d = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0] / 2 #Statische Höhe für Positives Biegemoment
-        ds = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0] / 2 #Statische Höhe für Negatives Biegemoment
-        if d <= 0 or ds <= 0:
+        d = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0] / 2 #Statische Höhe für Positives Biegemoment in x-Richtung
+        ds = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0] / 2 #Statische Höhe für Negatives Biegemoment in x-Richtung
+        dy = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0]- self.bw[2][0] / 2  # Statische Höhe für Positives Biegemoment in y-Richtung
+        dsy = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0]- self.bw[3][0] / 2  # Statische Höhe für Negatives Biegemoment in y-Richtung
+        if d <= 0 or ds <= 0 or dy<=0 or dsy <=0:
             print("d of ds<=0. Cross-section is not valid")
-        return d, ds
+        return d, ds, dy, dsy
 
-    def calc_mu(self, sign='pos'):
+    def calc_mu(self, direction = 'x', sign='pos'):
         #in: self
         #out: Biegewiderstand mu [Nm], Druckzonenhöhe x [m], Bewehrungsfläche a_s [m2], Querschnittsklasse qs_klasse []
         b = self.b  #Querschnittsbreite
@@ -459,6 +461,207 @@ class RectangularConcrete(SupStrucRectangular):
             resistance = 0
         return resistance
 
+# ........................................................................
+class FlatSlab2D(SupStrucRectangular):
+    # defines properties of rectangular, reinforced concrete cross-section
+    def __init__(self, concrete_type, rebar_type, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw=0.0, s_bw=0.15, n_bw=0, phi=2.0,
+                 c_nom=0.02, xi=0.0, jnt_srch=0.15):
+        # create a rectangular concrete object
+        section_type = "rc_rec"
+        super().__init__(section_type, b, h)
+        self.concrete_type = concrete_type
+        self.rebar_type = rebar_type
+        self.c_nom = c_nom #Bewehrungsüberdeckung
+        self.phi = phi
+
+        #Definition Bewehrung gemäss Eingabe
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
+        self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
+        mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
+
+        self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
+        [self.d, self.ds, self.dy, self.dsy] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
+
+        [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('x','pos')
+        [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('x','neg')
+        [self.mu_max_y, self.x_p_y, self.as_p_y, self.qs_class_p_y] = self.calc_mu('y', 'pos')
+        [self.mu_min_y, self.x_n_y, self.as_n_y, self.qs_class_n_y] = self.calc_mu('y', 'neg')
+        self.roh, self.rohs, self.rohy, self.rohsy = self.as_p / self.d, self.as_n / self.ds, self.as_p_y / self.dy, self.as_n_y / self.dsy  #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
+        [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
+        self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
+        self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
+
+        #TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
+        self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+
+        # Durchmesser Mindestbewehrung für 1. & 4. Lage
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+
+        #Durchmesser Mindestbewehrung für 2. & 3. Lage
+        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
+        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
+
+
+        #Neue Definition Bewehrung mit Mindestbewehrung
+        self.bw = [[max(di_xu, di_xu_min), s_xu], [max(di_xo, di_xo_min), s_xo], [max(di_yu, di_yu_min), s_yu], [max(di_yo,di_yo_min), s_yo]]
+
+        #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
+        h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
+        #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
+
+        #Gesamte Bewehrungsfläche as_tot
+        self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
+        self.joint_surcharge = jnt_srch  # joint surcharge
+        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
+
+        self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
+        self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
+        self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
+        self.co2 = (self.co2_rebar + self.co2_concrete)
+        self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
+                     + self.concrete_type.cost2)
+        self.ei_b = self.ei1
+        self.xi = xi
+        self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
+
+    def calc_d(self):
+        d = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0] / 2 #Statische Höhe für Positives Biegemoment in x-Richtung
+        ds = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0] / 2 #Statische Höhe für Negatives Biegemoment in x-Richtung
+        dy = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0]- self.bw[2][0] / 2  # Statische Höhe für Positives Biegemoment in y-Richtung
+        dsy = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0]- self.bw[3][0] / 2  # Statische Höhe für Negatives Biegemoment in y-Richtung
+        if d <= 0 or ds <= 0 or dy<=0 or dsy <=0:
+            print("d of ds<=0. Cross-section is not valid")
+        return d, ds, dy, dsy
+
+    def calc_mu(self, direction = 'x', sign='pos'):
+        #in: self
+        #out: Biegewiderstand mu [Nm], Druckzonenhöhe x [m], Bewehrungsfläche a_s [m2], Querschnittsklasse qs_klasse []
+        b = self.b  #Querschnittsbreite
+        fsd = self.rebar_type.fsd
+        fcd = self.concrete_type.fcd
+        if direction == 'x' and sign == 'pos':
+            [mu, x, a_s, qs_klasse] = self.mu_unsigned(self.bw[0][0], self.bw[0][1], self.d, b, fsd, fcd, self.mr_p)
+        elif direction == 'x' and sign == 'neg':
+            [mus, x, a_s, qs_klasse] = self.mu_unsigned(self.bw[1][0], self.bw[1][1], self.ds, b, fsd, fcd, self.mr_n)
+            mu = -mus
+        elif direction == 'y' and sign == 'pos':
+            [mu, x, a_s, qs_klasse] = self.mu_unsigned(self.bw[2][0], self.bw[2][1], self.dy, b, fsd, fcd, self.mr_p)
+        elif direction == 'y' and sign == 'neg':
+            [mus, x, a_s, qs_klasse] = self.mu_unsigned(self.bw[3][0], self.bw[3][1], self.dsy, b, fsd, fcd, self.mr_n)
+            mu = -mus
+        else:
+            [mu, x, a_s, qs_klasse] = [0, 0, 0, 0]
+            print("sign of moment resistance has to be 'neg' or 'pos'")
+        return mu, x, a_s, qs_klasse
+
+    @staticmethod
+    def mu_unsigned(di, s, d, b, fsd, fcd, mr):
+        #in: Bewehrungsdurchmesser di, Bewehrungsabstand s, Statische Höhe d, fsd, fcd, mr
+        #out: mu, x, a_s, qs_klasse
+        # units input: [m, m, m, m, N/m^2, N/m^2]
+        a_s = np.pi * di ** 2 / (4 * s) * b  # [m^2]
+        omega = a_s * fsd / (d * b * fcd)  # [-]
+        mu = a_s * fsd * d * (1 - omega / 2)  # [Nm]
+        x = omega * d / 0.85  # [m]
+        if x / d <= 0.35 and mu >= mr:
+            return mu, x, a_s, 1
+        elif x / d <= 0.5 and mu >= mr:
+            return mu, x, a_s, 2
+        else:  # zero resistance for x/d>0.5
+            epsilon = 1.0e-3
+            shift = 0.5
+            factor = 1 - 0.5 * (1 + 2 / np.pi * np.arctan((x/d - shift) / epsilon)) #irgendein Faktor, um die Funktion richtig auf 0 gehen zu lassen. Ist keine Formel aus irgendeiner Norm o.Ä., hat auch nichts mit der Statik zu tun#
+            return factor*mu, x, a_s, 99  # Querschnitt hat ungenügendes Verformungsvermögen
+
+    def calc_shear_resistance(self, d_installation=0.0):
+        # in: self
+        # out: Querkraftwiderstand positiv vu_p [N], Querkraftwiderstand negativ vu_n [N], Querkraftbewehrung as_bw [m2]
+
+        di = self.bw_bg[0]      # diameter
+        s = self.bw_bg[1]       # spacing
+        n = self.bw_bg[2]       # number of stirrups per spacing
+        fck = self.concrete_type.fck        #SIA 262
+        fcd = self.concrete_type.fcd        #SIA 262
+        tcd = self.concrete_type.tcd        #SIA 262
+        dmax = self.concrete_type.dmax      #dmax in mm
+        fsk = self.rebar_type.fsk           #SIA 262
+        fsd = self.rebar_type.fsd           #SIA 262
+        es = self.rebar_type.Es             #SIA 262
+        bw = self.b         #Stegbreite
+        d = self.d          #Statische Höhe für positives Biegemoment (untere Lagen)
+        ds = self.ds        #Statische Höhe für negatives Biegemoment (obere Lagen)
+        x_p = self.x_p      #Druckzonenhöhe positives Biegemoment (obere Querschnittsrand)
+        x_n = self.x_n      #Druckzonenhöhe negatives Biegemoment (unterer Querschnittsrand)
+        as_bw = self.calc_as_bw(di, n, s, d)
+        if d_installation < d / 6: #SIA262, 4.3.3.2.9
+            dv_p = d                    #Wirksame statische Höhe für Querkraft entspricht statischer Höhe für positives Biegemoment d (untere Lagen), einbetonierte Leitungen, Einlagen, etc. können vernachlässigt werden, wenn kleiner d/6
+        else:
+            dv_p = d - d_installation   #Wirksame statische Höhe für Querkraft, , einbetonierte Leitungen, Einlagen, etc. müssen verücksichtigt werden, wenn grösser d/6
+        if d_installation < ds / 6:
+            dv_n = ds                   #Wirksame statische Höhe für Querkraft
+        else:
+            dv_n = ds - d_installation  #Wirksame statische Höhe für Querkraft
+        vu_p = self.vu_unsigned(bw, di, n, s, as_bw, d, dv_p, x_p, fck, fcd, tcd, fsk, fsd, es, dmax)   #Positiver Querkraftwiderstand [N]
+        vu_n = self.vu_unsigned(bw, di, n, s, as_bw, ds, dv_n, x_n, fck, fcd, tcd, fsk, fsd, es, dmax)  #Negativer Querkraftwiederstand [N]
+        return vu_p, vu_n, as_bw
+
+    @staticmethod
+    def calc_as_bw(di, n, s, d):
+        #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
+        #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
+        as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d #ToDo: muss die Bügelquerschnittsfläche nicht noch mit der Plattenstärke multipliziert werden?
+        return as_bw #TODo: Berechnung as_bw falsch? (Einheiten?)
+
+    @staticmethod
+    def vu_unsigned(bw, di, n, s, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
+        rohw = as_bw / min(bw, 0.4)  # SIA 262, Zif. 5.5.2.2
+        rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # SIA 262, Zif. 5.5.2.2 Mindestbewehrungsgehalt Bügel für Balken
+        s_max = 25*s  # SIA262, Zif. 5.5.2.2 im Balken sind stets Bügel anzuodnen, deren gegenseitiger Abstand 25*dsw (Durchmesser Bewehrungstaebe) nicht übersteigt #TODO Anpassung Formel? 25*d
+        if bw < 0.5:  # SIA262, Zif. 5.5.2.3 für Stegbreiten > 500 mm sind idR mehrschnittige Bügel anzuordnen
+            n_min = 2
+        else:
+            n_min = 4
+        if rohw < rohw_min or s > s_max or n < n_min:  # cross-section resistance without stirrups
+            ev = 1.5 * fsd / es         #SIA 262
+            kg = 48 / (16 + dmax)       #SIA 262
+            kd = 1 / (1 + ev * d * kg)  #SIA 262
+            vrd = kd * tcd * dv
+            return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
+        else:  # cross-section resistance with vertical stirrups
+            z = d - 0.85 * x / 2
+            vrds = as_bw * z * fsd #mit alpha = 45° und cot(alpa) = 1.0
+            vrdc = bw * z * kc * fcd * np.sin(alpha) * np.cos(alpha)  # unit of alpha: [rad]
+            return min(vrds, vrdc) #Querkraftwiderstand MIT Querkraftbewehrung SIA 262
+
+    @staticmethod
+    def f_w_ger(roh, rohs, phi, h, d):
+        # f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
+        f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
+        #TODO: Prüfen, ob dieser Wert nicht zu konservativ ist! Als Abschätzung für die Vordimensionierung scheint der Wert jedoch schon i.O., ist zumindest nicht komplett willkürlich.
+        return f
+
+    @staticmethod
+    def fire_resistance(section):
+        # fire resistance of 1-D load-bearing plates according to SIA 262, Tab.16
+        c_nom = section.c_nom
+        h = section.h
+        b = section.b
+        if c_nom >= 0.04 and h >= 0.15 and b >= 0.4:
+            resistance = 180
+        elif c_nom >= 0.03 and h >= 0.12 and b >= 0.3:
+            resistance = 120
+        elif c_nom >= 0.03 and h >= 0.1 and b >= 0.2:
+            resistance = 90
+        elif c_nom >= 0.02 and h >= 0.08 and b >= 0.15:
+            resistance = 60
+        elif c_nom >= 0.02 and h >= 0.06 and b >= 0.1:
+            resistance = 30
+        else:
+            resistance = 0
+        return resistance
 
 #-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
@@ -1116,7 +1319,7 @@ class Slab:
         # get mechanical properties from database
         result = cursor.execute(
                     """
-                    SELECT NAME, RAENDER, LX, LY, MX_POS, MY_POS, MX_NEG, MY_NEG, V_POS, V_NEG, W, F 
+                    SELECT NAME, RAENDER, LX, LY, MX_POS, MX_NEG, MY_POS, MY_NEG, V_POS, V_NEG, W, F 
                     FROM slab_properties
                     WHERE RAENDER = ? AND LX = ? AND LY = ? """, (self.raender, self.lx, self.ly)).fetchall()
 
@@ -1382,10 +1585,10 @@ class Member2D:
         self.w_use_adm = self.li_min / self.requirements.lw_use
         self.w_app_adm = self.li_min / self.requirements.lw_app
         self.qu = self.calc_qu()
-        self.mkd_n = self.system.alpha_m_x[0] * (self.gk + self.qk) * self.li_max ** 2
-        self.mkd_p = self.system.alpha_m_x[1] * (self.gk + self.qk) * self.li_max ** 2
-        self.mkd_n_y = self.system.alpha_m_y[0] * (self.gk + self.qk) * self.li_min ** 2
-        self.mkd_p_y = self.system.alpha_m_y[1] * (self.gk + self.qk) * self.li_min ** 2
+        self.mkd_p = self.system.alpha_m_x[0] * (self.gk + self.qk) * self.li_max ** 2
+        self.mkd_n = self.system.alpha_m_x[1] * (self.gk + self.qk) * self.li_max ** 2
+        self.mkd_p_y = self.system.alpha_m_y[0] * (self.gk + self.qk) * self.li_min ** 2
+        self.mkd_n_y = self.system.alpha_m_y[1] * (self.gk + self.qk) * self.li_min ** 2
         #TODO: Everything for lx and ly!
         self.qk_zul_gzt = float
         self.fire = [0, 0, 0, 0]  # fire from bottom, left, top, right (0: no fire; 1: fire)
