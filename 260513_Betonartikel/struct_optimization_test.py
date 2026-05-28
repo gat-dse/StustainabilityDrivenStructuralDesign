@@ -26,91 +26,69 @@ class RandomDisplacementBounds(object):
 # OPTIMIZATION OF CROSS-SECTIONS FOR DEFINED MEMBERS
 # ----------------------------------------------------------------------------------------------------------------------
 
-#OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
-#.......................................................................................................................
-def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_inter = 100
-    # definition of initial values for variables, which are going to be optimized
-    h0 = m.section.h  # start value for height corresponds to 1/20 of system length
 
-    if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
+# OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
+# .......................................................................................................................
+def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
+    h0 = m.section.h
+
+    # Mindeststärken-Logik (Schallschutz)
+    if m.floorstruc.name == 'massiv':
+        h_min_schall = 0.16
+        bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
+    else:
+        bh = (max(0.08, m.section.hmin_c), 0.8)
+
+    bdi_xu = (0.008, 0.04)
+    bdi_xo = (0.008, 0.04)
+
+    # =========================================================================
+    # FALL 1: DURCHLAUFTRÄGER (Oben wird optimiert)
+    # =========================================================================
+    if m.system.__class__.__name__ == "BeamContinuousSupEl" or (
+            min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m)):
         optimise = "oben"
-        di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
-        var0 = [h0, di_xo0]
-
-        # define bounds of variables
-
-        # Mindestplattenstärke abhängig vom Bodenaufbau
-        if m.floorstruc.name == 'massiv':
-            h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # height between max of (8 cm, hmin_c, h_min_schall) and 80 cm with hmin_c = 2*cnom + 32 + 4*di
-
-        elif m.floorstruc.name == "Schuettung":
-            bh = (max(0.08, m.section.hmin_c), 0.8)
-
-        else:
-            # falls mal ein anderer Name reinkommt
-            bh = (max(0.08, m.section.hmin_c), 0.8)
-
-        #bh = (max(0.08, m.section.hmin_c, 0.8))
-        bdi_xo = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+        var0 = [h0, m.section.bw[1][0]]  # Optimiert h und di_xo
         bounds = [bh, bdi_xo]
-        # definition of fixed values of cross-section
-        b = m.section.b
-        s_xu, di_xu, s_xo = m.section.bw[0][1], m.section.bw[0][0], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
-        di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-        co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, b, s_xu, di_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,
-                   optimise]
+
+    # =========================================================================
+    # FALL 2: SIMPLE BEAM / EINFELDTRÄGER (Unten wird optimiert)
+    # =========================================================================
     else:
         optimise = "unten"
-        di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
-        var0 = [h0, di_xu0]
-        # define bounds of variables
-
-        # Mindestplattenstärke abhängig vom Bodenaufbau
-        if m.floorstruc.name == 'massiv':
-            h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) #height between max of (8 cm, hmin_c, h_min_schall) and 80 cm with hmin_c = 2*cnom + 32 + 4*di
-
-        elif m.floorstruc.name == "Schuettung":
-            bh = (max(0.08, m.section.hmin_c), 0.8)
-
-        else:
-            #falls mal ein anderer Name reinkommt
-            bh = (max(0.08, m.section.hmin_c), 0.8)
-
-
-        #bh = (max(0.06,m.section.hmin_c), 0.8)   # height between max of (6 cm, hmin_c) and 80 cm with hmin_c = 2*cnom + 32 + 4*di
-        bdi_xu = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+        var0 = [h0, m.section.bw[0][0]]  # Optimiert h und di_xu
         bounds = [bh, bdi_xu]
-        # definition of fixed values of cross-section
-        b = m.section.b
-        s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
-        di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-        co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, b, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,
-                   optimise]
 
-    # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
+    # Gemeinsame Werte auslesen
+    b = m.section.b
+    s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
+    di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
+    di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+    phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+    co, st = m.section.concrete_type, m.section.rebar_type
+
+    add_arg = [m.system, co, st, b, s_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt,
+               criterion, m.g2k, m.qk, optimise]
+
+    # Optimierung ausführen
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
-                                                                            "method": "Powell"}, take_step=bounded_step)
-    if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
+    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1,
+                       minimizer_kwargs={"args": (add_arg,), "bounds": bounds, "method": "Powell"},
+                       take_step=bounded_step)
+
+    # Auswertung nach der Optimierung
+    if optimise == "oben":
         h, di_xo = opt.x
-        optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw,
-                                                                n_bw,
-                                                                phi, c_nom, xi, jnt_srch)
+        # Unten bekommt rechnerisch 50% der Fläche von oben.
+        # Das Maximum aus diesem Wert, 8mm und dmin zieht deine Klasse automatisch.
+        di_xu = max(0.008, di_xo * (0.5 ** 0.5))
     else:
         h, di_xu = opt.x
-        optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw,
-                                                                n_bw,
-                                                                phi, c_nom, xi, jnt_srch)
-    return optimized_section
+        di_xo = 0.008  # Oben Minimum (Klasse korrigiert auf dmin falls nötig)
 
+    optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo,
+                                                            s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch)
+    return optimized_section
 
 #Possible Alternative Optimization (not correct yet)
 # from scipy.optimize import basinhopping
@@ -172,32 +150,35 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
 
 # inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
 def rc_rqs(var, add_arg):
-    # input: variables, which have to be optimized, additional info about cross-section and system, optimizing option
-    # output: if criterion == GWP -> co2 of cross-section, punished by delta 10*(qk_zul-qk)
-    # output: if criterion == h -> height of cross-section, punished by delta 1*(qk_zul-qk)
-    optimise = add_arg[17]
+    optimise = add_arg[-1]  # Holt das letzte Element (optimise) krisensicher heraus
+
+    # Exakt deine 2 Pfade
     if optimise == "oben":
         h, di_xo = var
-        di_xu = add_arg[5]
-    elif optimise == "unten":
+        di_xu = max(0.008, di_xo * (0.5 ** 0.5))
+    else:
         h, di_xu = var
-        di_xo = add_arg[5]
+        di_xo = 0.008
 
+    # Ab hier bleibt das fehlerfreie Entpacken deiner Struktur erhalten:
     system = add_arg[0]
     concrete = add_arg[1]
     reinfsteel = add_arg[2]
     b = add_arg[3]
     s_xu = add_arg[4]
-    s_xo = add_arg[6]
-    di_yu, s_yu = add_arg[7:9]
-    di_yo, s_yo = add_arg[9:11]
-    floorstruc = add_arg[11]
-    criteria = add_arg[12]
-    to_opt = add_arg[13]
-    criterion = add_arg[14]
-    g2k = add_arg[15]
-    qk = add_arg[16]
-    # TODO: nicht alle Inputs für RectangularConcrete sind hier übertragen
+    s_xo = add_arg[5]
+    di_yu = add_arg[6]
+    s_yu = add_arg[7]
+    di_yo = add_arg[8]
+    s_yo = add_arg[9]
+    floorstruc = add_arg[10]
+    criteria = add_arg[11]
+    to_opt = add_arg[12]
+    criterion = add_arg[13]
+    g2k = add_arg[14]
+    qk = add_arg[15]
+
+
     # create section
     section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo)
 
@@ -209,7 +190,11 @@ def rc_rqs(var, add_arg):
     penalty1 = max(member.qk - member.qk_zul_gzt, 0)
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if optimise == "oben" and member.mkd_n < member.section.mr_n:
+    if optimise == "beide" and (member.mkd_n < member.section.mr_n or member.mkd_p < member.section.mr_p):
+        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
+                      member.w_app - member.w_app_adm]
+
+    elif optimise == "oben" and member.mkd_n < member.section.mr_n:
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
     elif optimise == "unten" and member.mkd_p < member.section.mr_p:
@@ -337,7 +322,7 @@ def rc_rib_rqs(var, add_arg):
     criterion = add_arg[15]
     g2k = add_arg[16]
     qk = add_arg[17]
-    #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
+
     # create section
     section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
 

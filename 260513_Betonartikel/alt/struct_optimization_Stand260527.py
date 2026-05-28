@@ -26,6 +26,7 @@ class RandomDisplacementBounds(object):
 # OPTIMIZATION OF CROSS-SECTIONS FOR DEFINED MEMBERS
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 #OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
 def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_inter = 100
@@ -197,7 +198,7 @@ def rc_rqs(var, add_arg):
     criterion = add_arg[14]
     g2k = add_arg[15]
     qk = add_arg[16]
-    # TODO: nicht alle Inputs für RectangularConcrete sind hier übertragen
+
     # create section
     section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo)
 
@@ -337,7 +338,7 @@ def rc_rib_rqs(var, add_arg):
     criterion = add_arg[15]
     g2k = add_arg[16]
     qk = add_arg[17]
-    #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
+
     # create section
     section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
 
@@ -607,11 +608,11 @@ def wd_rib_rqs(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter):
+def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.2):
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rec(member, to_opt, criterion, max_iter)
+        return opt_rc_rec(member, to_opt, criterion, max_iter, h_min)
     elif member.section.section_type == "wd_rec":
         # available criterion arguments: "ULS", "SLS1", "SLS2"
         return opt_gzt_wd_rqs(member, criterion=criterion)

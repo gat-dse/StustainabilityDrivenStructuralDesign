@@ -1,6 +1,6 @@
 import sqlite3  # import modul for SQLite
 import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
+import struct_optimization_test  # file with code for structural optimization
 import struct_optimization_RCrib_cont  # file with code for structural optimization
 import random
 import numpy as np

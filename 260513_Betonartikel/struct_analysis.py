@@ -285,11 +285,11 @@ class RectangularConcrete(SupStrucRectangular):
         mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
 
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
-        [self.d, self.ds, self.dy, self.dsy] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
+        [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
-        self.roh, self.rohs, self.rohy, self.rohsy = self.as_p / self.d, self.as_n / self.ds, self.as_p_y / self.dy, self.as_n_y / self.dsy  #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
+        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
@@ -308,15 +308,14 @@ class RectangularConcrete(SupStrucRectangular):
 
 
         #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[max(di_xu, di_xu_min), s_xu], [max(di_xo, di_xo_min), s_xo], [max(di_yu, di_yu_min), s_yu], [max(di_yo,di_yo_min), s_yo]]
+        self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
-        h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
+        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
         #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
         #Gesamte Bewehrungsfläche as_tot
-        self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
+        self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
 
@@ -331,15 +330,13 @@ class RectangularConcrete(SupStrucRectangular):
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
 
     def calc_d(self):
-        d = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0] / 2 #Statische Höhe für Positives Biegemoment in x-Richtung
-        ds = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0] / 2 #Statische Höhe für Negatives Biegemoment in x-Richtung
-        dy = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0]- self.bw[2][0] / 2  # Statische Höhe für Positives Biegemoment in y-Richtung
-        dsy = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0]- self.bw[3][0] / 2  # Statische Höhe für Negatives Biegemoment in y-Richtung
-        if d <= 0 or ds <= 0 or dy<=0 or dsy <=0:
+        d = self.h - self.c_nom - self.bw_bg[0] - self.bw[0][0] / 2 #Statische Höhe für Positives Biegemoment
+        ds = self.h - self.c_nom - self.bw_bg[0] - self.bw[1][0] / 2 #Statische Höhe für Negatives Biegemoment
+        if d <= 0 or ds <= 0:
             print("d of ds<=0. Cross-section is not valid")
-        return d, ds, dy, dsy
+        return d, ds
 
-    def calc_mu(self, direction = 'x', sign='pos'):
+    def calc_mu(self, sign='pos'):
         #in: self
         #out: Biegewiderstand mu [Nm], Druckzonenhöhe x [m], Bewehrungsfläche a_s [m2], Querschnittsklasse qs_klasse []
         b = self.b  #Querschnittsbreite
@@ -1234,7 +1231,8 @@ class MatLayer:  # create a material layer
 
 
 class FloorStruc:  # create a floor structure
-    def __init__(self, mat_layers, database_name):
+    def __init__(self, mat_layers, database_name, name = ""):
+        self.name = name
         self.layers = []
         self.co2 = 0
         self.gk_area = 0

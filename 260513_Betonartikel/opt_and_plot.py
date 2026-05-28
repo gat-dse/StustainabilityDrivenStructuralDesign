@@ -11,6 +11,7 @@ from scipy.interpolate import interp1d
 import class_to_excel
 import class_to_excel_2
 
+
 import pandas as pd
 from scipy.spatial import ConvexHull
 
@@ -277,7 +278,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     material_lg = i[0].wood_type_1.mech_prop
                 else:
                     material_lg = "error: section material is not defined"
-                legend.append([i[0].section_type, material_lg, criterion, optimum])
+                legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name])
 
     # CREATE DATA OF ENVELOPE AREA OF DATASET
     # create data of envelope area for subplot 1: structural height
@@ -332,25 +333,38 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             if j == idx_vrfctn:
                 vrfctn_members[0].append(mem)
                 vrfctn_members[1].append(i)
-        sec_typ, mat, cri, opt = legend[i]
+        sec_typ, mat, cri, opt, floor_name = legend[i]
         # set line color
-        if sec_typ == "rc_rec" and system == "Simple Beam":
-            color = 'darkgreen'  # color for reinforced concrete
+        if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
+            color = 'darkgreen'
+
+        elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "Schuettung":
+            color = 'darkolivegreen'
+
+        elif sec_typ == "rc_rec" and system == "Continuous 1D" and floor_name == "Schuettung":
+            color = 'olivedrab'
+
+        elif sec_typ == "rc_rec" and system == "Simple Beam":
+            color = 'darkgreen'
 
         elif sec_typ == "rc_rec" and system == "Continuous 1D":
-            color = 'lightgreen'  # color for reinforced concrete
+            color = 'lightgreen'
 
         elif sec_typ == "wd_rec":
-            color = 'saddlebrown'  # color for wood
-        elif sec_typ == "rc_rib"and system == "Simple Beam":
-            color = 'limegreen'  # color for reinforced concrete
-        elif sec_typ == "rc_rib"and system == "Continuous 1D":
-            color = 'yellow'  # color for reinforced concrete
+            color = 'saddlebrown'
+
+        elif sec_typ == "rc_rib" and system == "Simple Beam":
+            color = 'limegreen'
+
+        elif sec_typ == "rc_rib" and system == "Continuous 1D":
+            color = 'yellow'
+
         elif sec_typ == "wd_rib":
-            color = 'sandybrown'  # color for wood
+            color = 'sandybrown'
 
         else:
             color = "k"
+
         # set linestyle
         if cri == "ULS":
             linestyle = "--"  # line style for ULS
