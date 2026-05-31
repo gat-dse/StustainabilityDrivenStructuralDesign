@@ -292,7 +292,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
         bounds = [bh_w, bh_f, bdi_xo, bb_w, bb]
 
         # definition of fixed values of cross-section
-        l0 = m.li_max
+        l0 = 0.7*m.li_max
         di_x_w = m.section.bw_r[0]  # start value for rebar diameter 18 mm
         di_xu, s_xu, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][1]
         di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
