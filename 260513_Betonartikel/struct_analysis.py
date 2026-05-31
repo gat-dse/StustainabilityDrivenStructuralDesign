@@ -672,7 +672,7 @@ class SupStrucRibbedConcrete(Section):
         self.h = h              # total height [m]
         self.h_f = h_f          # flange height [m]
         self.h_w = h - h_f      # web height [m]
-        self.l0 = l0            # Abstand Momentennullpunkte [m]
+        self.l0 = l0            # Abstand Momentennullpunkte [m] #ACHTUNG l0 ist abhängig vom statischen System
         self.b_eff = self.calc_beff()               #Effective width [m]
         self.a_brutt = self.calc_area()             #Bruttoquerschnittsfläche [m2]
         self.z_s = self.calc_center_of_gravity()    #center of gravity [m]
