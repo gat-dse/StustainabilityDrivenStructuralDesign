@@ -687,7 +687,7 @@ class SupStrucRibbedConcrete(Section):
         return a_brutt
 
     def calc_beff(self):
-        # in: width b [m], bw [m], l_0 [m]
+        # in: width b [m], bw [m], l_0 [m] #ACHTUNG: l0 ist abhängig von statischem System
         # out: effective width b_eff
         l_0 = self.l0
         b_eff_i = 0.2 * (self.b - self.b_w) / 2 + 0.1 * l_0  # SIA 262, 4.1.3.3.2 (20)
