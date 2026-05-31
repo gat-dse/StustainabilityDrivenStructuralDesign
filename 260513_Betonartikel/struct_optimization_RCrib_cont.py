@@ -271,6 +271,13 @@ def rc_rqs(var, add_arg, history_list):
 #OPTIMIZATION OF RIB CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
 def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
+    # definition of initial values for variables, which are going to be optimized
+    b_w0 = m.section.b_w
+
+    # Definition von maximaler effektiver Breite beff mit Fallunterscheidung für Einfeld- und Durchlaufträger
+    l0 = 0.7 * m.li_max
+    b_eff_max = 2 * 0.2 * l0 + b_w0  # max.eff. Breite mit l0 =0.7*l für Innenfeld: 2*beff,i + bw und beff,i,max = 0.2*l0
+
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
         # Fall negative Biegung wird massgebend und obere Bewehrung wird optimiert
         optimise = "oben"
@@ -289,6 +296,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
         bdi_xo = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
         bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
         bb = (0.4, 2.5)  # rib spacing between 0.4 and 1.5 m
+        #bb = (0.4m b_eff_max)
         bounds = [bh_w, bh_f, bdi_xo, bb_w, bb]
 
         # definition of fixed values of cross-section
@@ -329,6 +337,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
         bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
         bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
         bb = (0.4, 2.5)  # rib spacing between 0.4 and 1.5 m
+        # bb = (0.4m b_eff_max)
         bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
 
         # definition of fixed values of cross-section

@@ -44,7 +44,7 @@ if 'rc_rec' in df_clean['section_type'].values:
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
                    'Statisches System', 'lifespan Estrich [a]',
                    'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]',
-                   'Last Struktur [kN/m2]', 'Last Bodenaufbau [kN/m2]', 'co2 Total [kgCO2eq / m2]',
+                   'Last Struktur [N/m2]', 'Last Bodenaufbau [N/m2]', 'co2 Total [kgCO2eq / m2]',
                    'co2 Total pro Jahr [kgCO2eq / m2a]']
 
 if 'rc_rib' in df_clean['section_type'].values:
@@ -60,7 +60,7 @@ if 'rc_rib' in df_clean['section_type'].values:
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
                    'Statisches System', 'lifespan Estrich [a]',
                    'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]',
-                   'Last Struktur [kN/m2]', 'Last Bodenaufbau [kN/m2]', 'co2 Total [kgCO2eq / m2]',
+                   'Last Struktur [N/m2]', 'Last Bodenaufbau N/m2]', 'co2 Total [kgCO2eq / m2]',
                    'co2 Total pro Jahr [kgCO2eq / m2a]']
 
 

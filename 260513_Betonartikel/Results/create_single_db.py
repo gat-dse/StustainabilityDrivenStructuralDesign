@@ -77,12 +77,17 @@ df_final['plot_label'] = df_final['Statisches System'] + "_" + df_final['section
 #5. Neue spalte für Gesamte Querschnittshöhe
 df_final.insert(21, 'h_tot [m]', df_final['h_QS [m]'] + df_final['h_Bodenaufbau [m]'])
 
-# 5. Neue spalte für Gesamte Last am Ende ergänzen
+#6. Anpassung Einheit für Lasten von [N/m2] in [kN/m2]
+df_final['Last Struktur [kN/m2]'] = df_final.pop('Last Struktur [N/m2]') / 1000
+df_final['Last Bodenaufbau [kN/m2]'] = df_final.pop('Last Bodenaufbau [N/m2]') / 1000
+
+#6. Neue spalte für Gesamte Last am Ende ergänzen
 df_final['Last_tot [kN/m2]'] = df_final['Last Struktur [kN/m2]'] + df_final['Last Bodenaufbau [kN/m2]']
 
-# 6. Korrektur für GWP Member
+# 7. Korrektur für GWP Member
 df_final['co2 Total [kgCO2eq / m2]'] = df_final['co2 Total [kgCO2eq / m2]'] / df_final['l_tot [m]']
 df_final['co2 Total pro Jahr [kgCO2eq / m2a]'] = df_final['co2 Total pro Jahr [kgCO2eq / m2a]'] / df_final['l_tot [m]']
+
 
 
 # 7. Speichern

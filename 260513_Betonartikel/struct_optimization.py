@@ -33,7 +33,9 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
     h0 = l0 / 25
 
     # =========================================================================
-    # FALL 1: DURCHLAUFTRÄGER (Zweistufige sequentielle Optimierung)
+    # FALL 1: DURCHLAUFTRÄGER (Zweistufige sequentielle Optimierung).
+    # Zuerst wird QS im Feld optimiert (h, di_xu).
+    # Dann wird mit fixem h die Bewehrung über der Stütze optimiert
     # =========================================================================
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
         # --- STUFE 1: Erst Geometrie (h) und Feldbewehrung (di_xu) im Feld optimieren ---
@@ -45,15 +47,14 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 
         var0_stufe1 = [h0, di_xu0]
 
-        # DYNAMISCHER DECKEL (Wichtig gegen den Peak!):
-        # Verhindert unphysikalische Dickenschübe bei mittleren Spannweiten
-        h_max_dynamisch = max(0.35, l0 / 12)
+        #h_max_dynamisch = max(0.35, l0 / 12)
+
 
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) # h_max_dynamisch)
         else:
-            bh = (max(0.08, m.section.hmin_c), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
 
         bdi_xu = (0.008, 0.04)
         bounds_stufe1 = [bh, bdi_xu]
@@ -80,7 +81,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 
         h_opt, di_xu_opt = opt_1.x
 
-        # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Jetzt Stützenbewehrung (di_xo) ermitteln ---
+        # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Stützenbewehrung (di_xo) ermitteln ---
         optimise_stufe2 = "stuetze_fix_h"
         var0_stufe2 = [di_xo_schätzwert]
         bounds_stufe2 = [(0.008, 0.04)]
@@ -108,13 +109,13 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         di_xu0 = m.section.bw[0][0]
         var0 = [h0, di_xu0]
 
-        h_max_dynamisch = max(0.35, l0 / 12)
+        #h_max_dynamisch = max(0.35, l0 / 12)
 
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) #h_max_dynamisch)
         else:
-            bh = (max(0.08, m.section.hmin_c), h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
 
         bdi_xu = (0.008, 0.04)
         bounds = [bh, bdi_xu]
@@ -261,24 +262,42 @@ def rc_rqs(var, add_arg):
     penalty1 = max(member.qk - member.qk_zul_gzt, 0)
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if optimise == "beide":
-        # Beim Durchlaufträger im kombinierten Modus prüfen wir das maßgebende Feldmoment (pos) und Stützmoment (neg)
-        if member.mkd_p < member.section.mr_p and member.mkd_n < member.section.mr_n:
+    # 1. Fall: Reine Kragarme oder Bauteile mit reinem negativen Moment ("oben")
+    if optimise == "oben":
+        if abs(member.mkd_n) < abs(member.section.mr_n): #falls Biegemoment kleiner ist als Rissmoment ist QS ungerissen
             d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                          member.w_app - member.w_app_adm]
+                          member.w_app - member.w_app_adm] #Durchbiegung ungerissen
         else:
             d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
                           member.w_app_ger - member.w_app_adm]
-    elif optimise == "oben" and member.mkd_n < member.section.mr_n:
-        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
-    elif optimise == "unten" and member.mkd_p < member.section.mr_p:
-        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
+
+    # 2. Fall: Reiner Einfeldträger ("unten") -> Prüft nur das Feld
+    elif optimise == "unten":
+        if member.mkd_p < member.section.mr_p: #falls positives Biegemoment kleiner ist als Rissmoment, ist QS ungerissen
+            d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
+                          member.w_app - member.w_app_adm] #Durchbiegung ungerissen
+        else:
+            d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
+                          member.w_app_ger - member.w_app_adm]
+
+    # 3. Fall: Der Durchlaufträger (wird hier über "feld" und "stuetze_fix_h" abgefangen)
     else:
-        d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
-                      member.w_app_ger - member.w_app_adm]
+        # UNGERISSEN NUR WENN: Feld ungerissen UND Stütze ungerissen
+        # Hinweis: Da mr_n negativ definiert ist, prüfen wir mit absoluten Werten.
+        if member.mkd_p < member.section.mr_p and abs(member.mkd_n) < abs(member.section.mr_n):
+            # Für beide Bereiche ist Biegemoment < Rissmoment und somit Zustand I -> Ungerissen
+            d1, d2, d3 = [member.w_install - member.w_install_adm,
+                          member.w_use - member.w_use_adm,
+                          member.w_app - member.w_app_adm]
+        else:
+            # Sobald für Feld ODER Stütze das Biegemoment > Rissmoment wird, gilt Zustand II -> Gerissen rechnen
+            d1, d2, d3 = [member.w_install_ger - member.w_install_adm,
+                          member.w_use_ger - member.w_use_adm,
+                          member.w_app_ger - member.w_app_adm]
+
     penalty2 = 1e5 * max(d1, d2, d3, 0)
+
+
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
     pen_a = 0
@@ -344,24 +363,34 @@ def rc_rqs(var, add_arg):
 #OPTIMIZATION OF RIB CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
 def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
+
+
     # definition of initial values for variables, which are going to be optimized
     h_w0 = m.section.h-m.section.h_f  # start value for height corresponds to 1/20 of system length
     h_f0 = m.section.h_f
     di_x_w0 = m.section.bw_r[0]  # start value for rebar diameter 40 mm
     b_w0 = m.section.b_w
     b0 = m.section.b
+
+    #Definition von maximaler effektiver Breite beff für Einfeldträger (Optimierung Durchlaufträger aktuell in anderem File)
+    l0 = m.li_max
+
+    b_eff_max = 2 * 0.2 * l0 +b_w0 #max.eff. Breite mit l0 =0.7*l für Innenfeld: 2*beff,i + bw und beff,i,max = 0.2*l0
+
     var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
+
 
     # define bounds of variables #TODO adapt boundaries for Mindestplattenstärke für 4 Bewehrungslagen
     bh_f = (0.08, 0.5)  # height between 8 cm and 50 cm
     bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
-    bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm
-    bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m #TODO bb nicht in Optimierung sondern als bb in struct analyxis
+    bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
+    bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m #TODO Anpassung Grenzen optimierung
+    #bb = (0.4, b_eff_max)
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
 
     # definition of fixed values of cross-section
-    l0 = m.li_max
+    #l0 = m.li_max wird bereits oben definiert mit Fallunterscheidung für Statisches System
     di_xu, s_xu, di_xo, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
     di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
     n_x_w = m.section.bw_r[1]
@@ -409,36 +438,7 @@ def rc_rib_rqs(var, add_arg):
     # define penalty1, if ULS is not fulfilled
     penalty1 = max(member.qk - member.qk_zul_gzt, 0)
 
-    # define penalty2, if SLS1 (deflections) are not fulfilled
-    if optimise == "beide":
-        # Durchlaufträger: Er gilt als gerissen, sobald Feld ODER Stütze reißt!
-        is_gerissen = (member.mkd_p >= member.section.mr_p or member.mkd_n >= member.section.mr_n)
-    else:
-        # Einfeldträger ("unten"): Er gilt als gerissen, wenn das Feld reißt
-        is_gerissen = (member.mkd_p >= member.section.mr_p)
 
-    # Zuweisung der Verformungswerte basierend auf dem Risszustand
-    if not is_gerissen:
-        # Zustand I: Träger bleibt komplett ungerissen
-        d1 = member.w_install - member.w_install_adm
-        d2 = member.w_use - member.w_use_adm
-        d3 = member.w_app - member.w_app_adm
-        penalty_multiplikator = 1e5
-    else:
-        # Zustand II: Gerissen (Das Problemkind bei großen Spannweiten!)
-        d1 = member.w_install_ger - member.w_install_adm
-        d2 = member.w_use_ger - member.w_use_adm
-        d3 = member.w_app_ger - member.w_app_adm
-        # Höherer Multiplikator zwingt den Optimierer bei 10m/12m, die Decke
-        # real dicker zu machen (h0 zu vergrößern), anstatt nur Stahl zu spendieren.
-        penalty_multiplikator = 1e7
-
-    # Ermittlung der maximalen Verletzung des Grenzwerts
-    max_def_error = max(d1, d2, d3, 0)
-    penalty2 = penalty_multiplikator * max_def_error
-
-    #alte Definition von Penatly 2
-    '''
     # define penalty2, if SLS1 (deflections) are not fulfilled
     if member.mkd_p < member.section.mr_p and member.mkd_n < member.section.mr_n:
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
@@ -448,7 +448,7 @@ def rc_rib_rqs(var, add_arg):
                       member.w_app - member.w_app_adm]
         #d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
         #              member.w_app_ger - member.w_app_adm]
-    penalty2 = 1e5 * max(d1, d2, d3, 0)'''
+    penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
     #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
@@ -742,8 +742,8 @@ def get_opt_sec(section, gwp_budget):
         var0 = [h_0, di_xu0]
 
         # define bounds of variables
-        bh = (0.06, 2.0)  # height between 6 cm and 2.0 m
-        bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
+        bh = (0.08, 2.0)  # height between 8 cm and 2.0 m
+        bdi_xu = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
         bounds = [bh, bdi_xu]
 
         # definition of fixed values of cross-section
@@ -775,8 +775,8 @@ def get_opt_sec(section, gwp_budget):
         var0 = [h_0, di_xu0, b_w0, b0]
 
         # define bounds of variables
-        bh = (0.3, 2)  # height between 6 cm and 1.0 m #TODO Bounds anpassen!!
-        bdi_x_w = (0.01, 0.04)  # diameter of rebars between 6 mm and 40 mm
+        bh = (0.08, 1)  # height between 8 cm and 1.0 m #TODO Bounds anpassen!!
+        bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
         bb_w = (0.12, 0.4)  # rib width between 12 and 60 cm
         bb = (1, 1.5)  # rib spacing between 0.5 and 2.5 m
         bounds = [bh, bdi_x_w, bb_w, bb]

@@ -48,7 +48,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
             bh = (max(0.08, m.section.hmin_c), 0.8)
 
         else:
-            # falls mal ein anderer Name reinkommt
+            # für andere Boenaufbauten
             bh = (max(0.08, m.section.hmin_c), 0.8)
 
         #bh = (max(0.08, m.section.hmin_c, 0.8))
@@ -78,7 +78,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
             bh = (max(0.08, m.section.hmin_c), 0.8)
 
         else:
-            #falls mal ein anderer Name reinkommt
+            # für andere Boenaufbauten
             bh = (max(0.08, m.section.hmin_c), 0.8)
 
 
@@ -208,14 +208,14 @@ def rc_rqs(var, add_arg):
     # define penalty1, if ULS is not fulfilled
     penalty1 = max(member.qk - member.qk_zul_gzt, 0)
 
-    # define penalty2, if SLS1 (deflections) are not fulfilled
-    if optimise == "oben" and member.mkd_n < member.section.mr_n:
+    # define penalty2, if SLS1 (deflections) are not fulfilled #TODO FEHLER bei vergleich für neg. Moment mit negativen Werten
+    if optimise == "oben" and member.mkd_n < member.section.mr_n: #mkd_n und mr_n sind negative Wert. falls negativer Biegemoment (-) kleiner ist als Rissmoment (-), ist QS gerissen. z.B. Mk_n = -40kNm und Mr = -20 kNm
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
-    elif optimise == "unten" and member.mkd_p < member.section.mr_p:
+    elif optimise == "unten" and member.mkd_p < member.section.mr_p: #falls positiver Biegemoment kleiner ist als Rissmoment, ist QS ungerissen
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
-    else:
+                      member.w_app - member.w_app_adm] #Durchbiegung ungerissen
+    else: #sonst: Durchbiegung gerissen
         d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
                       member.w_app_ger - member.w_app_adm]
     penalty2 = 1e5 * max(d1, d2, d3, 0)
