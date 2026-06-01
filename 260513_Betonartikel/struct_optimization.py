@@ -393,6 +393,8 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     #l0 = m.li_max wird bereits oben definiert mit Fallunterscheidung für Statisches System
     di_xu, s_xu, di_xo, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
     di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+    #TODO Bügelbewehrung Plattenbalken ist nicht in Optimierung berücksichtigt.
+    #di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg_r[0], m.section.bw_bg_r[1], m.section.bw_bg_r[2]
     n_x_w = m.section.bw_r[1]
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
