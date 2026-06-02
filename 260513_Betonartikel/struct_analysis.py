@@ -1659,6 +1659,7 @@ class Member2D:
                                                                      self.section.h, self.section.d)
                     )
                 self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
+                self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2 / 60)
 
                 # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
                 """
