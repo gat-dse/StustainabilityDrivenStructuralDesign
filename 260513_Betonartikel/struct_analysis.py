@@ -481,6 +481,23 @@ class FlatSlab2D(SupStrucRectangular):
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds, self.dy, self.dsy] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
+        # TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
+        self.as_min = mr / (
+                    0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+
+        # Durchmesser Mindestbewehrung für 1. & 4. Lage
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+
+        # Durchmesser Mindestbewehrung für 2. & 3. Lage
+        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5  # 2. Lage mit Abstand s_yu
+        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
+
+        # Neue Definition Bewehrung mit Mindestbewehrung
+        self.bw = [[max(di_xu, di_xu_min), s_xu], [max(di_xo, di_xo_min), s_xo], [max(di_yu, di_yu_min), s_yu],
+                   [max(di_yo, di_yo_min), s_yo]]
+
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('x','pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('x','neg')
         [self.mu_max_y, self.x_p_y, self.as_p_y, self.qs_class_p_y] = self.calc_mu('y', 'pos')
@@ -490,21 +507,6 @@ class FlatSlab2D(SupStrucRectangular):
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
 
-        #TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
-        #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
-        self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-
-        # Durchmesser Mindestbewehrung für 1. & 4. Lage
-        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
-        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
-
-        #Durchmesser Mindestbewehrung für 2. & 3. Lage
-        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
-        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
-
-
-        #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[max(di_xu, di_xu_min), s_xu], [max(di_xo, di_xo_min), s_xo], [max(di_yu, di_yu_min), s_yu], [max(di_yo,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
@@ -512,6 +514,7 @@ class FlatSlab2D(SupStrucRectangular):
         #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
         #Gesamte Bewehrungsfläche as_tot
+        #TODO: asy ist so angesetzt, als würde es auch in x-Richtung verlaufen ! beim 1D Fall ist es ebenso falsch. solange lx = ly ist es nicht relevant.
         self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
@@ -1693,16 +1696,19 @@ class Member2D:
         Schauen, welche Nachweise man alles in beide Richtungen machen muss und bei welchen einfach l_max ausreicht!
         """
         # calculates maximal load qu in respect to bearing moment mu_max, mu_min and static system
-        alpha_m = self.system.alpha_m_x
+        alpha_m_x = self.system.alpha_m_x
+        alpha_m_y = self.system.alpha_m_y
         alpha_v = self.system.alpha_v
         qs_class_erf = self.system.qs_cl_erf  # z.B. [0, 2]
         qs_class_vorh = [self.section.qs_class_n, self.section.qs_class_p]
 
-        if min(alpha_m) == 0:
+        if min(alpha_m_x) == 0 and min(alpha_m_y) == 0:
             if qs_class_vorh[1] <= qs_class_erf[1]:
                 # if cross-section fulfills the ductility criterion (e.g. required: PP, present PP) then assign the full
                 # bending strength
-                qu_bend = self.section.mu_max / (max(alpha_m) * self.system.l_tot ** 2)
+                qu_bend_x = self.section.mu_max / (max(alpha_m_x) * self.system.lx ** 2)
+                qu_bend_y = self.section.mu_max_y / (max(alpha_m_y) * self.system.ly ** 2)
+                qu_bend =min(qu_bend_x, qu_bend_y)
             else:
                 # if the cross-section is not fulfilling the ductility criterion (e.g. required: EP, present PP) then
                 # assign a value, which drops from the full bending strength fast towards 0 (for concrete sections)
@@ -1716,17 +1722,25 @@ class Member2D:
                     else:
                         shift = 0.5
                     x_d = self.section.x_p / self.section.d
-                    factor = min(0.5 * (1 + 2 / np.pi * np.arctan((self.section.mu_max - self.section.mr_p) / epsilon)),    #README: Wieso wird hier mit diesem factor gearbeitet? und nicht ienfahc mit qu_bend = 0 wie beim Mehrfehldträger?
+                    factor_x = min(0.5 * (1 + 2 / np.pi * np.arctan((self.section.mu_max - self.section.mr_p) / epsilon)),    #README: Wieso wird hier mit diesem factor gearbeitet? und nicht ienfahc mit qu_bend = 0 wie beim Mehrfehldträger?
                                  1 - 0.5 * (1 + 2 / np.pi * np.arctan((x_d - shift) / epsilon)))
-                    qu_bend = factor * self.section.mu_max / (max(alpha_m) * self.system.l_tot ** 2)
+                    qu_bend_x = factor_x * self.section.mu_max / (max(alpha_m_x) * self.system.lx ** 2)
+                    x_d_y = self.section.x_p_y / self.section.dy
+                    factor_y = min( 0.5 * (1 + 2 / np.pi * np.arctan((self.section.mu_max_y - self.section.mr_p) / epsilon)),   # README: Wieso wird hier mit diesem factor gearbeitet? und nicht ienfahc mit qu_bend = 0 wie beim Mehrfehldträger?
+                                1 - 0.5 * (1 + 2 / np.pi * np.arctan((x_d_y - shift) / epsilon)))
+                    qu_bend_y = factor_y * self.section.mu_max_y / (max(alpha_m_y) * self.system.ly ** 2)
+                    qu_bend = min(qu_bend_x, qu_bend_y)
                 else:
                     # for all other cross-sections bending strength = 0
                     qu_bend = 0
             qu_shear = self.section.vu_p / (max(alpha_v) * self.system.l_tot)
         else:
             if qs_class_vorh[0] <= qs_class_erf[0] & qs_class_vorh[1] <= qs_class_erf[1]:
-                qu_bend = min(self.section.mu_max / (max(alpha_m) * self.system.l_tot ** 2), self.section.mu_min /
-                              (min(alpha_m) * self.system.l_tot ** 2))
+                qu_bend_x = min(self.section.mu_max / (max(alpha_m_x) * self.system.lx ** 2), self.section.mu_min /
+                              (min(alpha_m_x) * self.system.lx ** 2))
+                qu_bend_y = min(self.section.mu_max_y / (max(alpha_m_y) * self.system.ly ** 2), self.section.mu_min_y /
+                                (min(alpha_m_y) * self.system.ly ** 2))
+                qu_bend = min(qu_bend_x, qu_bend_y)
             else:
                 qu_bend = 0
             qu_shear = min(self.section.vu_p / (max(alpha_v) * self.system.l_tot),

@@ -14,7 +14,7 @@ import struct_optimization_2D
 idx_vrc = 1
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 50
+max_iter = 100
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
@@ -54,8 +54,8 @@ vrfctn_members = []
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED REINFORCED CONCRETE CROSS-SECTIONS
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names = ["'ready_mixed_concrete'"]
-length_x = [3.0]#, 6.0, 8.0, 12.0]
-length_y = [3.0]#, 6.0, 8.0, 12.0]
+length_x = [3.0, 6.0, 8.0, 12.0]
+length_y = [3.0, 6.0, 8.0, 12.0]
 support = ["LL-frei"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
@@ -66,8 +66,8 @@ vrfctn_members.append(vrfctn_members_new)
 
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names = ["'ready_mixed_concrete'"]
-length_x = [3.0]#, 6.0, 8.0, 12.0]
-length_y = [3.0]#, 6.0, 8.0, 12.0]
+length_x = [3.0, 6.0, 8.0, 12.0]
+length_y = [3.0, 6.0, 8.0, 12.0]
 support = ["LL-eingespannt"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
