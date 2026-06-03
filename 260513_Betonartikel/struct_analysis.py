@@ -308,7 +308,7 @@ class RectangularConcrete(SupStrucRectangular):
 
 
         #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [di_yu_min, s_yu], [di_yo_min, s_yo]]
+        self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
@@ -747,6 +747,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.c_nom = c_nom
         self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung
         self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
+
         self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
         mr_slab = self.b * self.h_f ** 2 / 6  * self.concrete_type.fctm  # Platte (Slab) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
@@ -754,23 +755,34 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.mr_p, self.mr_n = mr_slab, -mr_slab
         self.mr_pb_p = mr_pb
         self.mr_pb_n = -mr_pb
+
+        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr für Platte
+        self.as_min = mr_slab / (0.8 * self.h_f * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.8*h
+        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+        #Platte (slab) mit Mindestbewehrung
+        di_xu = max(0.008, di_xu_min)
+        di_xo = max(0.008, di_xo_min)
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung mit Mindestbewehrung
+
+        #Berechnung Satische Höhe, Mu (Biegewiderstand charak.) und Bew.-Gehalt für Platte (Slab) & Plattenbalken
         [self.d, self.ds, self.d_PB, self.ds_PB] = self.calc_d()
         [self.mu_max_slab, self.x_p, self.as_p, self.qs_class_p_slab] = self.calc_mu('pos')
         [self.mu_min_slab, self.x_n, self.as_n, self.qs_class_n_slab] = self.calc_mu('neg')
+
         [self.mu_max, self.x_PB_p, self.as_PB_p, self.qs_class_p] = self.calc_mu_pb('pos')
         [self.mu_min, self.x_PB_n, self.as_PB_n, self.qs_class_n] = self.calc_mu_pb('neg')
+
         self.roh_slab, self.rohs, self.roh = self.as_p / self.d, self.as_n / self.ds, self.as_PB_p / self.d_PB
+        # Berechnung Vu (Querkraftwiderstand charak.) für Platte (Slab) & Plattenbalken
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
-        [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance(
-            'Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
+        [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance('Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
+
         self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
         #a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
 
-        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr für Platte
-        self.as_min = mr_slab / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5 #1. Lage mit Abstand s_xu
-        di_xo_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xu
+
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Bewehrung in y-Richtung in Platte
         self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
 
@@ -795,8 +807,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     def calc_d(self):
         d = self.h_f - self.c_nom - self.bw[0][0] / 2  # Statische Höhe 1. Lage Platte
         ds = self.h_f - self.c_nom - self.bw[1][0] / 2  # Statische Höhe 4. Lage Platte
-        d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[
-            0] / 2  # Nur eine Lage Längsbewehrung implementiert. ACHTUNG: Check implementieren, ob genug Platz für Längsbewehrung vorhanden!!
+        d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[0] / 2  # Nur eine Lage Längsbewehrung implementiert. ACHTUNG: Check implementieren, ob genug Platz für Längsbewehrung vorhanden!!
         ds_PB = self.h - self.h_f/2   # Mittlere statische Höhe azûf Mitte Platte
         return d, ds, d_PB, ds_PB
 
@@ -903,7 +914,8 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         x_p, x_PB_p = self.x_p, self.x_PB_p
         x_n, x_PB_n = self.x_n, self.x_PB_n
         as_bw = 0
-        as_PB_bw = np.pi * di_r ** 2 / 4 * n_r / s_r * 0.9 * d
+        #Berechnung Bew.-fläche Bügel in Rippen
+        as_PB_bw = np.pi * di_r ** 2 / 4 * n_r / s_r * 0.9 * d #as_PB_bw = asi * (n + 0.9 d) / si
 
         if bauteil == 'Platte':
             if d_installation < d / 6:  #SIA 262 4.3.3.2.8
