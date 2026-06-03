@@ -629,7 +629,7 @@ class FlatSlab2D(SupStrucRectangular):
         if rohw < rohw_min or s > s_max or n < n_min:  # cross-section resistance without stirrups
             ev = 1.5 * fsd / es         #SIA 262
             kg = 48 / (16 + dmax)       #SIA 262
-            kd = 1 / (1 + ev * d * kg)  #SIA 262
+            kd = 1 / (1 + ev * d*1000 * kg)  #SIA 262 #d in mm
             vrd = kd * tcd * dv
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
         else:  # cross-section resistance with vertical stirrups
