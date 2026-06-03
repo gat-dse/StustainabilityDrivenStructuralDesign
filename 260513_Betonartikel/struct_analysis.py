@@ -495,8 +495,7 @@ class FlatSlab2D(SupStrucRectangular):
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
 
         # Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[max(di_xu, di_xu_min), s_xu], [max(di_xo, di_xo_min), s_xo], [max(di_yu, di_yu_min), s_yu],
-                   [max(di_yo, di_yo_min), s_yo]]
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu], [di_yo, s_yo]]
 
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('x','pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('x','neg')
@@ -515,7 +514,8 @@ class FlatSlab2D(SupStrucRectangular):
 
         #Gesamte Bewehrungsfläche as_tot
         #TODO: asy ist so angesetzt, als würde es auch in x-Richtung verlaufen ! beim 1D Fall ist es ebenso falsch. solange lx = ly ist es nicht relevant.
-        self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
+        self.a_s_stat = 0.6*self.as_p + 0.4*self.as_n + 0.6*self.as_p_y + 0.4*self.as_n_y + (0.6+0.4+0.6+0.4)*self.as_min +self.as_bw # Abgestuft bei den Momentennullpunkten, Rest mit Asmin
+        #self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
 
@@ -1312,7 +1312,7 @@ class BeamContinuousSupPl:
         self.li_max = self.l_tot  # max span (used for calculation of admissible deflections)
         self.alpha_m = [-3/48, 3/48]  # Faktor zur Berechung des Momentes unter verteilter Last
         self.alpha_v = [0.5, 0.5]  # Faktor zur Berechung der Querkarft unter verteilter Last
-        self.qs_cl_erf = [3, 3]  # Querschnittsklasse: 1 == PP, 2 == EP, 3 == EE
+        self.qs_cl_erf = [1,1]  # Querschnittsklasse: 1 == PP, 2 == EP, 3 == EE
         self.alpha_w = 1 / 384  # Faktor zur Berechung der Durchbiegung unter verteilter Last
         self.kf2 = 1.0  # Hilfsfaktor zur Brücksichtigung der Spannweitenverhältnisse bei Berechnung f1 gem. HBT, S. 46
         self.alpha_w_f_cd = 1/192  # Faktor zur Berechung der Durchbiegung unter Einzellast
@@ -1346,7 +1346,7 @@ class Slab:
         #y-Ritchtun = Richtung mit minimaler Spannweite
         self.alpha_m_y = (float(self.result[6]), float(self.result[7]))
         self.alpha_v = (float(self.result[8]), float(self.result[9]))
-        self.qs_cl_erf = [2, 1]
+        self.qs_cl_erf = [2, 2]
         self.alpha_w = float(self.result[10])
         self.kf2 = 1.0
         self.alpha_w_f_cd = 10000
@@ -1713,15 +1713,18 @@ class Member2D:
         alpha_v = self.system.alpha_v
         qs_class_erf = self.system.qs_cl_erf  # z.B. [0, 2]
         qs_class_vorh = [self.section.qs_class_n, self.section.qs_class_p]
+        qs_class_vorh_y = [self.section.qs_class_n_y, self.section.qs_class_p_y]
 
         if min(alpha_m_x) == 0 and min(alpha_m_y) == 0:
-            if qs_class_vorh[1] <= qs_class_erf[1]:
+            if qs_class_vorh[1] <= qs_class_erf[1] and qs_class_vorh_y[1] <= qs_class_erf[1]:
                 # if cross-section fulfills the ductility criterion (e.g. required: PP, present PP) then assign the full
                 # bending strength
                 qu_bend_x = self.section.mu_max / (max(alpha_m_x) * self.system.lx ** 2)
                 qu_bend_y = self.section.mu_max_y / (max(alpha_m_y) * self.system.ly ** 2)
                 qu_bend =min(qu_bend_x, qu_bend_y)
             else:
+                qu_bend = 0
+                """
                 # if the cross-section is not fulfilling the ductility criterion (e.g. required: EP, present PP) then
                 # assign a value, which drops from the full bending strength fast towards 0 (for concrete sections)
                 # or a value of 0 (for all other sections)
@@ -1745,14 +1748,16 @@ class Member2D:
                 else:
                     # for all other cross-sections bending strength = 0
                     qu_bend = 0
+                    """
             qu_shear = self.section.vu_p / (max(alpha_v) * self.system.l_tot)
         else:
-            if qs_class_vorh[0] <= qs_class_erf[0] & qs_class_vorh[1] <= qs_class_erf[1]:
-                qu_bend_x = min(self.section.mu_max / (max(alpha_m_x) * self.system.lx ** 2), self.section.mu_min /
-                              (min(alpha_m_x) * self.system.lx ** 2))
-                qu_bend_y = min(self.section.mu_max_y / (max(alpha_m_y) * self.system.ly ** 2), self.section.mu_min_y /
-                                (min(alpha_m_y) * self.system.ly ** 2))
-                qu_bend = min(qu_bend_x, qu_bend_y)
+            if qs_class_vorh[1] <= qs_class_erf[1] and qs_class_vorh_y[1] <= qs_class_erf[1]:
+                if qs_class_vorh[0] <= qs_class_erf[0] and qs_class_vorh[1] <= qs_class_erf[1]:
+                    qu_bend_x = min(self.section.mu_max / (max(alpha_m_x) * self.system.lx ** 2), self.section.mu_min / (min(alpha_m_x) * self.system.lx ** 2))
+                    qu_bend_y = min(self.section.mu_max_y / (max(alpha_m_y) * self.system.ly ** 2), self.section.mu_min_y / (min(alpha_m_y) * self.system.ly ** 2))
+                    qu_bend = min(qu_bend_x, qu_bend_y)
+                else:
+                    qu_bend = 0
             else:
                 qu_bend = 0
             qu_shear = min(self.section.vu_p / (max(alpha_v) * self.system.l_tot),

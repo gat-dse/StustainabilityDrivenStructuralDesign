@@ -14,7 +14,7 @@ import struct_optimization_2D
 idx_vrc = 1
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 200
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
