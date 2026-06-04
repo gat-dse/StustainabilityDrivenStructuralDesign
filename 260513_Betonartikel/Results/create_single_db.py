@@ -33,18 +33,22 @@ target_columns = [
     "h_Bodenaufbau [m]",
     "co2 Bodenaufbau [kgCO2eq/m2]",
     "co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]",
-    "Last Struktur [kN/m2]",
-    "Last Bodenaufbau [kN/m2]",
-    "co2 Total [kgCO2eq / m2]",
-    "co2 Total pro Jahr [kgCO2eq / m2a]",
+    "Last Struktur [N/m2]",
+    "Last Bodenaufbau [N/m2]",
+    "co2 [kgco2eq/m2]",
+    "co2 pro Jahr [kgco2eq/m2a]",
 ]
 
 # 1. Excel Files definieren
 excel_files = [
-    "Members_simple_rc_rec_150_clean.xlsx",
-    "Members_simple_rc_rib_150_clean.xlsx",
-    "Members_simple_rc_rec_150_var_clean.xlsx",
-    "Members_continuous_rc_rec_150_clean.xlsx",
+    "Members_rc_rec_2_clean.xlsx",
+    "Members_rc_rec_2span_2_clean.xlsx",
+    "Members_rc_rec_cont_2_clean.xlsx",
+    "Members_rc_rec_2_massiv_clean.xlsx",
+    "Members_rc_rec_2span_2_massiv_clean.xlsx",
+    "Members_rc_rec_cont_2_massiv_clean.xlsx",
+    "Members_rc_rib_2_clean.xlsx",
+    "Members_rc_rib_cont_2_clean.xlsx",
 ]
 
 # Liste, in der wir die vorbereiteten DataFrames sammeln
@@ -84,14 +88,9 @@ df_final['Last Bodenaufbau [kN/m2]'] = df_final.pop('Last Bodenaufbau [N/m2]') /
 #6. Neue spalte für Gesamte Last am Ende ergänzen
 df_final['Last_tot [kN/m2]'] = df_final['Last Struktur [kN/m2]'] + df_final['Last Bodenaufbau [kN/m2]']
 
-# 7. Korrektur für GWP Member
-df_final['co2 Total [kgCO2eq / m2]'] = df_final['co2 Total [kgCO2eq / m2]'] / df_final['l_tot [m]']
-df_final['co2 Total pro Jahr [kgCO2eq / m2a]'] = df_final['co2 Total pro Jahr [kgCO2eq / m2a]'] / df_final['l_tot [m]']
-
-
 
 # 7. Speichern
-output_file = "260520_Iteration150_total.xlsx"
+output_file = "260604_RC_1D_Systems.xlsx"
 df_final.to_excel(output_file, index=False)
 
 print(
