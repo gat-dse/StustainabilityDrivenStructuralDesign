@@ -75,20 +75,20 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
-
+'''
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc_rib,
                                                               req, "rc_rib", mat_names, g2k, qk, max_iter,
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)
+vrfctn_members.append(vrfctn_members_new)'''
 
-'''
+
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc, system="Continuous 1D" )
 data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)'''
+vrfctn_members.append(vrfctn_members_new)
 '''
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,

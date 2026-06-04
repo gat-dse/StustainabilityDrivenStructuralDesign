@@ -47,8 +47,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 
         var0_stufe1 = [h0, di_xu0]
 
-        #h_max_dynamisch = max(0.35, l0 / 12)
-
 
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
@@ -56,7 +54,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         else:
             bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
 
-        bdi_xu = (0.008, 0.04)
+        bdi_xu = (max(0.008, m.section.di_xu_min), 0.04) #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
         bounds_stufe1 = [bh, bdi_xu]
 
         # Fixe Werte aus dem Querschnitt auslesen
@@ -66,6 +64,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
+
 
         # Übergabe-Argumente für Stufe 1
         add_arg_stufe1 = [m.system, co, st, b, s_xu, di_xo_schätzwert, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
@@ -84,7 +83,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Stützenbewehrung (di_xo) ermitteln ---
         optimise_stufe2 = "stuetze_fix_h"
         var0_stufe2 = [di_xo_schätzwert]
-        bounds_stufe2 = [(0.008, 0.04)]
+        bounds_stufe2 = [(max(0.008, m.section.di_xo_min), 0.04)] #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
 
         add_arg_stufe2 = [m.system, co, st, b, s_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
                           m.requirements, to_opt, criterion, m.g2k, m.qk, h_opt, di_xu_opt, optimise_stufe2]
@@ -102,14 +101,12 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         di_xo = opt_2.x[0]
 
     # =========================================================================
-    # FALL 2: SIMPLE BEAM / EINFELDTRÄGER (Unverändert)
+    # FALL 2: SIMPLE BEAM / EINFELDTRÄGER
     # =========================================================================
     else:
         optimise = "unten"
         di_xu0 = m.section.bw[0][0]
         var0 = [h0, di_xu0]
-
-        #h_max_dynamisch = max(0.35, l0 / 12)
 
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
@@ -117,12 +114,13 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         else:
             bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
 
-        bdi_xu = (0.008, 0.04)
+        bdi_xu = (max(0.008, m.section.di_xu_min), 0.04) #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
         bounds = [bh, bdi_xu]
 
+        # Fixe Werte aus dem Querschnitt auslesen
         b = m.section.b
         s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
+        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0] , m.section.bw[3][1]
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
@@ -374,8 +372,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
     #Definition von maximaler effektiver Breite beff für Einfeldträger (Optimierung Durchlaufträger aktuell in anderem File)
     l0 = m.li_max
-
-    b_eff_max = 2 * 0.2 * l0 +b_w0 #max.eff. Breite mit l0 =0.7*l für Innenfeld: 2*beff,i + bw und beff,i,max = 0.2*l0
+    b_eff_max = 2 * 0.2 * l0 +b_w0 #max.eff. Breite mit l0 =l für Einfeldträger: 2*beff,i + bw und beff,i,max = 0.2*l0
 
     var0 = [h_w0, h_f0, di_x_w0, b_w0, b0]
 
@@ -389,13 +386,13 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     bb = (0.4, 3.8) # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
 
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
+    # TODO Bügelbewehrung Plattenbalken ist nicht in Optimierung berücksichtigt.
+    # di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg_r[0], m.section.bw_bg_r[1], m.section.bw_bg_r[2]
 
-    # definition of fixed values of cross-section
-    #l0 = m.li_max wird bereits oben definiert mit Fallunterscheidung für Statisches System
-    di_xu, s_xu, di_xo, s_xo = m.section.bw[0][0], m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
+    s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
+    di_xu, di_xo = max(0.008, m.section.di_xu_min, m.section.bw[0][0]), max(0.008, m.section.di_xo_min, m.section.bw[1][0])  #
+
     di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-    #TODO Bügelbewehrung Plattenbalken ist nicht in Optimierung berücksichtigt.
-    #di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg_r[0], m.section.bw_bg_r[1], m.section.bw_bg_r[2]
     n_x_w = m.section.bw_r[1]
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 

@@ -40,10 +40,10 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
 
     # define bounds of variables
     bh = (h_min, 1.2)  # height between h_min and 1.2 m
-    bdi_xu = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
-    bdi_xo = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
-    bdi_yu = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
-    bdi_yo = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bdi_xu = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+    bdi_xo = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+    bdi_yu = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
+    bdi_yo = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bounds = [bh, bdi_xu, bdi_xo, bdi_yu, bdi_yo]
 
     # definition of fixed values of cross-section
