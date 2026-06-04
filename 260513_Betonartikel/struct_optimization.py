@@ -440,7 +440,7 @@ def rc_rib_rqs(var, add_arg):
 
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if member.mkd_p < member.section.mr_p and member.mkd_n < member.section.mr_n:
+    if member.mkd_p < member.section.mr_p and abs(member.mkd_n) < abs(member.section.mr_n):
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
     else:
