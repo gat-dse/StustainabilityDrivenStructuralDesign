@@ -302,9 +302,12 @@ class RectangularConcrete(SupStrucRectangular):
         self.di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
         self.di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
 
-        #Durchmesser Mindestbewehrung für 2. & 3. Lage
-        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
-        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
+        #Durchmesser Mindestbewehrung für 2. & 3. Lage (Querbewehrung)
+        #Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
+        as_min_yu = max(self.as_min, 0.2 * self.as_p)  # Mindestbewehrung yu (2. Lage) mind. 20% der Hauptbewehrung (1. Lage, as_p)
+        as_min_yo = max(self.as_min, 0.2 * self.as_n)  # Mindestbewehrung yo (3. Lage) mind. 20% der Hauptbewehrung (4. Lage, as_n)
+        self.di_yu_min = ((as_min_yu * s_yu * 4) / np.pi) ** 0.5  #2. Lage mit Abstand s_yu
+        self.di_yo_min = ((as_min_yo * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
 
 
         #Neue Definition Bewehrung mit Mindestbewehrung #TODO: evtl. hier weglassen und Überschreiben mit Mind.-Bewehrung in Optimierung
