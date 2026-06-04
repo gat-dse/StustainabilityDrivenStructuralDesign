@@ -289,7 +289,7 @@ class RectangularConcrete(SupStrucRectangular):
 
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
-        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten) #TODO wieso mit d und nicht mit Höhe-QS?
+        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
@@ -307,12 +307,12 @@ class RectangularConcrete(SupStrucRectangular):
         di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
 
 
-        #Neue Definition Bewehrung mit Mindestbewehrung
+        #Neue Definition Bewehrung mit Mindestbewehrung #TODO: evtl. hier weglassen und Überschreiben mit Mind.-Bewehrung in Optimierung
         self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
-        #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
+
 
         #Gesamte Bewehrungsfläche as_tot
         self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
@@ -423,8 +423,10 @@ class RectangularConcrete(SupStrucRectangular):
             n_min = 4
         if rohw < rohw_min or s > s_max or n < n_min:  # cross-section resistance without stirrups
             ev = 1.5 * fsd / es         #SIA 262
-            kg = 48 / (16 + dmax)       #SIA 262
-            kd = 1 / (1 + ev * d*1000 * kg)  #SIA 262 mit d in mm
+            fck_MPa = fck / 1e6
+            kg = max(48 / (16 + dmax * min(1, (60 / (fck_MPa)) ** 2)),
+                     1.2)  # SIA 262
+            kd = 1 / (1 + ev * d * 1000 * kg)  # SIA 262 #d in mm
             vrd = kd * tcd * dv
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
         else:  # cross-section resistance with vertical stirrups
@@ -483,8 +485,7 @@ class FlatSlab2D(SupStrucRectangular):
 
         # TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
-        self.as_min = mr / (
-                    0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        self.as_min = mr / ( 0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
 
         # Durchmesser Mindestbewehrung für 1. & 4. Lage
         di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
@@ -508,7 +509,7 @@ class FlatSlab2D(SupStrucRectangular):
 
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
+        #self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
         h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
         #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
@@ -628,7 +629,9 @@ class FlatSlab2D(SupStrucRectangular):
             n_min = 4
         if rohw < rohw_min or s > s_max or n < n_min:  # cross-section resistance without stirrups
             ev = 1.5 * fsd / es         #SIA 262
-            kg = 48 / (16 + dmax)       #SIA 262
+            fck_MPa = fck/1e6
+            kg = max(48 / (16 + dmax * min(1, (60 / (fck_MPa)) ** 2)),
+                     1.2)  # SIA 262
             kd = 1 / (1 + ev * d*1000 * kg)  #SIA 262 #d in mm
             vrd = kd * tcd * dv
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
@@ -788,7 +791,6 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
         # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_xu_min + di_xo_min #erforderliche Stärke für die Bewehrung
-        self.h_f = max(self.hmin_c, self.h_f) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
 
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
@@ -950,8 +952,10 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     def vu_unsigned(bw, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
         if as_bw == 0:  # cross-section without stirrups
             ev = 1.5 * fsd / es  # SIA 262, 4.3.3.2.2, (39)
-            kg = 48 / (16 + dmax)  # SIA 262, 4.3.3.2.1, (37)
-            kd = 1 / (1 + ev * d * kg)  # SIA 262, 4.3.3.2.1, (36)
+            fck_MPa = fck/1e6
+            kg = max(48 / (16 + dmax * min(1, (60 / (fck_MPa)) ** 2)),
+                     1.2)  # SIA 262
+            kd = 1 / (1 + ev * d*1000 * kg)  #SIA 262 #d in mm
             vrd = kd * tcd * dv  # SIA 262, 4.3.3.2.1, (35)
             return vrd
         else:  # cross-section with vertical stirrups
