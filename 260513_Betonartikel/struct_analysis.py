@@ -311,7 +311,7 @@ class RectangularConcrete(SupStrucRectangular):
 
 
         #Neue Definition Bewehrung mit Mindestbewehrung #TODO: evtl. hier weglassen und Überschreiben mit Mind.-Bewehrung in Optimierung
-        self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
+        #self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
 
         #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
