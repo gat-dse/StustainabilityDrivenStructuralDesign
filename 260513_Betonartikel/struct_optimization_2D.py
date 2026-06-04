@@ -34,16 +34,16 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     di_xo0 = m.section.bw[1][0]  # start value for rebar diameter 40 mm
     di_yu0 = m.section.bw[2][0]
     di_yo0 = m.section.bw[3][0]
-    var0 = [h0, di_xu0,di_xo0,di_yu0,di_yo0]
+    var0 = [h0, di_xu0, di_xo0, di_yu0, di_yo0]
 
     #ToDo: Add optimization for upper reinforcement
 
     # define bounds of variables
     bh = (h_min, 1.2)  # height between h_min and 1.2 m
-    bdi_xu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
-    bdi_xo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
-    bdi_yu = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
-    bdi_yo = (0.006, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bdi_xu = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bdi_xo = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bdi_yu = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
+    bdi_yo = (0.008, 0.04)  # diameter of rebars between 6 mm and 40 mm
     bounds = [bh, bdi_xu, bdi_xo, bdi_yu, bdi_yo]
 
     # definition of fixed values of cross-section
@@ -54,11 +54,11 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
     co, st = m.section.concrete_type, m.section.rebar_type
-    add_arg = [m.system, co, st, b, s_xu, s_xo, s_yu, s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,]
+    add_arg = [m.system, co, st, b, s_xu, s_xo, s_yu, s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
 
     # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(rc_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
+    opt = basinhopping(rc_rqs2d, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
                                                                             "method": "Powell"}, take_step=bounded_step)
     h, di_xu, di_xo, di_yu, di_yo = opt.x
     optimized_section = struct_analysis.FlatSlab2D(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw, n_bw,
@@ -66,7 +66,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     return optimized_section
 
 # inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
-def rc_rqs(var, add_arg):
+def rc_rqs2d(var, add_arg):
     # input: variables, which have to be optimized, additional info about cross-section and system, optimizing option
     # output: if criterion == GWP -> co2 of cross-section, punished by delta 10*(qk_zul-qk)
     # output: if criterion == h -> height of cross-section, punished by delta 1*(qk_zul-qk)
@@ -92,16 +92,16 @@ def rc_rqs(var, add_arg):
     member.calc_qk_zul_gzt()  # calculate admissible live load
 
     # define penalty1, if ULS is not fulfilled
-    penalty1 = max(member.qk - member.qk_zul_gzt, 0)
+    penalty1 = max(10000*(member.qk - member.qk_zul_gzt), 0)
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if member.mkd_p < member.section.mr_p and member.mkd_n < member.section.mr_n:
+    if member.mkd_p < member.section.mr_p and abs(member.mkd_n) < abs(member.section.mr_n):
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
     else:
         d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
                       member.w_app_ger - member.w_app_adm]
-    penalty2 = 1e5 * max(d1, d2, d3, 0)
+    penalty2 = 1e6 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
     pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
@@ -112,7 +112,7 @@ def rc_rqs(var, add_arg):
         penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
     else:
         penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
-
+    penalty3 = 0
     # define penalty4, if fire resistance is not fulfilled
     member.get_fire_resistance()
     penalty4 = max(member.requirements.t_fire-member.fire_resistance, 0)

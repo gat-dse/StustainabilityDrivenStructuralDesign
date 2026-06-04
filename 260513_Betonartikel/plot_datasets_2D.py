@@ -112,10 +112,10 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 # create initial cross-sections
                 section_00 = struct_analysis.FlatSlab2D(concrete, rebar_low_em, 1.0, 0.20,
                                                                  0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
-                                                                 0, 0.15, 2)
+                                                                 0, 0.15, 0,2.0,0.02,0.0, 0.15)
                 section_01 = struct_analysis.FlatSlab2D(concrete, rebar_high_em, 1.0, 0.20,
                                                                  0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
-                                                                 0, 0.15, 2)
+                                                                 0, 0.15, 0,2.0,0.02,0.0, 0.15)
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
                 line_i1 = [section_01, floorstruc]
@@ -286,7 +286,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
             # extract the x and y coordinates for plotting
             x, y = polygon.exterior.xy
             # plot area
-            #plt.fill(x, y, alpha=0.05, facecolor=color)
+            plt.fill(x, y, alpha=0.05, facecolor=color)
             # plot lines
             plt.plot(length_x, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
             data_max[idx] = max(data_max[idx], max(data))
