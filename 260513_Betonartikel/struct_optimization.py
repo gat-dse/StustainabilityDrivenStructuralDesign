@@ -24,6 +24,26 @@ class RandomDisplacementBounds(object):
         return xnew
 
 
+
+# define database
+database_name = "database_260506_Hochbau.db"
+# database_name = "dummy_sustainability.db"  # define database name
+# create_dummy_database.create_database(database_name)  # create database
+
+
+# create floor structure for solid reinforced concrete cross-section
+bodenaufbau_rcdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                       ["'Unterlagsboden Zement, 85 mm'", False, False],
+                       ["'Glaswolle'", 0.03, False]]
+bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau_rcdecke, database_name, name="massiv")
+
+# create floor structure for ribbed reinforced concrete cross-section
+bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                       ["'Unterlagsboden Zement, 85 mm'", False, False],
+                       ["'Glaswolle'", 0.03, False],["'Kies gebrochen'", 0.06, False]]
+bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name, name="Schuettung")
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 # .......................................................................................................................
@@ -370,6 +390,15 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     b_w0 = m.section.b_w
     b0 = m.section.b
 
+    # Fallunterscheidung für Bodenaufbau, falls die Flanchstärke über 16 cm ist (Mindestanforderung Schallschutz)
+    # kann der Bodenaufbau reduziert werden auf den Aufbau ohne Schüttung
+    #if m.section.h_f >= 0.16:
+    #    floorstruc = bodenaufbau_rc
+    #    m.floorstruc = bodenaufbau_rc
+    #else:
+    #    floorstruc = bodenaufbau_rc_rib
+    #    m.floorstruc = bodenaufbau_rc_rib
+
     #Definition von maximaler effektiver Breite beff für Einfeldträger (Optimierung Durchlaufträger aktuell in anderem File)
     l0 = m.li_max
     b_eff_max = 2 * 0.2 * l0 +b_w0 #max.eff. Breite mit l0 =l für Einfeldträger: 2*beff,i + bw und beff,i,max = 0.2*l0
@@ -378,7 +407,13 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
 
     # define bounds of variables
-    bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
+    if m.floorstruc.name == 'massiv':
+        h_min_schall = 0.16
+        bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+    else:
+        bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
+
+    #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
     bh_w = (0.04, 2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60

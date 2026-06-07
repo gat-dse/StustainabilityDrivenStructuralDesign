@@ -415,12 +415,21 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         for member in pair
     ]
 
-    if crsec_type == "wd_rec":
+    '''if crsec_type == "wd_rec":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
 
     elif crsec_type == "rc_rec"and system == "Simple Beam":
         #class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
+        if members_1d:
+            floor_name = members_1d[0].floorstruc.name
+            floor_name_clean = str(floor_name)
+        else:
+            floor_name_clean = "default"
+
+        dynamic_filename = f"Members_rc_rec_{floor_name_clean}_2.xlsx"
+
+        class_to_excel_2.members_to_excel2(members_1d, dynamic_filename, folder="Results")
+        #class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
 
     elif crsec_type == "rc_rib" and system == "Simple Beam":
         #class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
@@ -440,7 +449,32 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     elif crsec_type == "wd_rib":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
     else:
-        print("cross-section type is not defined inside function plot_dataset()")
+        print("cross-section type is not defined inside function plot_dataset()")'''
+
+    # 1. Dynamisch den Bodenaufbau (floor_name) auslesen, falls vorhanden
+    if members_1d and hasattr(members_1d[0], 'floorstruc') and members_1d[0].floorstruc:
+        floor_name = members_1d[0].floorstruc.name
+        floor_name_clean = f"_{str(floor_name).replace(' ', '_').replace('/', '-')}"
+    else:
+        floor_name_clean = ""
+
+    # 2. System-Suffix übersetzen (Kurzformen für den Dateinamen)
+    system_mapping = {
+        "Simple Beam": "_simple",
+        "Continuous 1D": "_cont",
+        "Two span 1D 1D": "_2span"
+    }
+    # Nimmt das Suffix aus dem Mapping, andernfalls wird der Systemname direkt (bereinigt) angehängt
+    system_suffix = system_mapping.get(system, f"_{str(system).replace(' ', '_')}")
+
+    # 3. Weiche für Export-Klasse und Ordner anhand des Präfixes ('wd' vs. alle anderen)
+    if str(crsec_type).startswith("wd"):
+        filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
+        class_to_excel.members_to_excel(members_1d, filename, folder="Resultate")
+    else:
+        # Betrifft 'rc' und alle anderen Typen, die nicht mit 'wd' beginnen
+        filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
+        class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
 
 
     return data_max, vrfctn_members
