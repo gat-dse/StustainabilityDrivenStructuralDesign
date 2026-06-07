@@ -1,10 +1,11 @@
+import os
+import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
 
 # 1. Datei einlesen (Pfad ggf. anpassen)
-excel_file = "260520_Iteration150_total.xlsx"
+excel_file = "260604_RC_1D_Systems.xlsx"
 df = pd.read_excel(excel_file)
 
 
@@ -13,14 +14,15 @@ df = pd.read_excel(excel_file)
 # ==============================================================================
 def erstelle_gestapelten_balkenplot(data,
                                     komponente_unten,
+                                    excel_dateiname,  # Für die automatische Namensgebung
                                     komponente_oben=None,
                                     label_unten="Struktur",
                                     label_oben="Bodenaufbau",
                                     y_achsen_titel="Wert",
                                     diagramm_titel="Diagramm"):
     """
-    Erstellt ein gruppiertes und gestapeltes Balkendiagramm sortiert nach Spannweiten.
-    Farbe = Querschnittstyp, Struktur/Muster = Komponente.
+    Erstellt ein gruppiertes und gestapeltes Balkendiagramm sortiert nach Spannweiten
+    und speichert es automatisch ab.
     """
     # Lokale Kopie erstellen, um das originale df nicht zu verändern
     df_temp = data.copy()
@@ -59,13 +61,14 @@ def erstelle_gestapelten_balkenplot(data,
     farben = sns.color_palette("viridis", len(einzigartige_qs))
     farb_mapping = dict(zip(einzigartige_qs, farben))
 
-    # Abstände und Breiten definieren
+    # --- HIER DEINE GEWÜNSCHTEN ABSTÄNDE UND BREITEN ---
     balken_breite = 0.14
     balken_abstand = 0.03
-    abstand_zwischen_gruppen = 1.0
+    abstand_zwischen_gruppen = 2.0
 
-    plt.figure(figsize=(16, 8))
+    plt.figure(figsize=(24, 8))
     sns.set_theme(style="whitegrid")
+    # ----------------------------------------------------
 
     tick_positionen = []
     tick_labels = []
@@ -114,12 +117,10 @@ def erstelle_gestapelten_balkenplot(data,
                 )
 
     # --- LEGENDEN KONFIGURATION ---
-    # 1. Querschnitts-Legende
     aus_patches = [plt.Rectangle((0, 0), 1, 1, facecolor=farb_mapping[qs], edgecolor='black') for qs in einzigartige_qs]
     legende_qs = plt.legend(aus_patches, einzigartige_qs, title="Querschnitt-Varianten", bbox_to_anchor=(1.02, 1),
                             loc='upper left', fontsize='small')
 
-    # 2. Komponenten-Legende
     gwp_patches = [plt.Rectangle((0, 0), 1, 1, facecolor='gray', edgecolor='black', alpha=1.0)]
     gwp_labels = [label_unten]
 
@@ -131,7 +132,6 @@ def erstelle_gestapelten_balkenplot(data,
     legende_gwp = plt.legend(gwp_patches, gwp_labels, title="Komponenten", bbox_to_anchor=(1.02, 0.4),
                              loc='upper left', fontsize='small')
 
-    # Erste Legende wieder hinzufügen
     plt.gca().add_artist(legende_qs)
 
     # --- FINETUNING & ACHSEN ---
@@ -143,16 +143,26 @@ def erstelle_gestapelten_balkenplot(data,
     plt.grid(True, linestyle='--', alpha=0.5, axis='y')
 
     plt.tight_layout(rect=[0, 0, 0.75, 0.95])
+
+    # --- AUTOMATISCHES SPEICHERN ---
+    basis_name = os.path.splitext(os.path.basename(excel_dateiname))[0]
+    sauberer_titel = re.sub(r'[^\w\-_\. ]', '', diagramm_titel).replace(' ', '_')
+    speicher_name = f"{basis_name}_{sauberer_titel}.png"
+
+    plt.savefig(speicher_name, dpi=300, bbox_inches='tight')
+    print(f"Diagramm erfolgreich gespeichert als: {speicher_name}")
+
     plt.show()
 
 
 # ==============================================================================
-# ANWENDUNGSBEISPIELE: SO RUFST DU DIE FUNKTION JETZT AUF
+# ANWENDUNGSBEISPIELE
 # ==============================================================================
 
-# Beispiel 1: GWP (Treibhauspotenzial) für Struktur und Bodenaufbau plotten
+# Beispiel 1: GWP
 erstelle_gestapelten_balkenplot(
     data=df,
+    excel_dateiname=excel_file,
     komponente_unten='co2 Struktur [kgCO2eq/m2]',
     komponente_oben='co2 Bodenaufbau [kgCO2eq/m2]',
     label_unten='GWP Struktur (Dunkel / Glatt)',
@@ -161,12 +171,12 @@ erstelle_gestapelten_balkenplot(
     diagramm_titel='GWP-Aufteilung sortiert nach Spannweiten'
 )
 
-# Beispiel 2: Lasten für Struktur und Gesamtlast (bzw. Bodenaufbau) plotten
-# Hinweis: Wenn 'Last Bodenaufbau' nicht existiert, kannst du hier die Differenz oder die entsprechenden Spalten eintragen
+# Beispiel 2: Lasten
 erstelle_gestapelten_balkenplot(
     data=df,
+    excel_dateiname=excel_file,
     komponente_unten='Last Struktur [kN/m2]',
-    komponente_oben='Last Bodenaufbau [kN/m2]',  # Stelle sicher, dass diese Spalte so in deiner Excel heißt
+    komponente_oben='Last Bodenaufbau [kN/m2]',
     label_unten='Last Struktur (Dunkel / Glatt)',
     label_oben='Last Bodenaufbau (Hell / Schraffiert)',
     y_achsen_titel='Last [kN/m²]',

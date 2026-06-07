@@ -38,7 +38,7 @@ if 'rc_rec' in df_clean['section_type'].values:
     spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                      'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1', 'co2_rebar', 'co2_concrete', 'co2',
                      'system', 'name', 'lifespan_1',
-                     'h_4', 'co2_4', 'co2_a_3', 'g0k_1', 'g1k', 'co2_5', 'co2_a_4']
+                     'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
     Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]', 'concrete_type', 'mech_prop',
                    'prod_id', 'GWP concrete [kgCO2eq / t]', 'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
@@ -53,7 +53,7 @@ if 'rc_rib' in df_clean['section_type'].values:
                      'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1',
                      'co2_rebar', 'co2_concrete', 'co2',
                      'system', 'name', 'lifespan_1',
-                     'h_5', 'co2_5', 'co2_a_4', 'g0k_1', 'g1k', 'co2_6', 'co2_a_5']
+                     'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
     Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]' ,'b_w [m]', 'h_f [m]',
                    'concrete_type', 'mech_prop', 'prod_id', 'GWP concrete [kgCO2eq / t]',
                    'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',

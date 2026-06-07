@@ -1244,9 +1244,9 @@ class MatLayer:  # create a material layer
         result = cursor.fetchall()
         h_fix, e, density, weight, self.GWP, self.lifespan = result[0]
         if h_input is False:
-            self.h = h_fix
+            self.h_Fi = h_fix
         else:
-            self.h = h_input
+            self.h_Fi = h_input
         if roh_input is False:
             self.density = density
             self.weight = weight
@@ -1256,29 +1256,29 @@ class MatLayer:  # create a material layer
         if e == None:
             self.ei = 0.0
         else:
-            i = 1 * self.h ** 3 / 12
+            i = 1 * self.h_Fi ** 3 / 12
             self.ei = e * i
-        self.gk = self.weight * self.h  # weight per area in N/m^2
-        self.co2 = self.density * self.h * self.GWP  # CO2-eq per area in kg-C02/m^2
-        self.co2_a = self.density * self.h * self.GWP * (60/self.lifespan)/60 # CO2-eq per area in kg-C02/m^2*a
+        self.gk = self.weight * self.h_Fi  # weight per area in N/m^2
+        self.co2_Fi = self.density * self.h_Fi * self.GWP  # CO2-eq per area in kg-C02/m^2
+        self.co2_a_Fi = self.density * self.h_Fi * self.GWP * (60/self.lifespan)/60 # CO2-eq per area in kg-C02/m^2*a
 
 
 class FloorStruc:  # create a floor structure
     def __init__(self, mat_layers, database_name, name = ""):
         self.name = name
         self.layers = []
-        self.co2 = 0
+        self.co2_Floor = 0
         self.gk_area = 0
-        self.h = 0
+        self.h_Floor = 0
         self.ei = 0
-        self.co2_a = 0
+        self.co2_a_Floor = 0
         for mat_name, h_input, roh_input in mat_layers:
             current_layer = MatLayer(mat_name, h_input, roh_input, database_name)
             self.layers.append(current_layer)
-            self.co2 += current_layer.co2
-            self.co2_a += current_layer.co2_a
+            self.co2_Floor += current_layer.co2_Fi
+            self.co2_a_Floor += current_layer.co2_a_Fi
             self.gk_area += current_layer.gk
-            self.h += current_layer.h
+            self.h_Floor += current_layer.h_Fi
             self.ei = max(self.ei, current_layer.ei)
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -1379,6 +1379,7 @@ class Member1D:
         self.requirements = requirements
         self.li_max = self.system.li_max
         self.g0k = self.section.g0k
+        self.g0k_b  = self.section.g0k_b
         self.g1k = self.floorstruc.gk_area
         self.g2k = g2k
         self.gk = self.g0k + self.g1k + self.g2k
@@ -1466,8 +1467,8 @@ class Member1D:
             #                                                 self.section.h, self.section.d)
             #)
 
-        self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
-        self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2/60)
+        self.co2 = system.l_tot * (self.floorstruc.co2_Floor + self.section.co2)
+        self.co2_a = system.l_tot * (self.floorstruc.co2_a_Floor  + self.section.co2/60)
 
         # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
         self.f1 = self.calc_f1()
@@ -1714,8 +1715,8 @@ class Member2D:
                     #                                                 self.section.h, self.section.d)
                     #)
 
-        self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
-        self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2 / 60)
+        self.co2 = system.l_tot * (self.floorstruc.co2_Floor + self.section.co2)
+        self.co2_a = system.l_tot * (self.floorstruc.co2_a_Floor + self.section.co2 / 60)
 
         # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
         """
