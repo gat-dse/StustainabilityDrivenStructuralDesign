@@ -282,40 +282,49 @@ class RectangularConcrete(SupStrucRectangular):
         #Definition Bewehrung gemäss Eingabe
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
         self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
-        mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
 
+        #Berechnung Rissmoment und statische Höhe
+        mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
+        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
+        self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+
+        # Durchmesser Mindestbewehrung für 1. & 4. Lage
+        self.di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        self.di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+
+        # Durchmesser Mindestbewehrung für 2. & 3. Lage (Querbewehrung)
+        self.di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5  # 2. Lage mit Abstand s_yu
+        self.di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
+
+        # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = (2 * c_nom + 0.032
+                       + max(0.008, self.di_xu_min, di_xu)  # 1. Lage
+                       + max(0.008, self.di_xo_min, di_xo)  # 4. Lage
+                       + max(0.008, self.di_yu_min)  # 2. Lage
+                       + max(0.008, self.di_yo_min))  # 3. Lage
+
+        # Update Bewehrungsmatrix unter Berücksichtigung von Mindestbewehrung und d,min = 8 mm
+        self.bw[0][0] = max(0.008, self.di_xu_min, di_xu) # 1. Lage
+        self.bw[1][0] = max(0.008, self.di_xo_min, di_xo) # 4. Lage
+        self.bw[2][0] = max(0.008, self.di_yu_min, di_yu) # 2. Lage
+        self.bw[3][0] = max(0.008, self.di_yo_min, di_yo) # 3. Lage
+
+        #Update Statische Höhe
+        [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
+
+        #Berechnung Traglasten und Eigengewicht
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
-        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten) #TODO wieso mit d und nicht mit Höhe-QS?
+        self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
 
-        #TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
-        #Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
-        self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
-
-        # Durchmesser Mindestbewehrung für 1. & 4. Lage
-        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
-        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
-
-        #Durchmesser Mindestbewehrung für 2. & 3. Lage
-        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5 #2. Lage mit Abstand s_yu
-        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  #3. Lage mit Abstand s_yo
-
-
-        #Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[max(0.008, di_xu_min, di_xu), s_xu], [max(0.008, di_xo_min, di_xo), s_xo], [max(0.008,di_yu_min), s_yu], [max(0.008,di_yo_min), s_yo]]
-
-        #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_yu_min + di_yo_min #erforderliche Stärke für die Bewehrung
-        #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
-
-        #Gesamte Bewehrungsfläche as_tot
-        self.a_s_stat = self.as_p + self.as_n + 2 * self.as_min + self.as_bw  # rebar area without reinforcement joint surcharge
+        #Gesamte Bewehrungsfläche as_tot: Feldbewehrung nur über 60% des Members und Stützenbewehrung über 40%. Die restlichen Bereiche mit Mindestbewehrung.
+        self.a_s_stat = 0.6 * self.as_p + 0.4 * self.as_n + (0.6 + 0.4 + 1 + 1) * self.as_min + self.as_bw  # Abgestuft bei den Momentennullpunkten, Rest mit Asmin
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
 
@@ -423,8 +432,10 @@ class RectangularConcrete(SupStrucRectangular):
             n_min = 4
         if rohw < rohw_min or s > s_max or n < n_min:  # cross-section resistance without stirrups
             ev = 1.5 * fsd / es         #SIA 262
-            kg = 48 / (16 + dmax)       #SIA 262
-            kd = 1 / (1 + ev * d * kg)  #SIA 262
+            fck_MPa = fck / 1e6
+            kg = max(48 / (16 + dmax * min(1, (60 / (fck_MPa)) ** 2)),
+                     1.2)  # SIA 262
+            kd = 1 / (1 + ev * d * 1000 * kg)  # SIA 262 #d in mm
             vrd = kd * tcd * dv
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
         else:  # cross-section resistance with vertical stirrups
@@ -435,9 +446,7 @@ class RectangularConcrete(SupStrucRectangular):
 
     @staticmethod
     def f_w_ger(roh, rohs, phi, h, d):
-        # f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
         f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
-        #TODO: Prüfen, ob dieser Wert nicht zu konservativ ist! Als Abschätzung für die Vordimensionierung scheint der Wert jedoch schon i.O., ist zumindest nicht komplett willkürlich.
         return f
 
     @staticmethod
@@ -476,27 +485,35 @@ class FlatSlab2D(SupStrucRectangular):
         #Definition Bewehrung gemäss Eingabe
         self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu],[di_yo, s_yo]] #Definition Biegebewehrung 4-Lagig. x-Richtung ist dabei die Haupttragrichtung, di = Durchmesser, s = Abstand, u = untere Lagen (positives Biegemoment), o = obere Lagen (negatives Biegemoment)
         self.bw_bg = [di_bw, s_bw, n_bw] #Definition Querkraftbewehrung
+        #Berechnung Rissmoment und statische Höhe
         mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  #cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
-
         self.mr_p, self.mr_n = mr, -mr #mr_p: positives Rissmoment, mr_n: negatives Rissmoment
         [self.d, self.ds, self.dy, self.dsy] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
 
-        # TODO für Platten gilt: Querbewehrung mind. 20% der Hauptbewehrung (SIA262, 5.5.3.2)
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
-        self.as_min = mr / (
-                    0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
+        self.as_min = mr / ( 0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
 
         # Durchmesser Mindestbewehrung für 1. & 4. Lage
-        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
-        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
-
+        self.di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        self.di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
         # Durchmesser Mindestbewehrung für 2. & 3. Lage
-        di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5  # 2. Lage mit Abstand s_yu
-        di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
+        self.di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5  # 2. Lage mit Abstand s_yu
+        self.di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
 
-        # Neue Definition Bewehrung mit Mindestbewehrung
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo], [di_yu, s_yu], [di_yo, s_yo]]
+        # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = (2 * self.c_nom + 0.032
+                       + max(0.008, self.di_xu_min, self.bw[0][0])  # 1. Lage
+                       + max(0.008, self.di_xo_min, self.bw[1][0])  # 2. Lage
+                       + max(0.008, self.di_yu_min, self.bw[2][0])  # 3. Lage
+                       + max(0.008, self.di_yo_min, self.bw[3][0]))  # 4. Lage
 
+        # Update Bewehrungsmatrix unter Berücksichtigung von Mindestbewehrung und d,min = 8 mm
+        self.bw[0][0] = max(0.008, self.di_xu_min, di_xu)  # 1. Lage
+        self.bw[1][0] = max(0.008, self.di_xo_min, di_xo)  # 4. Lage
+        self.bw[2][0] = max(0.008, self.di_yu_min, di_yu)  # 2. Lage
+        self.bw[3][0] = max(0.008, self.di_yo_min, di_yo)  # 3. Lage
+
+        # Berechnung Traglasten und Eigengewicht
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('x','pos')
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('x','neg')
         [self.mu_max_y, self.x_p_y, self.as_p_y, self.qs_class_p_y] = self.calc_mu('y', 'pos')
@@ -506,14 +523,8 @@ class FlatSlab2D(SupStrucRectangular):
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
 
-
-        #Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = 2 * c_nom + 0.032 + self.bw[0][0] + self.bw[1][0] + self.bw[2][0] + self.bw[3][0] #erforderliche Stärke für die Bewehrung
-        h_schallschutz = 0.16 #Mindeststärke für Schallschutz ohne Schüttung für Mind.-Anforderungen (GAE)
-        #self.h = max(self.hmin_c, self.h, h_schallschutz) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
-
-        #Gesamte Bewehrungsfläche as_tot
-        #TODO: asy ist so angesetzt, als würde es auch in x-Richtung verlaufen ! beim 1D Fall ist es ebenso falsch. solange lx = ly ist es nicht relevant.
+        #Gesamte Bewehrungsfläche as_tot: Feldbewehrung nur über 60% des Members und Stützenbewehrung über 40%. Die restlichen Bereiche mit Mindestbewehrung.
+        #TODO: asy ist so angesetzt, als würde es auch in x-Richtung verlaufen ! solange lx = ly ist es nicht relevant.
         self.a_s_stat = 0.6*self.as_p + 0.4*self.as_n + 0.6*self.as_p_y + 0.4*self.as_n_y + (0.6+0.4+0.6+0.4)*self.as_min +self.as_bw # Abgestuft bei den Momentennullpunkten, Rest mit Asmin
         #self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
@@ -628,8 +639,10 @@ class FlatSlab2D(SupStrucRectangular):
             n_min = 4
         if rohw < rohw_min or s > s_max or n < n_min:  # cross-section resistance without stirrups
             ev = 1.5 * fsd / es         #SIA 262
-            kg = 48 / (16 + dmax)       #SIA 262
-            kd = 1 / (1 + ev * d * kg)  #SIA 262
+            fck_MPa = fck/1e6
+            kg = max(48 / (16 + dmax * min(1, (60 / (fck_MPa)) ** 2)),
+                     1.2)  # SIA 262
+            kd = 1 / (1 + ev * d*1000 * kg)  #SIA 262 #d in mm
             vrd = kd * tcd * dv
             return vrd #Querkraftwiderstand OHNE Querkraftbewehrung SIA 262
         else:  # cross-section resistance with vertical stirrups
@@ -640,9 +653,7 @@ class FlatSlab2D(SupStrucRectangular):
 
     @staticmethod
     def f_w_ger(roh, rohs, phi, h, d):
-        # f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
         f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
-        #TODO: Prüfen, ob dieser Wert nicht zu konservativ ist! Als Abschätzung für die Vordimensionierung scheint der Wert jedoch schon i.O., ist zumindest nicht komplett willkürlich.
         return f
 
     @staticmethod
@@ -745,51 +756,54 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.concrete_type = concrete_type
         self.rebar_type = rebar_type
         self.c_nom = c_nom
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung
-        self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
 
+        # Definition Bewehrung für Initial-QS
+        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung (1. & 4. Lage)
+        self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
         self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
+
+        #Rissmoment und statische Höhe für Platte und Plattenbalken
         mr_slab = self.b * self.h_f ** 2 / 6  * self.concrete_type.fctm  # Platte (Slab) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
         mr_pb = self.iy / (self.h - self.z_s) * self.concrete_type.fctm  # Plattenbalken (PB) cracking moment (SIA262:2025, 4.4.1.3: mr = fctm * bh^2/6)
         self.mr_p, self.mr_n = mr_slab, -mr_slab
         self.mr_pb_p = mr_pb
         self.mr_pb_n = -mr_pb
 
-        # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr für Platte
+        # Platte (slab): Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr_slab / (0.8 * self.h_f * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.8*h
-        di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
-        di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
-        #Platte (slab) mit Mindestbewehrung
-        di_xu = max(0.008, di_xu_min)
-        di_xo = max(0.008, di_xo_min)
-        self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung mit Mindestbewehrung
+        self.di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
+        self.di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
 
-        #Berechnung Satische Höhe, Mu (Biegewiderstand charak.) und Bew.-Gehalt für Platte (Slab) & Plattenbalken
+        # Platte (slab): Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
+        self.hmin_c = (2 * self.c_nom + 0.032
+                       + max(0.008, self.di_xu_min, self.bw[0][0])  # 1. Lage
+                       + max(0.008, self.di_xo_min, self.bw[1][0])  # 4. Lage
+                       + max(0.008, self.di_xu_min)  # 2. Lage analog 1. Lage
+                       + max(0.008, self.di_xo_min))  # 3. Lage analog 4. Lage
+
+        # Platte (slab): Update Bewehrungsmatrix unter Berücksichtigung von Mindestbewehrung und d,min = 8 mm
+        self.bw[0][0] = max(0.008, self.di_xu_min, di_xu)  # 1. Lage
+        self.bw[1][0] = max(0.008, self.di_xo_min, di_xo)  # 4. Lage
+
+
+        #Berechnung Statische Höhe, Mu (Biegewiderstand charak.) und Bew.-Gehalt für Platte (Slab) & Plattenbalken
         [self.d, self.ds, self.d_PB, self.ds_PB] = self.calc_d()
         [self.mu_max_slab, self.x_p, self.as_p, self.qs_class_p_slab] = self.calc_mu('pos')
         [self.mu_min_slab, self.x_n, self.as_n, self.qs_class_n_slab] = self.calc_mu('neg')
-
         [self.mu_max, self.x_PB_p, self.as_PB_p, self.qs_class_p] = self.calc_mu_pb('pos')
         [self.mu_min, self.x_PB_n, self.as_PB_n, self.qs_class_n] = self.calc_mu_pb('neg')
-
         self.roh_slab, self.rohs, self.roh = self.as_p / self.d, self.as_n / self.ds, self.as_PB_p / self.d_PB
+
         # Berechnung Vu (Querkraftwiderstand charak.) für Platte (Slab) & Plattenbalken
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance('Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
 
         self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
-        #a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw
 
-
-        # Gesamte Bewehrungsfläche as_tot inkl. Mindestebewehrung für Bewehrung in y-Richtung in Platte
+        # Gesamte Bewehrungsfläche as_tot inkl. Mindestbewehrung für Bewehrung in y-Richtung in Platte
         self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
-
-        # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = 2 * c_nom + 0.032 + di_xu + di_xo + di_xu_min + di_xo_min #erforderliche Stärke für die Bewehrung
-        self.h_f = max(self.hmin_c, self.h_f) #maximum aus Stärke für Bewehrung, für Schallschutz und berechnetem h
-
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
@@ -950,8 +964,10 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     def vu_unsigned(bw, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
         if as_bw == 0:  # cross-section without stirrups
             ev = 1.5 * fsd / es  # SIA 262, 4.3.3.2.2, (39)
-            kg = 48 / (16 + dmax)  # SIA 262, 4.3.3.2.1, (37)
-            kd = 1 / (1 + ev * d * kg)  # SIA 262, 4.3.3.2.1, (36)
+            fck_MPa = fck/1e6
+            kg = max(48 / (16 + dmax * min(1, (60 / (fck_MPa)) ** 2)),
+                     1.2)  # SIA 262
+            kd = 1 / (1 + ev * d*1000 * kg)  #SIA 262 #d in mm
             vrd = kd * tcd * dv  # SIA 262, 4.3.3.2.1, (35)
             return vrd
         else:  # cross-section with vertical stirrups
@@ -1228,9 +1244,9 @@ class MatLayer:  # create a material layer
         result = cursor.fetchall()
         h_fix, e, density, weight, self.GWP, self.lifespan = result[0]
         if h_input is False:
-            self.h = h_fix
+            self.h_Fi = h_fix
         else:
-            self.h = h_input
+            self.h_Fi = h_input
         if roh_input is False:
             self.density = density
             self.weight = weight
@@ -1240,29 +1256,29 @@ class MatLayer:  # create a material layer
         if e == None:
             self.ei = 0.0
         else:
-            i = 1 * self.h ** 3 / 12
+            i = 1 * self.h_Fi ** 3 / 12
             self.ei = e * i
-        self.gk = self.weight * self.h  # weight per area in N/m^2
-        self.co2 = self.density * self.h * self.GWP  # CO2-eq per area in kg-C02/m^2
-        self.co2_a = self.density * self.h * self.GWP * (60/self.lifespan)/60 # CO2-eq per area in kg-C02/m^2*a
+        self.gk = self.weight * self.h_Fi  # weight per area in N/m^2
+        self.co2_Fi = self.density * self.h_Fi * self.GWP  # CO2-eq per area in kg-C02/m^2
+        self.co2_a_Fi = self.density * self.h_Fi * self.GWP * (60/self.lifespan)/60 # CO2-eq per area in kg-C02/m^2*a
 
 
 class FloorStruc:  # create a floor structure
     def __init__(self, mat_layers, database_name, name = ""):
         self.name = name
         self.layers = []
-        self.co2 = 0
+        self.co2_Floor = 0
         self.gk_area = 0
-        self.h = 0
+        self.h_Floor = 0
         self.ei = 0
-        self.co2_a = 0
+        self.co2_a_Floor = 0
         for mat_name, h_input, roh_input in mat_layers:
             current_layer = MatLayer(mat_name, h_input, roh_input, database_name)
             self.layers.append(current_layer)
-            self.co2 += current_layer.co2
-            self.co2_a += current_layer.co2_a
+            self.co2_Floor += current_layer.co2_Fi
+            self.co2_a_Floor += current_layer.co2_a_Fi
             self.gk_area += current_layer.gk
-            self.h += current_layer.h
+            self.h_Floor += current_layer.h_Fi
             self.ei = max(self.ei, current_layer.ei)
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -1363,6 +1379,7 @@ class Member1D:
         self.requirements = requirements
         self.li_max = self.system.li_max
         self.g0k = self.section.g0k
+        self.g0k_b  = self.section.g0k_b
         self.g1k = self.floorstruc.gk_area
         self.g2k = g2k
         self.gk = self.g0k + self.g1k + self.g2k
@@ -1392,65 +1409,66 @@ class Member1D:
 
         # calculation of deflections uncracked (plus cracked for concrete sections self.section.section_type[0:2] = rc))
         section_material = self.section.section_type[0:2]
-        unit_def = self.system.alpha_w * self.system.l_tot ** 4 / self.section.ei1  # deflection for q = 1, phi = 0
+        self.unit_def = self.system.alpha_w * self.system.l_tot ** 4 / self.section.ei1  # deflection for q = 1, phi = 0
 
-        if self.requirements.install == "ductile":
-            self.w_install = unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
-            if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                # Vereinfachte Berechnung für gerissene Durchbiegung #TODO Prüfen der vereinfachten Berechnung!
-                #self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                #                                           self.section.h, self.section.d)
-                #self.w_install_ger = self.w_install *min(self.f_w_ger,4)  # Begrenzung Beiwert auf Grössenordnung 2 - 4
-                #Berechnung gerissene Durchbiegung mit SIA262, Formel 104
-                self.w_install_ger = unit_def * (
-                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                                 self.section.h, self.section.d)
-                        + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                                                                                   0, self.section.h, self.section.d)
-                        - self.q_per
-                )
+        if self.requirements.install == "ductile": #Lastfall häufig und w < L/350
+            self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
+            if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
+                # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                           self.section.h, self.section.d)
+                self.w_install_ger = self.unit_def * self.q_freq * max(3.4,self.f_w_ger)  #SIA262:2025, Formel (104), wobei fger immer grösser 3.4 sein muss.
+                #Alte Berechnung gerissene Durchbiegung Langzeit
+                #self.w_install_ger = unit_def * (
+                #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                #                                                 self.section.h, self.section.d)
+                #        + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
+                #                                                                   0, self.section.h, self.section.d)
+                #        - self.q_per
+                #)
 
-        elif self.requirements.install == "brittle":
+        elif self.requirements.install == "brittle": #Lastfall selten und w < L/500
             self.w_install = unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
-            if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                # Vereinfachte Berechnung für gerissene Durchbiegung #TODO Prüfen der vereinfachten Berechnung!
-                #self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                #                                           self.section.h, self.section.d)
-                #self.w_install_ger = self.w_install* min(self.f_w_ger,4)  # Begrenzung Beiwert auf Grössenordnung 2 - 4
-                # Alte Berechnung gerissene Durchbiegung
-                self.w_install_ger = unit_def * (
-                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                                 self.section.h, self.section.d)
-                        + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                                                                                   0, self.section.h, self.section.d)
-                        - self.q_per
-                )
+            if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
+                # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                           self.section.h, self.section.d)
+                self.w_install_ger = self.unit_def * self.q_rare * max(3.4,self.f_w_ger) # SIA262:2025, Formel (104)
+                # Alte Berechnung gerissene Durchbiegung Langzeit
+                #self.w_install_ger = unit_def * (
+                #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                #                                                 self.section.h, self.section.d)
+                #        + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
+                #                                                                   0, self.section.h, self.section.d)
+                #        - self.q_per
+                #)
 
-        self.w_use = unit_def * (self.q_freq - self.gk)
-        if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-            # Vereinfachte Berechnung für gerissene Durchbiegung #TODO Prüfen der vereinfachten Berechnung!
-            #self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-            #                                                 self.section.h, self.section.d)
-            #self.w_use_ger = self.w_use *min(self.f_w_ger,4)  # Begrenzung Beiwert auf Grössenordnung 2 - 4
+        self.w_use = self.unit_def * (self.q_freq - self.gk) #Lastfall häufig, aber Durchbiegung infolge veränderlicher Einwirkung und w < L/350
+        if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
+            # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+            self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                       self.section.h, self.section.d)
+            self.w_use_ger = self.unit_def * self.q_freq * max(3.4,self.f_w_ger) # SIA262:2025, Formel (104)
             #Alte Berechnung gerissene Durchbiegung
-            self.w_use_ger = unit_def * (
-                    (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
-                                                                             self.section.h, self.section.d)
-            )
+            #self.w_use_ger = unit_def * (
+            #        (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
+            #                                                                 self.section.h, self.section.d)
+            #)
 
-        self.w_app = unit_def * self.q_per * (1 + self.section.phi)
-        if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-            # Vereinfachte Berechnung für gerissene Durchbiegung #TODO Prüfen der vereinfachten Berechnung!
-            #self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-            #                                           self.section.h, self.section.d)
-            #self.w_app_ger = self.w_app *min(self.f_w_ger,4)  # Begrenzung Beiwert auf Grössenordnung 2 - 4
+        self.w_app = self.unit_def * self.q_per * (1 + self.section.phi)
+        if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
+            # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+            self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                       self.section.h, self.section.d)
+            self.w_app_ger = self.unit_def * self.q_per * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
             # Alte Berechnung gerissene Durchbiegung
-            self.w_app_ger = unit_def * (
-                    self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                             self.section.h, self.section.d)
-            )
-        self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
-        self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2/60)
+            #self.w_app_ger = unit_def * (
+            #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+            #                                                 self.section.h, self.section.d)
+            #)
+
+        self.co2 = system.l_tot * (self.floorstruc.co2_Floor + self.section.co2)
+        self.co2_a = system.l_tot * (self.floorstruc.co2_a_Floor  + self.section.co2/60)
 
         # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
         self.f1 = self.calc_f1()
@@ -1645,56 +1663,81 @@ class Member2D:
 
         if self.requirements.install == "ductile":
             self.w_install = unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
+            # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+            self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                       self.section.h, self.section.d)
+            self.w_install_ger = unit_def * self.q_freq * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
+            # Alte Berechnung Durchbiegung
+            #if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
+            #    self.w_install_ger = unit_def * (
+            #            self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
+            #            + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h,self.section.d)
+            #            - self.q_per
+            #            )
+        elif self.requirements.install == "brittle":
+            self.w_install = unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                self.w_install_ger = unit_def * (
-                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
-                        + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h,self.section.d)
-                        - self.q_per
-                        )
-            elif self.requirements.install == "brittle":
-                self.w_install = unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
-                if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                    self.w_install_ger = unit_def * (
-                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
-                        + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h, self.section.d)
-                        - self.q_per
-                        )
-            self.w_use = unit_def * (self.q_freq - self.gk)
-            if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                self.w_use_ger = unit_def * (
-                            (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh,
-                                                                                     self.section.rohs, 0,
-                                                                                     self.section.h, self.section.d)
-                    )
-                self.w_app = unit_def * (self.q_per * (1 + self.section.phi))
-                if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                    self.w_app_ger = unit_def * (
-                            self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                                                                     self.section.phi,
-                                                                     self.section.h, self.section.d)
-                    )
-                self.co2 = system.l_tot * (self.floorstruc.co2 + self.section.co2)
-                self.co2_a = system.l_tot * (self.floorstruc.co2_a + self.section.co2 / 60)
+                    # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                    self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                               self.section.h, self.section.d)
+                    self.w_install_ger = unit_def * self.q_rare * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
 
-                # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
-                """
-                self.f1 = self.calc_f1()
-                # calculation of further vibration criteria for wooden cross-sections
-                section_material = self.section.section_type[0:2]
-                if section_material == "wd" or section_material == "rc":  # check for material type
-                    self.ei_b = max(self.section.ei_b,
-                                    self.floorstruc.ei)  # Berücksichtigung n.t. Bodenaufbau gemäss Beispielsammlung HBT)
-                    self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.section.ei1) ** 0.25  # HBT Seite 46
-                    self.a_ed = self.calc_vib1()
-                    self.wf_ed, self.ve_ed = self.calc_vib2()
-                    if self.section.xi < 0.015:
-                        self.r1 = 1.0  # HBT S. 48
-                    elif self.section.xi < 0.025:
-                        self.r1 = 1.15  # HBT S. 48
-                    else:
-                        self.r1 = 1.25  # HBT S. 48
-                    self.ve_cd = self.requirements.alpha_ve_cd * 100 ** (self.f1 * self.section.xi - 1)
-                """
+                    # Alte Berechnung Durchbiegung
+                    #self.w_install_ger = unit_def * (
+                    #    self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
+                    #    + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h, self.section.d)
+                    #    - self.q_per
+                    #    )
+
+        self.w_use = unit_def * (self.q_freq - self.gk)
+        if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
+                # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                           self.section.h, self.section.d)
+                self.w_use_ger = unit_def * self.q_freq * max(3.4,self.f_w_ger) # SIA262:2025, Formel (104)
+                #Alte Berechnung Durchbiegung
+                #self.w_use_ger = unit_def * (
+                #            (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh,
+                #                                                                     self.section.rohs, 0,
+                #                                                                     self.section.h, self.section.d)
+                #    )
+
+        self.w_app = unit_def * (self.q_per * (1 + self.section.phi))
+        if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
+                    # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                    self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                               self.section.h, self.section.d)
+                    self.w_app_ger = unit_def * self.q_per * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
+                    #Alte Berechnung Durchbiegung
+                    #self.w_app_ger = unit_def * (
+                    #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
+                    #                                                 self.section.phi,
+                    #                                                 self.section.h, self.section.d)
+                    #)
+
+        self.co2 = system.l_tot * (self.floorstruc.co2_Floor + self.section.co2)
+        self.co2_a = system.l_tot * (self.floorstruc.co2_a_Floor + self.section.co2 / 60)
+
+        # calculation first frequency (uncracked cross-section, method for cracked cross-section is not implemented jet)
+        """
+        self.f1 = self.calc_f1()
+        # calculation of further vibration criteria for wooden cross-sections
+        section_material = self.section.section_type[0:2]
+        if section_material == "wd" or section_material == "rc":  # check for material type
+            self.ei_b = max(self.section.ei_b,
+                            self.floorstruc.ei)  # Berücksichtigung n.t. Bodenaufbau gemäss Beispielsammlung HBT)
+            self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.section.ei1) ** 0.25  # HBT Seite 46
+            self.a_ed = self.calc_vib1()
+            self.wf_ed, self.ve_ed = self.calc_vib2()
+            if self.section.xi < 0.015:
+                self.r1 = 1.0  # HBT S. 48
+            elif self.section.xi < 0.025:
+                self.r1 = 1.15  # HBT S. 48
+            else:
+                self.r1 = 1.25  # HBT S. 48
+            self.ve_cd = self.requirements.alpha_ve_cd * 100 ** (self.f1 * self.section.xi - 1)
+        """
+
         self.a_ed = 0
         self.wf_ed = 0
         self.ve_cd = 0

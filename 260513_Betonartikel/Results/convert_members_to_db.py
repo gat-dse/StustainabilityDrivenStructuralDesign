@@ -10,7 +10,7 @@ import seaborn as sns
 
 #1. Excel File einlesen:
 # 1.1. Load the Excel file
-excel_file = "Members_rc_rib_cont_2.xlsx"
+excel_file = "Members_rc_rib_2.xlsx"
 df = pd.read_excel(excel_file)
 # 1. Den Namen dynamisch generieren
 file_name_base = os.path.splitext(excel_file)[0]
@@ -37,31 +37,31 @@ df_clean.columns = cols
 if 'rc_rec' in df_clean['section_type'].values:
     spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                      'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1', 'co2_rebar', 'co2_concrete', 'co2',
-                     'system', 'lifespan_1',
-                     'h_4', 'co2_4', 'co2_a_3', 'g0k_1', 'g1k', 'co2_5', 'co2_a_4']
+                     'system', 'name', 'lifespan_1',
+                     'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
     Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]', 'concrete_type', 'mech_prop',
                    'prod_id', 'GWP concrete [kgCO2eq / t]', 'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
-                   'Statisches System', 'lifespan Estrich [a]',
-                   'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]',
-                   'Last Struktur [N/m2]', 'Last Bodenaufbau [N/m2]', 'co2 Total [kgCO2eq / m2]',
-                   'co2 Total pro Jahr [kgCO2eq / m2a]']
+                   'Statisches System', 'Bodenaufbau', 'lifespan Estrich [a]',
+                   'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq/m2a]',
+                   'Last Struktur [N/m2]', 'Last Bodenaufbau [N/m2]', 'co2 Bauteil [kgCO2eq/m]',
+                   'co2 Bauteil pro Jahr [kgCO2eq/ma]']
 
 if 'rc_rib' in df_clean['section_type'].values:
     spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'b_w', 'h_f',
                      'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                      'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1',
                      'co2_rebar', 'co2_concrete', 'co2',
-                     'system', 'lifespan_1',
-                     'h_5', 'co2_5', 'co2_a_4', 'g0k_1', 'g1k', 'co2_6', 'co2_a_5']
+                     'system', 'name', 'lifespan_1',
+                     'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
     Spalten_Neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]' ,'b_w [m]', 'h_f [m]',
                    'concrete_type', 'mech_prop', 'prod_id', 'GWP concrete [kgCO2eq / t]',
                    'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                    'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
-                   'Statisches System', 'lifespan Estrich [a]',
-                   'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]',
-                   'Last Struktur [N/m2]', 'Last Bodenaufbau N/m2]', 'co2 Total [kgCO2eq / m2]',
-                   'co2 Total pro Jahr [kgCO2eq / m2a]']
+                   'Statisches System', 'Bodenaufbau', 'lifespan Estrich [a]',
+                   'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq/m2a]',
+                   'Last Struktur [N/m2]', 'Last Bodenaufbau [N/m2]', 'co2 Bauteil [kgCO2eq/m]',
+                   'co2 Bauteil pro Jahr [kgCO2eq/ma]']
 
 
 # 2. Schritt: NUR die Spalten aus 'spalten_fokus' behalten
@@ -82,7 +82,16 @@ df_final = df_final[[n for n in Spalten_Neu if n in df_final.columns]]
 df_final.insert(1, 'criteria', 'ENV')
 
 #6.2 Spalte ergänzen für Bodenaufbau
-df_final.insert(18, 'Bodenaufbau', 'RC_slim')
+#df_final.insert(18, 'Bodenaufbau', 'RC_slim')
+
+df_final['l_tot [m]'] = pd.to_numeric(df_final['l_tot [m]'], errors='coerce')
+df_final['co2 Bauteil [kgCO2eq/m]'] = pd.to_numeric(df_final['co2 Bauteil [kgCO2eq/m]'], errors='coerce')
+df_final['co2 Bauteil pro Jahr [kgCO2eq/ma]'] = pd.to_numeric(df_final['co2 Bauteil pro Jahr [kgCO2eq/ma]'], errors='coerce')
+
+# Berechnung der neuen Spalten (werden automatisch am Schluss angehängt)
+df_final['co2 [kgco2eq/m2]'] = df_final['co2 Bauteil [kgCO2eq/m]'] / df_final['l_tot [m]']
+df_final['co2 pro Jahr [kgco2eq/m2a]'] = df_final['co2 Bauteil pro Jahr [kgCO2eq/ma]'] / df_final['l_tot [m]']
+
 
 
 # Als Excel speichern
@@ -92,7 +101,7 @@ df_final.to_excel(output_file, index=False)
 #Plot erstellen:
 # 1. Sicherstellen, dass die Daten numerisch sind
 df_final['l_tot [m]'] = pd.to_numeric(df_final['l_tot [m]'], errors='coerce')
-df_final['co2 Total [kgCO2eq / m2]'] = pd.to_numeric(df_final['co2 Total [kgCO2eq / m2]'], errors='coerce')
+df_final['co2 Struktur [kgCO2eq/m2]'] = pd.to_numeric(df_final['co2 Struktur [kgCO2eq/m2]'], errors='coerce')
 
 # WICHTIG: Damit die Linie sinnvoll verbindet, müssen die Daten nach der x-Achse sortiert sein
 df_final = df_final.sort_values('l_tot [m]')
@@ -101,7 +110,7 @@ df_final = df_final.sort_values('l_tot [m]')
 g = sns.relplot(
     data=df_final,
     x='l_tot [m]',
-    y='co2 Total [kgCO2eq / m2]',
+    y='co2 Struktur [kgCO2eq/m2]',
     hue='mech_prop',      # Farbe nach Betongüte
     kind='line',          # Linien statt Regression
     marker='o',           # Fügt Punkte auf der Linie hinzu
@@ -112,8 +121,8 @@ g = sns.relplot(
 )
 
 # 3. Titel und Achsen beschriften
-g.set_axis_labels("Spannweite [m]", "CO2 Total [kgCO2eq / m2]")
-g.figure.suptitle("GWP-Verlauf nach Spannweite", fontsize=14)
+g.set_axis_labels("Spannweite [m]", "CO2 Struktur [kgCO2eq / m2]")
+g.figure.suptitle("GWP-Verlauf nach Spannweite mit Bodenfaufbau 1b, V1 (Estrich 60a)", fontsize=14)
 g.figure.subplots_adjust(top=0.9)
 
 plt.grid(True, linestyle='--', alpha=0.5)
