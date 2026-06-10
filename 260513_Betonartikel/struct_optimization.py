@@ -71,8 +71,14 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
             bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) # h_max_dynamisch)
+
+        elif m.floorstruc.name == 'Schuettung':
+            h_min_schall = 0.13
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) # h_max_dynamisch)
+
         else:
             bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
+
 
         bdi_xu = (max(0.008, m.section.di_xu_min), 0.04) #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
         bounds_stufe1 = [bh, bdi_xu]
@@ -130,9 +136,14 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) #h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+
+        elif m.floorstruc.name == 'Schuettung':
+            h_min_schall = 0.13
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+
         else:
-            bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c), 0.8)  # h_max_dynamisch)
 
         bdi_xu = (max(0.008, m.section.di_xu_min), 0.04) #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
         bounds = [bh, bdi_xu]
@@ -422,12 +433,11 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb]
     # TODO Bügelbewehrung Plattenbalken ist nicht in Optimierung berücksichtigt.
-    # di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg_r[0], m.section.bw_bg_r[1], m.section.bw_bg_r[2]
 
     s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
     di_xu, di_xo = max(0.008, m.section.di_xu_min, m.section.bw[0][0]), max(0.008, m.section.di_xo_min, m.section.bw[1][0])  #
 
-    di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+    di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg_r[0], m.section.bw_bg_r[1], m.section.bw_bg_r[2]
     n_x_w = m.section.bw_r[1]
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 

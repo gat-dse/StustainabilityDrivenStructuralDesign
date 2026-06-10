@@ -18,7 +18,7 @@ lengths = [4,5,6,7,8,9,10,11,12]
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 10
+max_iter = 200
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
@@ -62,27 +62,52 @@ vrfctn_members = []
 start = time.time()
 
 
+#system="Two span 1D 1D
 
 #-----------------------------------------------------------------------------------------------------------------------
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED REINFORCED CONCRETE CROSS-SECTIONS
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names = ["'ready_mixed_concrete'"]
 
-
+#-------------------------------------------------
+#Rc-Rec, SimpleBeamEl, Bodenaufau massiv
+#-------------------------------------------------
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
-                                                              req, "rc_rib", mat_names, g2k, qk, max_iter,
+                                                              req, "rc_rec", mat_names, g2k, qk, max_iter,
+                                                              idx_vrc)
+data_max = max_of_arrays(data_max, data_max_new)
+vrfctn_members.append(vrfctn_members_new)
+
+#-------------------------------------------------
+#Rc-Rec, SimpleBeamEl, Bodenaufbau Schüttung
+#-------------------------------------------------
+# retrieve data from database, find optimal cross-sections and plot results for solid cross-section
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc_rib,
+                                                              req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                              idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
-'''
+#-------------------------------------------------
+#Rc-Rec, Continuous Beam, Bodenaufbau massiv
+#-------------------------------------------------
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
-                                                             idx_vrc, system="Two span 1D 1D")
+                                                             idx_vrc, system = 'Continuous 1D')
 data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)'''
+vrfctn_members.append(vrfctn_members_new)
+
+#-------------------------------------------------
+#Rc-Rec, Continuous Beam, Bodenaufbau Schüttung
+#-------------------------------------------------
+# retrieve data from database, find optimal cross-sections and plot results for solid cross-section
+data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc_rib,
+                                                              req, "rc_rec", mat_names, g2k, qk, max_iter,
+                                                             idx_vrc, system = 'Continuous 1D')
+data_max = max_of_arrays(data_max, data_max_new)
+vrfctn_members.append(vrfctn_members_new)
 
 '''
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section

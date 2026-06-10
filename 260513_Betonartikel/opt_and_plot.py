@@ -771,7 +771,7 @@ def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50
                 # create a Rebar material object
                 rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name)
                 # create initial wooden rectangular cross-section
-                section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.0, 0.14, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.02, 3, 0.01, 0.15, 2)
+                section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.0, 0.14, 0.3, 0.18, 0.006, 0.15, 0.006, 0.15, 0.02, 3, 0.008, 0.15, 2)
                 color = 'mediumseagreen'
 ## XXXXXXXXXXX neuen Querschnittstyp initialisieren
             else:
