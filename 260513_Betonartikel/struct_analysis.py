@@ -793,7 +793,12 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         [self.mu_min_slab, self.x_n, self.as_n, self.qs_class_n_slab] = self.calc_mu('neg')
         [self.mu_max, self.x_PB_p, self.as_PB_p, self.qs_class_p] = self.calc_mu_pb('pos')
         [self.mu_min, self.x_PB_n, self.as_PB_n, self.qs_class_n] = self.calc_mu_pb('neg')
-        self.roh_slab, self.rohs, self.roh = self.as_p / self.d, self.as_n / self.ds, self.as_PB_p / self.d_PB
+        self.roh_slab = self.as_p / self.d
+
+        #Berechnung Geometrischer Bewehrungsgehalt roh für PB (aus Hausübung 02, Stahlbeton II)
+        self.roh = 0.85*(self.concrete_type.fcd/self.rebar_type.fsd)*(self.x_PB_p/self.d_PB)
+        self.rohs = 0.85 * (self.concrete_type.fcd / self.rebar_type.fsd) * (self.x_PB_n / self.ds_PB)
+
 
         # Berechnung Vu (Querkraftwiderstand charak.) für Platte (Slab) & Plattenbalken
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
