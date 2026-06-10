@@ -799,8 +799,8 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance('Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
         #Bewehrung Rippen vs. Mindestebewerung nach sIA262_2025, Formel (116)
-        self.rohw = (self.as_PB_bw / self.b_w) / (0.9 * d)
-        self.rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # Formel (116) mit fck und fyk in MPa
+        self.rohw = (self.as_PB_bw / self.b_w) / (0.9 * self.d)
+        self.rohw_min = 0.001 * (self.concrete_type.fck * 1e-6 / 30) ** 0.5 * 500 / (self.rebar_type.fsk * 1e-6)  # Formel (116) mit fck und fyk in MPa
 
         self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
