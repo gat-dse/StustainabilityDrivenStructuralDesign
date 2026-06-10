@@ -327,6 +327,8 @@ class RectangularConcrete(SupStrucRectangular):
         self.a_s_stat = 0.6 * self.as_p + 0.4 * self.as_n + (0.6 + 0.4 + 1 + 1) * self.as_min + self.as_bw  # Abgestuft bei den Momentennullpunkten, Rest mit Asmin
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
+        #Bewehrungsgehalt Decke (kg Stahl / m3 Beton / m')
+        self.Bew_Gehalt = a_s_tot / (self.h * self.b * 1)
 
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
