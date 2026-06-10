@@ -825,7 +825,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         d = self.h_f - self.c_nom - self.bw[0][0] / 2  # Statische Höhe 1. Lage Platte
         ds = self.h_f - self.c_nom - self.bw[1][0] / 2  # Statische Höhe 4. Lage Platte
         d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[0] / 2  # Nur eine Lage Längsbewehrung implementiert. ACHTUNG: Check implementieren, ob genug Platz für Längsbewehrung vorhanden!!
-        ds_PB = self.h - self.h_f/2   # Mittlere statische Höhe azûf Mitte Platte
+        ds_PB = self.h - self.h_f/2   # Mittlere statische Höhe azûf Mitte Platte (obere Lagen unter Zug)
         return d, ds, d_PB, ds_PB
 
     #Slab = Platte in Querrichtung. ACHTUNG: DURCHLAUFWIRKUNG MUSS NOCH IMPLEMENTIERT WERDEN!

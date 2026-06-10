@@ -22,7 +22,7 @@ print("=" * 60)
 x_achse = 'l_tot [m]'
 y_achse = 'co2 [kgco2eq/m2]'
 kategorie_1 = 'plot_label'
-kategorie_2 = 'Statisches System'
+kategorie_2 = 'Bodenaufbau'
 
 df[x_achse] = pd.to_numeric(df[x_achse], errors='coerce')
 df[y_achse] = pd.to_numeric(df[y_achse], errors='coerce')
@@ -31,6 +31,14 @@ df_single = df.dropna(subset=[x_achse, y_achse, kategorie_1, kategorie_2]).copy(
 
 # WICHTIGE KORREKTUR: Zuerst nach 'plot_label' und dann nach der X-Achse sortieren
 df_single = df_single.sort_values(by=[kategorie_1, x_achse])
+
+# --- BEHOBEN: EXAKTES FARBMAPPING (Inklusive "El" für Continuous) ---
+farb_mapping = {
+    'BeamContinuousSupEl_rc_rec_Schuettung': '#1f77b4',  # Dunkelblau
+    'BeamContinuousSupEl_rc_rec_massiv': '#6baed6',      # Hellblau
+    'BeamSimpleSup_rc_rec_Schuettung': '#2ca02c',        # Dunkelgrün
+    'BeamSimpleSup_rc_rec_massiv': '#a1d99b'            # Hellgrün
+}
 
 # 3. Plot erstellen
 plt.figure(figsize=(11, 7))
@@ -49,7 +57,7 @@ ax_single = sns.lineplot(
     marker='o',
     errorbar=("pi", 100),
     estimator='mean',
-    palette='viridis',
+    palette=farb_mapping,  # Das korrigierte Farbmapping
     linewidth=2
 )
 
@@ -119,7 +127,7 @@ for i, aktueller_y_wert in enumerate(ziel_werte):
         marker='o',
         errorbar=("pi", 0),
         estimator='mean',
-        palette='viridis',
+        palette=farb_mapping,  # Das korrigierte Farbmapping auch hier nutzen
         linewidth=1,
         ax=ax
     )
