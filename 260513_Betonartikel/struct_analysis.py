@@ -1402,8 +1402,9 @@ class Member1D:
         self.q_freq = self.gk + self.psi[1] * self.qk # [kN/m']
         self.q_per = self.gk + self.psi[2] * self.qk # [kN/m']
         self.q_gzt = 1.35*self.gk + 1.5*self.qk # [kN/m'
-        self.mRd_n = self.system.alpha_m[0] * self.q_gzt * self.system.l_tot ** 2
-        self.mRd_p = self.system.alpha_m[1] * self.q_gzt * self.system.l_tot ** 2
+        self.mEd_n = self.system.alpha_m[0] * self.q_gzt * self.system.l_tot ** 2
+        self.mEd_p = self.system.alpha_m[1] * self.q_gzt * self.system.l_tot ** 2
+        self.vEd = max(self.system.alpha_v[0] , self.system.alpha_v[1]) * self.q_gzt * self.system.l_tot
         self.m = self.q_per / 10
         self.w_install_adm = self.system.li_max / self.requirements.lw_install
         self.w_use_adm = self.system.li_max / self.requirements.lw_use
