@@ -79,7 +79,28 @@ print(dfC3037["DENSITY"])
 print(dfC3037["Total_GWP"])
 print(dfC3037["Total_GWP_m3"])
 print(dfC3037["MECH_PROP"])
+#------------------------------------------------------------------------------------------------------------------------
+#extract values for all concrete Hochbau
+#
+inquiry = (""" 
+        SELECT PROD_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
+        WHERE DENSITY IS NOT NULL
+        AND "MATERIAL" LIKE '%ready_mixed_concrete%'
+        AND (MECH_PROP LIKE '%C20/25%' OR MECH_PROP LIKE '%C25/30%' OR MECH_PROP LIKE '%C30/37%')
+        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+        AND ValidEPD = 1
+        AND Man_Ausschluss = 1 """
+           )
+cursor.execute(inquiry)
+result = cursor.fetchall()
 
+dfHochbaubeton = pd.DataFrame(result, columns=["PROD_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
+
+print(dfHochbaubeton["PROD_ID"])
+print(dfHochbaubeton["DENSITY"])
+print(dfHochbaubeton["Total_GWP"])
+print(dfHochbaubeton["Total_GWP_m3"])
+print(dfHochbaubeton["MECH_PROP"])
 #------------------------------------------------------------------------------------------------------------------------
 #extract values for Timber GL24
 #
@@ -148,6 +169,28 @@ print(dfGL30["DENSITY"])
 print(dfGL30["Total_GWP"])
 print(dfGL30["Total_GWP_m3"])
 print(dfGL30["MECH_PROP"])
+#------------------------------------------------------------------------------------------------------------------------
+#extract values for all GL (BSH)
+#
+inquiry = (""" 
+        SELECT PROD_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
+        WHERE DENSITY IS NOT NULL
+        AND "MATERIAL" LIKE '%Glue_laminated_timber%'
+        AND MECH_PROP IS NOT NULL
+        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+        AND ValidEPD = 1
+        AND Man_Ausschluss = 1 """
+           )
+cursor.execute(inquiry)
+result = cursor.fetchall()
+
+dfBSH = pd.DataFrame(result, columns=["PROD_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
+
+print(dfBSH["PROD_ID"])
+print(dfBSH["DENSITY"])
+print(dfBSH["Total_GWP"])
+print(dfBSH["Total_GWP_m3"])
+print(dfBSH["MECH_PROP"])
 
 #------------------------------------------------------------------------------------------------------------------------
 #extract values for Timber GL32
