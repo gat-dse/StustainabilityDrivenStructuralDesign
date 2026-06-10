@@ -36,10 +36,22 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     di_yo0 = m.section.bw[3][0]
     var0 = [h0, di_xu0, di_xo0, di_yu0, di_yo0]
 
-    #ToDo: Add optimization for upper reinforcement
+
+
+    #define bound for height depending on Schallschutzanforderung
+    if m.floorstruc.name == 'massiv':
+        h_min_schall = 0.16
+        bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+
+    elif m.floorstruc.name == 'Schuettung':
+        h_min_schall = 0.13
+        bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+
+    else:
+        bh = (max(0.08, m.section.hmin_c), 0.8)  # h_max_dynamisch)
+
 
     # define bounds of variables
-    bh = (h_min, 1.2)  # height between h_min and 1.2 m
     bdi_xu = (max(0.008, m.section.di_xu_min), 0.04)  # diameter of rebars between 8 mm and 40 mm
     bdi_xo = (max(0.008, m.section.di_xo_min), 0.04)  # diameter of rebars between 8 mm and 40 mm
     bdi_yu = (max(0.008, m.section.di_yu_min), 0.04)  # diameter of rebars between 8 mm and 40 mm
