@@ -929,7 +929,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         x_n, x_PB_n = self.x_n, self.x_PB_n
         as_bw = 0
         #Berechnung Bew.-fläche Bügel in Rippen
-        as_PB_bw = np.pi * di_r ** 2 / 4 * n_r / s_r * 0.9 * d #as_PB_bw = asi * (n + 0.9 d) / si
+        as_PB_bw = np.pi * di_r ** 2 / 4 * n_r / s_r #Bewehrungsfläche Bügel in Rippen [mm2/mm']
 
         if bauteil == 'Platte':
             if d_installation < d / 6:  #SIA 262 4.3.3.2.8
