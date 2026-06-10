@@ -209,7 +209,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     h_max = [max(values) for values in zip(*h)]
 
     # create data of envelope area for subplot 2: total height
-    h_tot = [[mem.section.h+mem.floorstruc.h for mem in sublist] for sublist in member_list]
+    h_tot = [[mem.section.h+mem.floorstruc.h_Floor for mem in sublist] for sublist in member_list]
     h_tot_min = [min(values) for values in zip(*h_tot)]
     h_tot_max = [max(values) for values in zip(*h_tot)]
 
@@ -219,7 +219,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     co2_max = [max(values) for values in zip(*co2)]
 
     # create data of envelope area for subplot 4: total co2
-    co2_tot = [[mem.section.co2+mem.floorstruc.co2 for mem in sublist] for sublist in member_list]
+    co2_tot = [[mem.section.co2+mem.floorstruc.co2_Floor for mem in sublist] for sublist in member_list]
     co2_tot_min = [min(values) for values in zip(*co2_tot)]
     co2_tot_max = [max(values) for values in zip(*co2_tot)]
 
@@ -234,9 +234,9 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
         plotdata = [[], [], [], []]
         for j, mem in enumerate(members):
             plotdata[0].append(mem.section.h)
-            plotdata[1].append(mem.section.h + mem.floorstruc.h)
+            plotdata[1].append(mem.section.h + mem.floorstruc.h_Floor)
             plotdata[2].append(mem.section.co2)
-            plotdata[3].append(mem.section.co2 + mem.floorstruc.co2)
+            plotdata[3].append(mem.section.co2 + mem.floorstruc.co2_Floor)
             if j == idx_vrfctn:
                 vrfctn_members[0].append(mem)
                 vrfctn_members[1].append(i)
