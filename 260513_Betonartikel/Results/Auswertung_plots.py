@@ -3,16 +3,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-
 # ==============================================================================
 # PART 1: EINZELPLOT (GWP TOTAL)
 # ==============================================================================
 
 # 1. Datei über absoluten Pfad einlesen
-excel_file = "260604_RC_1D_Systems.xlsx"
+excel_file = "260610_0812_Members.xlsx"
 df = pd.read_excel(excel_file)
 
 # --- DIAGNOSE-PRINT ---
@@ -26,24 +22,29 @@ print("=" * 60)
 x_achse = 'l_tot [m]'
 y_achse = 'co2 [kgco2eq/m2]'
 kategorie_1 = 'plot_label'
-kategorie_2 = 'Bodenaufbau'
+kategorie_2 = 'Statisches System'
 
 df[x_achse] = pd.to_numeric(df[x_achse], errors='coerce')
 df[y_achse] = pd.to_numeric(df[y_achse], errors='coerce')
 
 df_single = df.dropna(subset=[x_achse, y_achse, kategorie_1, kategorie_2]).copy()
-df_single = df_single.sort_values(x_achse)
+
+# WICHTIGE KORREKTUR: Zuerst nach 'plot_label' und dann nach der X-Achse sortieren
+df_single = df_single.sort_values(by=[kategorie_1, x_achse])
 
 # 3. Plot erstellen
 plt.figure(figsize=(11, 7))
 sns.set_theme(style="whitegrid")
 
-# Wir fangen den aktuellen Achsen-Kontext (ax) ab, um ihn zu manipulieren
+# Wir holen uns die eindeutigen plot_labels sortiert für eine einheitliche Farbreihenfolge
+hue_order = sorted(df_single[kategorie_1].unique())
+
 ax_single = sns.lineplot(
     data=df_single,
     x=x_achse,
     y=y_achse,
     hue=kategorie_1,
+    hue_order=hue_order,  # Sortierte Farben
     style=kategorie_2,
     marker='o',
     errorbar=("pi", 100),
@@ -63,6 +64,7 @@ plt.ylabel(r"GWP$_{total}$ [kg CO$_{2eq}$ / m$^2$]", fontsize=12)
 plt.legend(title=r"Betonfestigkeit (f$_{ck}$)", bbox_to_anchor=(1.05, 1), loc='upper left')
 plt.tight_layout()
 plt.grid(True, linestyle='--', alpha=0.5)
+
 
 # ==============================================================================
 # PART 2: SUBPLOTS (3x2 MULTIKRITERIEN-ANALYSE)
@@ -95,7 +97,10 @@ for wert in ziel_werte:
 
 pflicht_spalten = [x_achse, kategorie_1, kategorie_2] + ziel_werte
 df_subplots = df.dropna(subset=pflicht_spalten).copy()
-df_subplots = df_subplots.sort_values(x_achse)
+
+# WICHTIGE KORREKTUR: Auch hier sauber nach Label und X-Achse sortieren
+df_subplots = df_subplots.sort_values(by=[kategorie_1, x_achse])
+hue_order_subplots = sorted(df_subplots[kategorie_1].unique())
 
 fig, axes = plt.subplots(nrows=3, ncols=2, figsize=(16, 10))
 sns.set_theme(style="whitegrid")
@@ -109,6 +114,7 @@ for i, aktueller_y_wert in enumerate(ziel_werte):
         x=x_achse,
         y=aktueller_y_wert,
         hue=kategorie_1,
+        hue_order=hue_order_subplots,  # Gleiche sortierte Reihenfolge in allen Teilgrafiken
         style=kategorie_2,
         marker='o',
         errorbar=("pi", 0),
@@ -140,21 +146,38 @@ axes_flat[2].set_ylim(0, ymax_co2)
 axes_flat[3].set_ylim(0, ymax_co2)
 # ------------------------------------------------------------------------------
 
-# --- LEGENDE EXTRAHIEREN ---
+# --- GLOBAL LEGENDE SORTIERT & GEFILTERT EXTRAHIEREN ---
+# Wir holen uns die Handles und Labels aus dem ersten Subplot
 handles, labels = axes_flat[0].get_legend_handles_labels()
 
+# FILTER: Steuerungs-Spalten-Namen von Seaborn herausfiltern
+unerwuenschte_eintraege = {'plot_label', 'Bodenaufbau', ''}
+gefilterte_eintraege = [
+    (h, l) for h, l in zip(handles, labels) if l not in unerwuenschte_eintraege
+]
+
+# Sortiert die verbleibenden Legenden-Einträge alphabetisch nach dem Label-Namen
+sorted_legend = sorted(gefilterte_eintraege, key=lambda t: t[1])
+
+if sorted_legend:
+    handles_sorted, labels_sorted = zip(*sorted_legend)
+else:
+    handles_sorted, labels_sorted = [], []
+
+# Einzelne Legenden in den Subplots löschen
 for ax in axes_flat:
     if ax.get_legend():
         ax.get_legend().remove()
 
+# Globale Legende am rechten Rand platzieren
 fig.legend(
-    handles,
-    labels,
-    title=r"System-Spezifikation / Querschnitt",
+    handles_sorted,
+    labels_sorted,
+    title="System-Spezifikation / Querschnitt",
     loc="center left",
     bbox_to_anchor=(0.78, 0.5),
-    fontsize='x-small',
-    title_fontsize='small'
+    fontsize='small',
+    title_fontsize='medium'
 )
 
 fig.suptitle("Multikriterien-Analyse für Betonquerschnitte", fontsize=16, fontweight='bold', y=0.98)

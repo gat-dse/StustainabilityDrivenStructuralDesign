@@ -14,7 +14,7 @@ import struct_optimization_2D
 idx_vrc = 1
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 200
+max_iter = 10
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
@@ -31,7 +31,13 @@ database_name = "database_260506_Hochbau.db"
 bodenaufbau_rcdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                        ["'Unterlagsboden Zement, 85 mm'", False, False],
                        ["'Glaswolle'", 0.03, False]]
-bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau_rcdecke, database_name)
+bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau_rcdecke, database_name, name="massiv")
+
+# create floor structure for ribbed reinforced concrete cross-section
+bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                       ["'Unterlagsboden Zement, 85 mm'", False, False],
+                       ["'Glaswolle'", 0.03, False],["'Kies gebrochen'", 0.06, False]]
+bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name, name="Schuettung")
 
 
 # define loads on member
@@ -59,6 +65,13 @@ length_y = [3.0, 6.0, 8.0, 12.0]
 support = ["LL-frei"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
+                                                              req, "rc_rec", mat_names, g2k, qk, max_iter,
+                                                              idx_vrc)
+data_max = max_of_arrays(data_max, data_max_new)
+vrfctn_members.append(vrfctn_members_new)
+
+# retrieve data from database, find optimal cross-sections and plot results for solid cross-section
+data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc_rib,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
