@@ -818,6 +818,10 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)
+
+        # Bewehrungsgehalt Decke (kg Stahl / m3 Beton / m')
+        self.Bew_Gehalt = a_s_tot / ((self.h_w * self.b_w + self.h_f * self.b)*1/self.b)
+
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density/self.b  # [kg_CO2_eq/m2]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
