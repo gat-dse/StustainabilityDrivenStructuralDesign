@@ -427,7 +427,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
     di_xu, di_xo = max(0.008, m.section.di_xu_min, m.section.bw[0][0]), max(0.008, m.section.di_xo_min, m.section.bw[1][0])  #
 
-    di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+    di_pb_bw, s_pb_bw, n_pb_bw = m.section.bw_bg_r[0], m.section.bw_bg_r[1], m.section.bw_bg_r[2]
     n_x_w = m.section.bw_r[1]
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
