@@ -7,7 +7,7 @@ import struct_analysis  # file with code for structural analysis
 import os
 
 # define database
-database_name = "database_260506_Hochbau.db"
+database_name = "database_260610_Hochbau_neu.db"
 #connect to the database
 connection = sqlite3.connect(database_name)
 # create cursor object
@@ -28,7 +28,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfC2025 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("C20/25:")
 print(dfC2025["PRO_ID"])
 print(dfC2025["DENSITY"])
 print(dfC2025["Total_GWP"])
@@ -50,7 +50,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfC2530 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("C25/30:")
 print(dfC2530["PRO_ID"])
 print(dfC2530["DENSITY"])
 print(dfC2530["Total_GWP"])
@@ -73,7 +73,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfC3037 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("C30/37:")
 print(dfC3037["PRO_ID"])
 print(dfC3037["DENSITY"])
 print(dfC3037["Total_GWP"])
@@ -95,7 +95,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfHochbaubeton = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("Hochbaubeton:")
 print(dfHochbaubeton["PRO_ID"])
 print(dfHochbaubeton["DENSITY"])
 print(dfHochbaubeton["Total_GWP"])
@@ -117,7 +117,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfGL24 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("GL24:")
 print(dfGL24["PRO_ID"])
 print(dfGL24["DENSITY"])
 print(dfGL24["Total_GWP"])
@@ -140,7 +140,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfGL28 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("GL28:")
 print(dfGL28["PRO_ID"])
 print(dfGL28["DENSITY"])
 print(dfGL28["Total_GWP"])
@@ -163,34 +163,12 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfGL30 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("GL30:")
 print(dfGL30["PRO_ID"])
 print(dfGL30["DENSITY"])
 print(dfGL30["Total_GWP"])
 print(dfGL30["Total_GWP_m3"])
 print(dfGL30["MECH_PROP"])
-#------------------------------------------------------------------------------------------------------------------------
-#extract values for all GL (BSH)
-#
-inquiry = (""" 
-        SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
-        WHERE DENSITY IS NOT NULL
-        AND "MATERIAL" LIKE '%Glue_laminated_timber%'
-        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
-        AND ValidEPD = 1
-        AND Man_Ausschluss = 1 """
-           )
-cursor.execute(inquiry)
-result = cursor.fetchall()
-
-dfBSH = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
-print(dfBSH["PRO_ID"])
-print(dfBSH["DENSITY"])
-print(dfBSH["Total_GWP"])
-print(dfBSH["Total_GWP_m3"])
-print(dfBSH["MECH_PROP"])
-
 #------------------------------------------------------------------------------------------------------------------------
 #extract values for Timber GL32
 #
@@ -207,12 +185,35 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfGL32 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("GL32:")
 print(dfGL32["PRO_ID"])
 print(dfGL32["DENSITY"])
 print(dfGL32["Total_GWP"])
 print(dfGL32["Total_GWP_m3"])
 print(dfGL32["MECH_PROP"])
+#------------------------------------------------------------------------------------------------------------------------
+#extract values for all GL (BSH)
+#
+inquiry = (""" 
+        SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
+        WHERE DENSITY IS NOT NULL
+        AND "MATERIAL" LIKE '%Glue_laminated_timber%'
+        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+        AND ValidEPD = 1
+        AND Man_Ausschluss = 1 """
+           )
+cursor.execute(inquiry)
+result = cursor.fetchall()
+
+dfBSH = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
+print("alle BSH:")
+print(dfBSH["PRO_ID"])
+print(dfBSH["DENSITY"])
+print(dfBSH["Total_GWP"])
+print(dfBSH["Total_GWP_m3"])
+print(dfBSH["MECH_PROP"])
+
+
 
 #------------------------------------------------------------------------------------------------------------------------
 #extract values for Timber C24
@@ -230,7 +231,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfKVHC24 = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("alle KVH C24:")
 print(dfKVHC24["PRO_ID"])
 print(dfKVHC24["DENSITY"])
 print(dfKVHC24["Total_GWP"])
@@ -252,7 +253,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfCLT = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("CLT:")
 print(dfCLT["PRO_ID"])
 print(dfCLT["DENSITY"])
 print(dfCLT["Total_GWP"])
@@ -273,7 +274,7 @@ inquiry = ("""
            )
 cursor.execute(inquiry)
 result = cursor.fetchall()
-
+print("B500B:")
 dfB500B = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
 
 print(dfB500B["PRO_ID"])
@@ -297,7 +298,7 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfRebar = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("alle Bewehrungsstähle:")
 print(dfRebar["PRO_ID"])
 print(dfRebar["DENSITY"])
 print(dfRebar["Total_GWP"])
@@ -319,13 +320,13 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfSteel = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
-
+print("alle Baustähle:")
 print(dfSteel["PRO_ID"])
 print(dfSteel["DENSITY"])
 print(dfSteel["Total_GWP"])
 print(dfSteel["Total_GWP_m3"])
 print(dfSteel["MECH_PROP"])
-"""
+
 #________________________________________________________________________________________________________________________
 #           SINGLE     PLOT       TOTAL GWP
 #________________________________________________________________________________________________________________________
@@ -344,7 +345,7 @@ y_positions = {
     "B500B": 4,
     "Steel": 2
 }
-
+"""
 # -----------------------
 # Plot
 # -----------------------
@@ -488,10 +489,10 @@ plt.show()
 
 
 y_positions = {
-   # "C20/25": 10,
-   # "C25/30": 11,
-   # "C30/37": 12,
-    "Hochbaubeton": 10,
+    "C20/25": 10,
+    "C25/30": 11,
+    "C30/37": 12,
+   # "Hochbaubeton": 10,
     "BSP": 8,
     "KVH": 7,
     "BSH": 6,
@@ -504,14 +505,14 @@ def jitter(y, n):
 def plot_data(ax, x_col):
     # Beton
 
-    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["Hochbaubeton"]), color="lightgreen")
-    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["Hochbaubeton"]), color="green")
-    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["Hochbaubeton"]), color="darkgreen")
+    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
+    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
+    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
     #plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")
 
     # Holz
-    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP"]), color="orange")
-    ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH"]), color="orange")
+    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP"]), color="red")
+    ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH"]), color="darkorange")
     ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
 
     # Stahl
@@ -547,7 +548,7 @@ plot_data(axes[0, 0], "Total_GWP")
 #axes[0, 0].set_ylabel("Material")
 axes[0, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
 axes[0, 0].set_xlim(0, 1400)
-axes[0, 0].set_ylim(0, 11)
+axes[0, 0].set_ylim(0, 13.5)
 
 # -----------------------
 # OBEN RECHTS
@@ -556,14 +557,14 @@ plot_data(axes[0, 1], "Total_GWP_m3")
 #axes[0, 1].set_title("Total GWP [kg CO₂-eq / m³]")
 axes[0, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 axes[0, 1].set_xlim(0, 10000)
-axes[0, 1].set_ylim(0, 11)
+axes[0, 1].set_ylim(0, 13.5)
 
 # -----------------------
 # Mitte LINKS zoom Beton
 # -----------------------
 plot_data(axes[1, 0], "Total_GWP")
-axes[1, 0].set_xlim(0, 150)
-axes[1, 0].set_ylim(9, 11)
+axes[1, 0].set_xlim(0, 130)
+axes[1, 0].set_ylim(9, 13.5)
 axes[1, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
 
 # -----------------------
@@ -571,7 +572,7 @@ axes[1, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
 # -----------------------
 plot_data(axes[1, 1], "Total_GWP_m3")
 axes[1, 1].set_xlim(0, 350)
-axes[1, 1].set_ylim(9, 11)
+axes[1, 1].set_ylim(9, 13.5)
 axes[1, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 
 # -----------------------
