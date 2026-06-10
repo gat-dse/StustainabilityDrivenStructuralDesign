@@ -759,7 +759,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
         # Definition Bewehrung für Initial-QS
         self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung (1. & 4. Lage)
-        self.bw_bg = [0, 0.15, 0]  # Allow for no slab shear reinforcement
+        self.bw_bg = [0, 0.15, 2]  # Allow for no slab shear reinforcement
         self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
 
@@ -798,6 +798,9 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         # Berechnung Vu (Querkraftwiderstand charak.) für Platte (Slab) & Plattenbalken
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance('Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
+        #Bewehrung Rippen vs. Mindestebewerung nach sIA262_2025, Formel (116)
+        self.rohw = (self.as_PB_bw / self.b_w) / (0.9 * d)
+        self.rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)  # Formel (116) mit fck und fyk in MPa
 
         self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
@@ -973,12 +976,11 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         else:  # cross-section with vertical stirrups
             z = d - 0.85 * x / 2
             vrds = as_bw * z * fsd  # SIA 262, 4.3.3.4.3, (43)
-            vrdc = bw * z * kc * fcd * np.sin(alpha) * np.cos(
-                alpha)  # unit of alpha: [rad]    # SIA 262, 4.3.3.4.6, (45)
+            vrdc = bw * z * kc * fcd * np.sin(alpha) * np.cos(alpha)  # unit of alpha: [rad]    # SIA 262, 4.3.3.4.6, (45)
             rohw = as_bw / bw /(0.9*d)
-            rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6)
+            rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6) #Formel mit fck und fyk in MPa
             if rohw < rohw_min:
-                print("minimal reinforcement ratio of stirrups is lower than required according to SIA 262, (110)")
+                print("minimal reinforcement ratio of stirrups is lower than required according to SIA 262:2025, (116)")
             return min(vrds, vrdc)
 
     #ÜBERNOMMEN VON RECHTECK-QS, NICHT ANGEPASST
