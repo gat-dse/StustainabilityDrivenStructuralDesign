@@ -1398,9 +1398,10 @@ class Member1D:
         self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m']
         self.qk = qk * self.section.b #[kN/m']
         self.psi = [psi0, psi1, psi2]
-        self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m2]
-        self.q_freq = self.gk + self.psi[1] * self.qk # [kN/m2]
-        self.q_per = self.gk + self.psi[2] * self.qk # [kN/m2]
+        self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m']
+        self.q_freq = self.gk + self.psi[1] * self.qk # [kN/m']
+        self.q_per = self.gk + self.psi[2] * self.qk # [kN/m']
+        self.q_gzt = 1.35*self.gk + 1.5*self.qk # [kN/m']
         self.m = self.q_per / 10
         self.w_install_adm = self.system.li_max / self.requirements.lw_install
         self.w_use_adm = self.system.li_max / self.requirements.lw_use
