@@ -130,7 +130,12 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 
         if m.floorstruc.name == 'massiv':
             h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) #h_max_dynamisch)
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+
+        elif m.floorstruc.name == 'Schuettung':
+            h_min_schall = 0.13
+            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+
         else:
             bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
 
