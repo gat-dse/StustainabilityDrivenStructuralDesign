@@ -835,18 +835,18 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
 
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestbewehrung für Bewehrung in y-Richtung in Platte
-        self.as_Platte = (self.as_p + self.as_n)* self.b + (self.as_p + self.as_n) * 1 # [m2/m]
-        self.as_Rippe_bg = (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w) / self.bw_bg_r[1] # [m2/m]
-        self.as_Rippe_x = self.as_PB_p * 1 # [m2/m}
-        self.as_stat_2 = self.as_Platte + self.as_Rippe_bg + self.as_Rippe_x
+        self.as_Platte = (self.as_p + self.as_n)* self.b * 1 * 2 # [m3]
+        self.as_Rippe_bg = (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w) / self.bw_bg_r[1] # [m3]
+        self.as_Rippe_x = self.as_PB_p * 1 # [m3}
+        self.as_stat_2 = self.as_Platte + self.as_Rippe_bg + self.as_Rippe_x #[m3]
         self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w)/self.bw_bg_r[1]# rebar area without reinforcement joint surcharge
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
-        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)
+        a_s_tot = self.as_stat_2 * (1 + self.joint_surcharge) / (self.b *1)  #[m3/m2]
 
         # Bewehrungsgehalt Decke (kg Stahl / m3 Beton / m')
-        self.Bew_Gehalt = a_s_tot/self.b * self.rebar_type.density / ((self.h_w * self.b_w + self.h_f * self.b)/self.b)  # [kg CO2 eq / m3]
+        self.Bew_Gehalt = a_s_tot * self.rebar_type.density / (self.h_w * self.b_w + self.h_f * self.b) # [kg CO2 eq / m3]
 
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density/self.b  # [kg_CO2_eq/m2]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m]
@@ -1427,7 +1427,7 @@ class Member1D:
         self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m']
         self.q_freq = self.gk + self.psi[1] * self.qk # [kN/m']
         self.q_per = self.gk + self.psi[2] * self.qk # [kN/m']
-        self.q_gzt = 1.35*self.gk + 1.5*self.qk # [kN/m'
+        self.q_gzt = 1.35*self.gk + 1.5*self.qk # [kN/m']
         self.mEd_n = self.system.alpha_m[0] * self.q_gzt * self.system.l_tot ** 2
         self.mEd_p = self.system.alpha_m[1] * self.q_gzt * self.system.l_tot ** 2
         self.vEd = max(self.system.alpha_v[0] , self.system.alpha_v[1]) * self.q_gzt * self.system.l_tot
