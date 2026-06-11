@@ -11,13 +11,13 @@ from datetime import datetime
 target_columns = [
     "Member_ID", "criteria", "section_type", "Statisches System", "l_tot [m]",
     "h_QS [m]", "b [m]", "b_w [m]", "h_f [m]",
-    "Bew_Gehalt [kg/m3]", "MEd [kNm]", "VEd [kN]",
+    "Bew_Gehalt [kg/m3]", "MEd_n [kNm]", "MEd_p [kNm]", "VEd [kN]",
     "concrete_type", "mech_prop", "prod_id", "GWP concrete [kgCO2eq / t]",
     "rebar_type", "mech_prop_1", "prod_id_1", "GWP rebar [kgCO2eq / t]",
     "co2_rebar [kgCO2eq/m2]", "co2_concrete [kgCO2eq/m2]", "co2 Struktur [kgCO2eq/m2]",
     "Bodenaufbau", "lifespan Estrich [a]", "h_Bodenaufbau [m]", "co2 Bodenaufbau [kgCO2eq/m2]",
     "co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]", "Last Struktur [N/m2]",
-    "Last Bodenaufbau [N/m2]", "co2 [kgco2eq/m2]", "co2 pro Jahr [kgco2eq/m2a]",
+    "Last Bodenaufbau [N/m2]", "co2 [kgco2eq/m2]", "co2 pro Jahr [kgco2eq/m2a]"
 ]
 
 
@@ -45,13 +45,24 @@ def clean_single_member_file(file_path):
                                        for count in range(len(cols[cols == i]))]
     df_clean.columns = cols
 
+    #EINHEITENKONVERTIERUNG (Nm -> kNm und N -> kN) ---
+    #Werte numerisch konvertieren und teilen sie durch 1000
+    for col in ['mEd_n', 'mEd_p', 'vEd']:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce') / 1000
+
+
     # Relevante Spalten definieren (Inklusive Korrektur von g0k_b_1 und co2_1)
     if 'rc_rec' in df_clean['section_type'].values:
-        spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'concrete_type', 'mech_prop', 'prod_id', 'GWP',
+        spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b',
+                         'Bew_Gehalt', 'mEd_n', 'mEd_p', 'vEd',
+                         'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                          'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1', 'co2_rebar', 'co2_concrete', 'co2',
                          'system', 'name', 'lifespan_1',
                          'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
-        spalten_neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]', 'concrete_type', 'mech_prop',
+        spalten_neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]',
+                       'Bew_Gehalt [kg/m3]', 'MEd_n [kNm]', 'MEd_p [kNm]', 'VEd [kN]',
+                       'concrete_type', 'mech_prop',
                        'prod_id', 'GWP concrete [kgCO2eq / t]', 'rebar_type', 'mech_prop_1', 'prod_id_1',
                        'GWP rebar [kgCO2eq / t]',
                        'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
@@ -61,12 +72,14 @@ def clean_single_member_file(file_path):
                        'co2 Bauteil pro Jahr [kgCO2eq/ma]']
     elif 'rc_rib' in df_clean['section_type'].values:
         spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b', 'b_w', 'h_f',
+                         'Bew_Gehalt', 'mEd_n', 'mEd_p', 'vEd',
                          'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                          'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1',
                          'co2_rebar', 'co2_concrete', 'co2',
                          'system', 'name', 'lifespan_1',
                          'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
         spalten_neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]', 'b_w [m]', 'h_f [m]',
+                       'Bew_Gehalt [kg/m3]', 'MEd_n [kNm]', 'MEd_p [kNm]', 'VEd [kN]',
                        'concrete_type', 'mech_prop', 'prod_id', 'GWP concrete [kgCO2eq / t]',
                        'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                        'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
