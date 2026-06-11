@@ -1687,6 +1687,11 @@ class Member2D:
         self.mkd_p_y = self.system.alpha_m_y[0] * (self.gk + self.qk) * self.li_min ** 2
         self.mkd_n_y = self.system.alpha_m_y[1] * (self.gk + self.qk) * self.li_min ** 2
         #TODO: Everything for lx and ly!
+
+        self.mEd_n = max(abs(self.system.alpha_m_x[1]), abs(self.system.alpha_m_y[1])) * self.q_gzt * self.system.l_tot ** 2
+        self.mEd_p = max(abs(self.system.alpha_m_x[0]), abs(self.system.alpha_m_y[0])) * self.q_gzt * self.system.l_tot ** 2
+        self.vEd = max(abs(self.system.alpha_v[0]), abs(self.system.alpha_v[1])) * self.q_gzt * self.system.l_tot
+
         self.qk_zul_gzt = float
         self.fire = [0, 0, 0, 0]  # fire from bottom, left, top, right (0: no fire; 1: fire)
         if fire_b is True:
