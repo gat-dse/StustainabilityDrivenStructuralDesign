@@ -12,7 +12,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,5,6,7,8,9,10,11,12]
+lengths = [3,4,5,6,7,8,9,10,11,12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
