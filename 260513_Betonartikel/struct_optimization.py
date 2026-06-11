@@ -475,7 +475,24 @@ def rc_rib_rqs(var, add_arg):
     g2k = add_arg[15]
     qk = add_arg[16]
     #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
-    # create section
+
+    # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
+    # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
+    b_w_min_c_aktuell = (2 * c_nom +  # 2 * Überdeckung
+                         0.032 * (n_x_w - 1) +  # (n-1) * Grösstkorn zwischen Längsstäben
+                         2 * di_pb_bw +  # 2 * AKTUELLER Bügeldurchmesser
+                         di_x_w * n_x_w  # n * AKTUELLER Längsstabdurchmesser
+                        +0.01) #Reserve 10 mm
+
+    b_w_erforderlich = max(0.15, b_w_min_c_aktuell)
+
+    # Wenn b_w zu klein ist, wird ein Geometrie-Strafwert generiert
+    penalty_bw = max(b_w_erforderlich - b_w, 0)
+
+    # Skalierungsfaktor für die Strafe (muss hoch sein, da Abweichungen im Millimeterbereich liegen)
+    penalty_bw_scaled = penalty_bw * 1e5
+
+    #create section
     section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
 
      # create member
