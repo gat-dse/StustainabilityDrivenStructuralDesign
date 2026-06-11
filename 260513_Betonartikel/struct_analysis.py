@@ -1456,7 +1456,7 @@ class Member1D:
                 # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
-                self.w_install_ger = self.unit_def * self.q_freq * max(3.4,self.section.Faktor_ger)  #SIA262:2025, Formel (104), wobei fger immer grösser 3.4 sein muss.
+                self.w_install_ger = self.unit_def * self.q_freq * min(10.0, max(3.4, self.section.Faktor_ger))  #SIA262:2025, Formel (104), wobei fger immer grösser 3.4 sein muss.
                 #Alte Berechnung gerissene Durchbiegung Langzeit
                 #self.w_install_ger = unit_def * (
                 #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
