@@ -1677,6 +1677,7 @@ class Member2D:
         self.q_rare = self.gk + self.qk
         self.q_freq = self.gk + self.psi[1] * self.qk
         self.q_per = self.gk + self.psi[2] * self.qk
+        self.q_gzt = 1.35 * self.gk + 1.5 * self.qk # [kN/m'] #TODO Achtung nur gültig für Breite 1m
         self.m = self.q_per / 10
         self.w_install_adm = self.li_min / self.requirements.lw_install
         self.w_use_adm = self.li_min / self.requirements.lw_use
