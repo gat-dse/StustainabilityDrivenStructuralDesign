@@ -835,7 +835,11 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
 
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestbewehrung für Bewehrung in y-Richtung in Platte
-        self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w)/self.bw_bg_r[1] + 2 * self.as_min# rebar area without reinforcement joint surcharge
+        self.as_Platte = (self.as_p + self.as_n)* self.b + (self.as_p + self.as_n) * 1 # [m2/m]
+        self.as_Rippe_bg = (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w) / self.bw_bg_r[1] # [m2/m]
+        self.as_Rippe_x = self.as_PB_p * 1 # [m2/m}
+        self.as_stat_2 = self.as_Platte + self.as_Rippe_bg + self.as_Rippe_x
+        self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w)/self.bw_bg_r[1]# rebar area without reinforcement joint surcharge
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
