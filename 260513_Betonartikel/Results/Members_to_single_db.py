@@ -10,11 +10,12 @@ from datetime import datetime
 # Ziel-Struktur für die finale Datenbank (Schritt 2)
 target_columns = [
     "Member_ID", "criteria", "section_type", "Statisches System", "l_tot [m]",
-    "h_QS [m]", "b [m]", "b_w [m]", "h_f [m]", "concrete_type", "mech_prop",
-    "prod_id", "GWP concrete [kgCO2eq / t]", "rebar_type", "mech_prop_1",
-    "prod_id_1", "GWP rebar [kgCO2eq / t]", "co2_rebar [kgCO2eq/m2]",
-    "co2_concrete [kgCO2eq/m2]", "co2 Struktur [kgCO2eq/m2]", "Bodenaufbau",
-    "lifespan Estrich [a]", "h_Bodenaufbau [m]", "co2 Bodenaufbau [kgCO2eq/m2]",
+    "h_QS [m]", "b [m]", "b_w [m]", "h_f [m]",
+    "Bew_Gehalt [kg/m3]", "MEd [kNm]", "VEd [kN]",
+    "concrete_type", "mech_prop", "prod_id", "GWP concrete [kgCO2eq / t]",
+    "rebar_type", "mech_prop_1", "prod_id_1", "GWP rebar [kgCO2eq / t]",
+    "co2_rebar [kgCO2eq/m2]", "co2_concrete [kgCO2eq/m2]", "co2 Struktur [kgCO2eq/m2]",
+    "Bodenaufbau", "lifespan Estrich [a]", "h_Bodenaufbau [m]", "co2 Bodenaufbau [kgCO2eq/m2]",
     "co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]", "Last Struktur [N/m2]",
     "Last Bodenaufbau [N/m2]", "co2 [kgco2eq/m2]", "co2 pro Jahr [kgco2eq/m2a]",
 ]
