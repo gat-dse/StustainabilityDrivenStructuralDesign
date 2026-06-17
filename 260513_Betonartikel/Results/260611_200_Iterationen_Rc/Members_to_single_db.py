@@ -9,14 +9,14 @@ from datetime import datetime
 
 # Ziel-Struktur für die finale Datenbank (Schritt 2)
 target_columns = [
-    "Member_ID", "criteria", "section_type", "Statisches System", "l_tot [m]",
+    "Member_ID", "criteria", "section_type", "Statisches System", "Raender" , "l_tot [m]",
     "h_QS [m]", "b [m]", "b_w [m]", "h_f [m]",
     "Bew_Gehalt [kg/m3]", "MEd_n [kNm]", "MEd_p [kNm]", "VEd [kN]",
     "concrete_type", "mech_prop", "prod_id", "GWP concrete [kgCO2eq / t]",
     "rebar_type", "mech_prop_1", "prod_id_1", "GWP rebar [kgCO2eq / t]",
     "co2_rebar [kgCO2eq/m2]", "co2_concrete [kgCO2eq/m2]", "co2 Struktur [kgCO2eq/m2]",
     "Bodenaufbau", "lifespan Estrich [a]", "h_Bodenaufbau [m]", "co2 Bodenaufbau [kgCO2eq/m2]",
-    "co2 Bodenaufbau pro Jahr [kgCO2eq / m2a]", "Last Struktur [N/m2]",
+    "co2 Bodenaufbau pro Jahr [kgCO2eq/m2a]", "Last Struktur [N/m2]",
     "Last Bodenaufbau [N/m2]", "co2 [kgco2eq/m2]", "co2 pro Jahr [kgco2eq/m2a]"
 ]
 
@@ -45,20 +45,18 @@ def clean_single_member_file(file_path):
                                        for count in range(len(cols[cols == i]))]
     df_clean.columns = cols
 
-    #EINHEITENKONVERTIERUNG (Nm -> kNm und N -> kN) ---
-    #Werte numerisch konvertieren und teilen sie durch 1000
+    # EINHEITENKONVERTIERUNG (Nm -> kNm und N -> kN) ---
     for col in ['mEd_n', 'mEd_p', 'vEd']:
         if col in df_clean.columns:
             df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce') / 1000
 
-
-    # Relevante Spalten definieren (Inklusive Korrektur von g0k_b_1 und co2_1)
+    # Relevante Spalten definieren
     if 'rc_rec' in df_clean['section_type'].values:
         spalten_fokus = ['Member_ID', 'section_type', 'l_tot', 'h', 'b',
                          'Bew_Gehalt', 'mEd_n', 'mEd_p', 'vEd',
                          'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                          'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1', 'co2_rebar', 'co2_concrete', 'co2',
-                         'system', 'name', 'lifespan_1',
+                         'system', 'raender', 'name', 'lifespan_1',
                          'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
         spalten_neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]',
                        'Bew_Gehalt [kg/m3]', 'MEd_n [kNm]', 'MEd_p [kNm]', 'VEd [kN]',
@@ -66,7 +64,7 @@ def clean_single_member_file(file_path):
                        'prod_id', 'GWP concrete [kgCO2eq / t]', 'rebar_type', 'mech_prop_1', 'prod_id_1',
                        'GWP rebar [kgCO2eq / t]',
                        'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
-                       'Statisches System', 'Bodenaufbau', 'lifespan Estrich [a]',
+                       'Statisches System', 'Raender', 'Bodenaufbau', 'lifespan Estrich [a]',
                        'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq/m2a]',
                        'Last Struktur [N/m2]', 'Last Bodenaufbau [N/m2]', 'co2 Bauteil [kgCO2eq/m]',
                        'co2 Bauteil pro Jahr [kgCO2eq/ma]']
@@ -76,14 +74,14 @@ def clean_single_member_file(file_path):
                          'concrete_type', 'mech_prop', 'prod_id', 'GWP',
                          'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP_1',
                          'co2_rebar', 'co2_concrete', 'co2',
-                         'system', 'name', 'lifespan_1',
+                         'system', 'raender', 'name', 'lifespan_1',
                          'h_Floor', 'co2_Floor', 'co2_a_Floor', 'g0k_b_1', 'g1k', 'co2_1', 'co2_a']
         spalten_neu = ['Member_ID', 'section_type', 'l_tot [m]', 'h_QS [m] ', 'b [m]', 'b_w [m]', 'h_f [m]',
                        'Bew_Gehalt [kg/m3]', 'MEd_n [kNm]', 'MEd_p [kNm]', 'VEd [kN]',
                        'concrete_type', 'mech_prop', 'prod_id', 'GWP concrete [kgCO2eq / t]',
                        'rebar_type', 'mech_prop_1', 'prod_id_1', 'GWP rebar [kgCO2eq / t]',
                        'co2_rebar [kgCO2eq/m2]', 'co2_concrete [kgCO2eq/m2]', 'co2 Struktur [kgCO2eq/m2]',
-                       'Statisches System', 'Bodenaufbau', 'lifespan Estrich [a]',
+                       'Statisches System', 'Raender', 'Bodenaufbau', 'lifespan Estrich [a]',
                        'h_Bodenaufbau [m]', 'co2 Bodenaufbau [kgCO2eq/m2]', 'co2 Bodenaufbau pro Jahr [kgCO2eq/m2a]',
                        'Last Struktur [N/m2]', 'Last Bodenaufbau [N/m2]', 'co2 Bauteil [kgCO2eq/m]',
                        'co2 Bauteil pro Jahr [kgCO2eq/ma]']
@@ -91,30 +89,24 @@ def clean_single_member_file(file_path):
         print(f"-> Übersprungen: Unbekannter Bauteiltyp in {file_path}")
         return None
 
-    # Sicheres Filtern & Umbenennen (Zwingt Reihenfolge auf und verhindert KeyErrors)
+    # Sicheres Filtern & Umbenennen
     vorhandene_spalten = [c for c in spalten_fokus if c in df_clean.columns]
     df_final = df_clean[vorhandene_spalten].copy()
     rename_dict = {alt: neu for alt, neu in zip(spalten_fokus, spalten_neu) if alt in vorhandene_spalten}
     df_final = df_final.rename(columns=rename_dict)
 
-    # Spaltenreihenfolge strikt wie definiert halten
     df_final = df_final[[n for n in spalten_neu if n in df_final.columns]]
-
-    # Konstante Metadaten einfügen
     df_final.insert(1, 'criteria', 'ENV')
 
-    # Numerische Typkonvertierung für nachfolgende mathematische Operationen
     for col in ['l_tot [m]', 'co2 Bauteil [kgCO2eq/m]', 'co2 Bauteil pro Jahr [kgCO2eq/ma]']:
         if col in df_final.columns:
             df_final[col] = pd.to_numeric(df_final[col], errors='coerce')
 
-    # Berechnete Spalten ergänzen
     if 'l_tot [m]' in df_final.columns and 'co2 Bauteil [kgCO2eq/m]' in df_final.columns:
         df_final['co2 [kgco2eq/m2]'] = df_final['co2 Bauteil [kgCO2eq/m]'] / df_final['l_tot [m]']
     if 'l_tot [m]' in df_final.columns and 'co2 Bauteil pro Jahr [kgCO2eq/ma]' in df_final.columns:
         df_final['co2 pro Jahr [kgco2eq/m2a]'] = df_final['co2 Bauteil pro Jahr [kgCO2eq/ma]'] / df_final['l_tot [m]']
 
-    # Speicherpfad generieren und wegschreiben
     file_name_base = os.path.splitext(file_path)[0]
     output_clean_file = f"{file_name_base}_clean.xlsx"
     df_final.to_excel(output_clean_file, index=False)
@@ -127,10 +119,7 @@ def clean_single_member_file(file_path):
 # ==============================================================================
 if __name__ == "__main__":
 
-    # --- SCHRITT 1: Suchen und Bereinigen aller Rohdaten ---
     print("=== SCHRITT 1: Bereinige Rohdaten-Excel ===")
-
-    # Findet alle Excel-Dateien im Ordner, die mit "Members_" starten, aber keine "_clean" sind
     raw_files = [f for f in glob.glob("Members_*.xlsx") if "_clean" not in f]
 
     clean_files_pool = []
@@ -140,27 +129,31 @@ if __name__ == "__main__":
             clean_files_pool.append(output_path)
 
     if not clean_files_pool:
-        print("Keine zu bereinigenden Rohdateien gefunden! Stelle sicher, dass die Dateien im selben Ordner liegen.")
+        print("Keine zu bereinigenden Rohdateien gefunden!")
 
-    # --- SCHRITT 2: Zusammenführen zur finalen Master-Datenbank ---
     print("\n=== SCHRITT 2: Zusammenführen zur Master-Datenbank ===")
-
     cleaned_dfs = []
 
     for file in clean_files_pool:
         print(f"Lese bereinigte Datei ein: {file}")
         df = pd.read_excel(file)
-
-        # Spaltennamen von unsichtbaren Leerzeichen befreien (wichtig für 'h_QS [m] ')
         df.columns = df.columns.str.strip()
-
-        # Reindexiert das DataFrame auf die finale einheitliche Struktur
         df_reindexed = df.reindex(columns=target_columns)
         cleaned_dfs.append(df_reindexed)
 
     if cleaned_dfs:
-        # Alle homogenisierten DataFrames untereinanderhängen
         df_master = pd.concat(cleaned_dfs, axis=0, ignore_index=True)
+
+        # --- NEU: TEXT-KOMBINATION & ÜBERSCHREIBEN DER SPALTE "Statisches System" ---
+        # .fillna('') sorgt dafür, dass leere Zellen ignoriert werden und kein "nan" im Text steht.
+        # .strip('_') entfernt den Unterstrich am Ende, falls keine Ränder vorhanden waren.
+        df_master['Statisches System'] = (
+                df_master['Statisches System'].astype(str).fillna('') + "_" + df_master['Raender'].fillna('').astype(
+            str)
+        ).str.strip('_')
+
+        # Die separate Spalte "Raender" löschen, da sie nun integriert ist
+        df_master = df_master.drop(columns=['Raender'])
 
         # Neue Spalte: plot_label generieren
         df_master.insert(2, 'plot_label', '')
@@ -180,11 +173,9 @@ if __name__ == "__main__":
         # Neue Spalte: Gesamte Last berechnen
         df_master['Last_tot [kN/m2]'] = df_master['Last Struktur [kN/m2]'] + df_master['Last Bodenaufbau [kN/m2]']
 
-        # --- Zeitstempel generieren ---
-        # %y = Jahr (zweistellig), %m = Monat, %d = Tag, %H = Stunde, %M = Minute
+        # Zeitstempel generieren
         timestamp = datetime.now().strftime("%y%m%d_%H%M")
 
-        # Finale Master-Datenbank abspeichern mit dynamischem Namen
         final_output_file = f"{timestamp}_Members.xlsx"
         df_master.to_excel(final_output_file, index=False)
 
@@ -193,7 +184,7 @@ if __name__ == "__main__":
         print("\n==================================================")
         print(f"DONE! Master-Datenbank erfolgreich erstellt.")
         print(f"Datei: {final_output_file}")
-        print(f"Spaltenanzahl: {df_master.shape[1]} | Zeilenanzahlgesamt: {df_master.shape[0]}")
+        print(f"Spaltenanzahl: {df_master.shape[1]} | Zeilenanzahl gesamt: {df_master.shape[0]}")
         print("==================================================")
     else:
         print("\nAbbruch: Keine bereinigten Daten zum Zusammenführen vorhanden.")

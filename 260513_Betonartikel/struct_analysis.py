@@ -312,8 +312,10 @@ class RectangularConcrete(SupStrucRectangular):
         self.bw[2][0] = max(0.008, self.di_yu_min, di_yu) # 2. Lage
         self.bw[3][0] = max(0.008, self.di_yo_min, di_yo) # 3. Lage
 
-        #Update Statische Höhe
+        #Update Statische Höhe und Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
+        mr = self.b * self.h ** 2 / 6 * self.concrete_type.fctm  # cracking moment mr = fctm * b*h^2/6 (SIA262:2025, 4.4.1.3)
+        self.mr_p, self.mr_n = mr, -mr  # mr_p: positives Rissmoment, mr_n: negatives Rissmoment
 
         #Berechnung Traglasten und Eigengewicht
         [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
@@ -323,10 +325,16 @@ class RectangularConcrete(SupStrucRectangular):
         self.g0k = self.calc_weight(concrete_type.weight) #dead weight of cross section per length [N/m]
         self.g0k_b = self.g0k / self.b # dead weight of cross section per m2 [N/m2]
 
+        #Faktor für Durchbiegung Langzeit, gerissen
+        self.Faktor_ger = self.f_w_ger(self.roh, self.rohs, self.phi, self.h, self.d)
+
+
         #Gesamte Bewehrungsfläche as_tot: Feldbewehrung nur über 60% des Members und Stützenbewehrung über 40%. Die restlichen Bereiche mit Mindestbewehrung.
         self.a_s_stat = 0.6 * self.as_p + 0.4 * self.as_n + (0.6 + 0.4 + 1 + 1) * self.as_min + self.as_bw  # Abgestuft bei den Momentennullpunkten, Rest mit Asmin
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
+        #Bewehrungsgehalt Decke (kg Stahl / m3 Beton / m')
+        self.Bew_Gehalt = a_s_tot*self.rebar_type.density / (self.h * self.b * 1) # [kg CO2 eq / m3]
 
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
@@ -529,6 +537,9 @@ class FlatSlab2D(SupStrucRectangular):
         #self.a_s_stat = max(self.as_p,self.as_min) + max(self.as_n,self.as_min) + max(self.as_p_y,self.as_min) + max(self.as_n_y,self.as_min) + self.as_bw  # rebar area without reinforcement joint surcharge
         self.joint_surcharge = jnt_srch  # joint surcharge
         a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)  # rebar area with reinforcement joint surcharge
+
+        # Bewehrungsgehalt Decke (kg Stahl / m3 Beton / m')
+        self.Bew_Gehalt = a_s_tot * self.rebar_type.density / (self.h * self.b * 1) # [kg CO2 eq / m3]
 
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density  # [kg_CO2_eq/m]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
@@ -782,18 +793,36 @@ class RibbedConcrete(SupStrucRibbedConcrete):
                        + max(0.008, self.di_xu_min)  # 2. Lage analog 1. Lage
                        + max(0.008, self.di_xo_min))  # 3. Lage analog 4. Lage
 
+
+        #Mindestbreite Flanch
+        self.b_w_min_c = (2 * self.c_nom +               # 2 * Überdeckung
+                          0.032 * (self.bw_r[1]-1)       # (n-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
+                          + 2 * self.bw_bg_r[0]          # 2 * Bügeldurchmesser
+                          + self.bw_r[0] * self.bw_r[1]  # n * Durchmesser
+                          )
+
+
         # Platte (slab): Update Bewehrungsmatrix unter Berücksichtigung von Mindestbewehrung und d,min = 8 mm
         self.bw[0][0] = max(0.008, self.di_xu_min, di_xu)  # 1. Lage
         self.bw[1][0] = max(0.008, self.di_xo_min, di_xo)  # 4. Lage
 
+        #Update Statische Höhe
+        [self.d, self.ds, self.d_PB, self.ds_PB] = self.calc_d()
 
         #Berechnung Statische Höhe, Mu (Biegewiderstand charak.) und Bew.-Gehalt für Platte (Slab) & Plattenbalken
-        [self.d, self.ds, self.d_PB, self.ds_PB] = self.calc_d()
         [self.mu_max_slab, self.x_p, self.as_p, self.qs_class_p_slab] = self.calc_mu('pos')
         [self.mu_min_slab, self.x_n, self.as_n, self.qs_class_n_slab] = self.calc_mu('neg')
         [self.mu_max, self.x_PB_p, self.as_PB_p, self.qs_class_p] = self.calc_mu_pb('pos')
         [self.mu_min, self.x_PB_n, self.as_PB_n, self.qs_class_n] = self.calc_mu_pb('neg')
-        self.roh_slab, self.rohs, self.roh = self.as_p / self.d, self.as_n / self.ds, self.as_PB_p / self.d_PB
+        self.roh_slab = self.as_p / self.d
+
+        #Berechnung Geometrischer Bewehrungsgehalt roh für PB (aus Hausübung 02, Stahlbeton II)
+        self.roh = 0.85*(self.concrete_type.fcd/self.rebar_type.fsd)*(self.x_PB_p/self.d_PB)
+        self.rohs = 0.85 * (self.concrete_type.fcd / self.rebar_type.fsd) * (self.x_PB_n / self.ds_PB)
+
+        # Faktor für Durchbiegung Langzeit, gerissen
+        self.Faktor_ger = self.f_w_ger(self.roh, self.rohs, self.phi, self.h, self.d_PB)
+
 
         # Berechnung Vu (Querkraftwiderstand charak.) für Platte (Slab) & Plattenbalken
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
@@ -806,11 +835,19 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
 
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestbewehrung für Bewehrung in y-Richtung in Platte
-        self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + self.as_PB_bw + 2 * self.as_min# rebar area without reinforcement joint surcharge
+        self.as_Platte = (self.as_p + self.as_n)* self.b * 1 * 2 # [m3]
+        self.as_Rippe_bg = (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w) / self.bw_bg_r[1] # [m3]
+        self.as_Rippe_x = self.as_PB_p * 1 # [m3}
+        self.as_stat_2 = self.as_Platte + self.as_Rippe_bg + self.as_Rippe_x #[m3]
+        self.a_s_stat = self.as_p + self.as_n + self.as_bw + self.as_PB_p + self.as_PB_n + (np.pi * self.bw_bg_r[0]**2 /4)* 2 * (self.h + self.b_w)/self.bw_bg_r[1]# rebar area without reinforcement joint surcharge
 
         #TODO: Achtung - es fehlt die Spreizbewehrung
         self.joint_surcharge = jnt_srch
-        a_s_tot = self.a_s_stat * (1 + self.joint_surcharge)
+        a_s_tot = self.as_stat_2 * (1 + self.joint_surcharge) / (self.b *1)  #[m3/m2]
+
+        # Bewehrungsgehalt Decke (kg Stahl / m3 Beton / m')
+        self.Bew_Gehalt = a_s_tot * self.rebar_type.density / (self.h_w * self.b_w + self.h_f * self.b) # [kg CO2 eq / m3]
+
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density/self.b  # [kg_CO2_eq/m2]
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
@@ -987,7 +1024,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     @staticmethod
     #SIA 262, 4.4.3.2.5: Annahme für den vollständig gerissenen Zustand
     def f_w_ger(roh, rohs, phi, h, d):
-        f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
+        f = ((1 - 20 * rohs) / (10 * roh ** 0.7)) * (0.75 + 0.1 * phi) * (h / d) ** 3
         return f
 
     @staticmethod
@@ -1380,16 +1417,20 @@ class Member1D:
         self.floorstruc = floorstruc
         self.requirements = requirements
         self.li_max = self.system.li_max
-        self.g0k = self.section.g0k
-        self.g0k_b  = self.section.g0k_b
-        self.g1k = self.floorstruc.gk_area
-        self.g2k = g2k
-        self.gk = self.g0k + self.g1k + self.g2k
-        self.qk = qk
+        self.g0k = self.section.g0k #[kN/m]
+        self.g0k_b  = self.section.g0k_b #[kN/m2]
+        self.g1k = self.floorstruc.gk_area #[kN/m2]
+        self.g2k = g2k #[kN/m2]
+        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m']
+        self.qk = qk * self.section.b #[kN/m']
         self.psi = [psi0, psi1, psi2]
-        self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung
-        self.q_freq = self.gk + self.psi[1] * self.qk
-        self.q_per = self.gk + self.psi[2] * self.qk
+        self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m']
+        self.q_freq = self.gk + self.psi[1] * self.qk # [kN/m']
+        self.q_per = self.gk + self.psi[2] * self.qk # [kN/m']
+        self.q_gzt = 1.35*self.gk + 1.5*self.qk # [kN/m']
+        self.mEd_n = self.system.alpha_m[0] * self.q_gzt * self.system.l_tot ** 2
+        self.mEd_p = self.system.alpha_m[1] * self.q_gzt * self.system.l_tot ** 2
+        self.vEd = max(self.system.alpha_v[0] , self.system.alpha_v[1]) * self.q_gzt * self.system.l_tot
         self.m = self.q_per / 10
         self.w_install_adm = self.system.li_max / self.requirements.lw_install
         self.w_use_adm = self.system.li_max / self.requirements.lw_use
@@ -1419,7 +1460,7 @@ class Member1D:
                 # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
-                self.w_install_ger = self.unit_def * self.q_freq * max(3.4,self.f_w_ger)  #SIA262:2025, Formel (104), wobei fger immer grösser 3.4 sein muss.
+                self.w_install_ger = self.unit_def * self.q_freq * min(10.0, max(3.4, self.section.Faktor_ger))  #SIA262:2025, Formel (104), wobei fger immer grösser 3.4 sein muss.
                 #Alte Berechnung gerissene Durchbiegung Langzeit
                 #self.w_install_ger = unit_def * (
                 #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
@@ -1435,7 +1476,7 @@ class Member1D:
                 # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
-                self.w_install_ger = self.unit_def * self.q_rare * max(3.4,self.f_w_ger) # SIA262:2025, Formel (104)
+                self.w_install_ger = self.unit_def * self.q_rare * min(10.0, max(3.4, self.section.Faktor_ger)) # SIA262:2025, Formel (104)
                 # Alte Berechnung gerissene Durchbiegung Langzeit
                 #self.w_install_ger = unit_def * (
                 #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
@@ -1450,7 +1491,7 @@ class Member1D:
             # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
             self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                        self.section.h, self.section.d)
-            self.w_use_ger = self.unit_def * self.q_freq * max(3.4,self.f_w_ger) # SIA262:2025, Formel (104)
+            self.w_use_ger = self.unit_def * self.q_freq * min(10.0, max(3.4, self.section.Faktor_ger)) # SIA262:2025, Formel (104)
             #Alte Berechnung gerissene Durchbiegung
             #self.w_use_ger = unit_def * (
             #        (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
@@ -1462,7 +1503,7 @@ class Member1D:
             # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
             self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                        self.section.h, self.section.d)
-            self.w_app_ger = self.unit_def * self.q_per * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
+            self.w_app_ger = self.unit_def * self.q_per * min(10.0, max(3.4, self.section.Faktor_ger))  # SIA262:2025, Formel (104)
             # Alte Berechnung gerissene Durchbiegung
             #self.w_app_ger = unit_def * (
             #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
@@ -1626,16 +1667,17 @@ class Member2D:
         self.requirements = requirements
         self.li_min = min(self.system.lx, self.system.ly)
         self.li_max = self.system.li_max
-        self.g0k = self.section.g0k
+        self.g0k = self.section.g0k #[kN/m2]
         self.g0k_b = self.section.g0k_b
-        self.g1k = self.floorstruc.gk_area
-        self.g2k = g2k
-        self.gk = self.g0k + self.g1k + self.g2k
-        self.qk = qk
+        self.g1k = self.floorstruc.gk_area #[kN/m2]
+        self.g2k = g2k #[kN/m2]
+        self.gk = self.g0k + self.g1k + self.g2k #[kN/m2]
+        self.qk = qk #[kN/m2]
         self.psi = [psi0, psi1, psi2]
         self.q_rare = self.gk + self.qk
         self.q_freq = self.gk + self.psi[1] * self.qk
         self.q_per = self.gk + self.psi[2] * self.qk
+        self.q_gzt = 1.35 * self.gk + 1.5 * self.qk # [kN/m'] #TODO Achtung nur gültig für Breite 1m
         self.m = self.q_per / 10
         self.w_install_adm = self.li_min / self.requirements.lw_install
         self.w_use_adm = self.li_min / self.requirements.lw_use
@@ -1646,6 +1688,11 @@ class Member2D:
         self.mkd_p_y = self.system.alpha_m_y[0] * (self.gk + self.qk) * self.li_min ** 2
         self.mkd_n_y = self.system.alpha_m_y[1] * (self.gk + self.qk) * self.li_min ** 2
         #TODO: Everything for lx and ly!
+
+        self.mEd_n = max(abs(self.system.alpha_m_x[1]), abs(self.system.alpha_m_y[1])) * self.q_gzt * self.system.l_tot ** 2
+        self.mEd_p = max(abs(self.system.alpha_m_x[0]), abs(self.system.alpha_m_y[0])) * self.q_gzt * self.system.l_tot ** 2
+        self.vEd = max(abs(self.system.alpha_v[0]), abs(self.system.alpha_v[1])) * self.q_gzt * self.system.l_tot
+
         self.qk_zul_gzt = float
         self.fire = [0, 0, 0, 0]  # fire from bottom, left, top, right (0: no fire; 1: fire)
         if fire_b is True:

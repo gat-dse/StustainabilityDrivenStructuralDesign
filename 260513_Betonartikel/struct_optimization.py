@@ -421,20 +421,41 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     # define bounds of variables
     if m.floorstruc.name == 'massiv':
         h_min_schall = 0.16
-        bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+        h_fix = max(0.08,m.section.hmin_c, h_min_schall)
+        bh_f = (h_fix, h_fix)
+        #bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+
+    elif m.floorstruc.name == 'Schuettung':
+        h_min_schall = 0.13
+        h_fix = max(0.08, m.section.hmin_c, h_min_schall)
+        bh_f = (h_fix, h_fix)
+        #bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+
     else:
-        bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
+        h_fix = max(0.08, m.section.hmin_c)
+        bh_f = (h_fix, h_fix)
+        #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
 
     #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
     bh_w = (0.04, 1.2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bdi_pb_bw = (0.008, 0.016) #diameter of rebars between 8mm and 16 mm for stirrups
-    bb_w = (0.15, 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
-    #bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
-    bb = (0.4, 3.8) # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
+    # Statische Grenze für Rippenbreite. Das exakte bewehrungsabhängige Minimum wird dynamisch über eine Penalty in der Zielfunktion erzwungen.
+    bb_w = (0.15, 0.4)  # 15 cm entspricht Mindeststegbreite für R60
+
+    #Dynamische Grenze für Rippenbreite
+    #b_w_min_c = (2 * m.section.c_nom +  # 2 * Überdeckung
+    #                  0.032 * (m.section.bw_r[1] - 1)  # (n-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
+    #                  + 2 * m.section.bw_bg_r[0]  # 2 * Bügeldurchmesser
+    #                  + m.section.bw_r[0] * m.section.bw_r[1]  # n * Durchmesser
+    #                  +0.03 )
+    #bb_w = (max(0.15, b_w_min_c), 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
+
+
+    #bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
+    bb = (1.0 , 1.0) # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
 
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb, bdi_pb_bw]
-    # TODO Bügelbewehrung Plattenbalken ist nicht in Optimierung berücksichtigt.
 
     s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
     di_xu, di_xo = max(0.008, m.section.di_xu_min, m.section.bw[0][0]), max(0.008, m.section.di_xo_min, m.section.bw[1][0])  #
@@ -444,13 +465,14 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
     co, st = m.section.concrete_type, m.section.rebar_type
-    add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+    add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk, c_nom]
 
     # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
     opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
                                                                             "method": "Powell"}, take_step=bounded_step)
     h_w, h_f, di_x_w, b_w, b, di_pb_bw = opt.x
+
     optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi, jnt_srch)
     #print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
 
@@ -474,8 +496,26 @@ def rc_rib_rqs(var, add_arg):
     criterion = add_arg[14]
     g2k = add_arg[15]
     qk = add_arg[16]
+    c_nom = add_arg[17]
     #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
-    # create section
+
+    # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
+    # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
+    b_w_min_c_aktuell = (2 * c_nom +  # 2 * Überdeckung
+                         0.032 * (n_x_w - 1) +  # (n-1) * Grösstkorn zwischen Längsstäben
+                         2 * di_pb_bw +  # 2 * AKTUELLER Bügeldurchmesser
+                         di_x_w * n_x_w  # n * AKTUELLER Längsstabdurchmesser
+                        +0.01) #Reserve 10 mm
+
+    b_w_erforderlich = max(0.15, b_w_min_c_aktuell)
+
+    # Wenn b_w zu klein ist, wird ein Geometrie-Strafwert generiert
+    penalty_bw = max(b_w_erforderlich - b_w, 0)
+
+    # Skalierungsfaktor für die Strafe (muss hoch sein, da Abweichungen im Millimeterbereich liegen)
+    penalty_bw_scaled = penalty_bw * 1e5
+
+    #create section
     section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
 
      # create member
@@ -487,14 +527,19 @@ def rc_rib_rqs(var, add_arg):
 
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
-    if member.mkd_p < member.section.mr_p and abs(member.mkd_n) < abs(member.section.mr_n):
+    '''if member.mkd_p < member.section.mr_p and abs(member.mkd_n) < abs(member.section.mr_n):
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
     else:
         d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
                       member.w_app - member.w_app_adm]
         #d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
-        #              member.w_app_ger - member.w_app_adm]
+        #              member.w_app_ger - member.w_app_adm]'''
+
+    #Berechnung immer für Durchbiegung gerissen
+    d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
+                      member.w_app_ger - member.w_app_adm]
+
     penalty2 = 1e5 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
@@ -515,37 +560,37 @@ def rc_rib_rqs(var, add_arg):
     # optimize ULS only
     if criterion == "ULS":  # optimize ultimate limit state
         if to_opt == "GWP":
-            return member.section.co2*(1+penalty1)
+            return member.section.co2*(1+penalty1) + penalty_bw_scaled
         elif to_opt == "h":
-            return member.section.h*(1+penalty1)
+            return member.section.h*(1+penalty1) + penalty_bw_scaled
 
     # optimize SLS1 (deflections). Make sure, that also ULS is fulfilled
     elif criterion == "SLS1":  # optimize service limit state (deflections)
         if to_opt == "GWP":
-            return member.section.co2*(1+penalty2)
+            return member.section.co2*(1+penalty2) + penalty_bw_scaled
         elif to_opt == "h":
-            return member.section.h*(1+penalty2)
+            return member.section.h*(1+penalty2) + penalty_bw_scaled
 
     # optimize SLS2 (vibrations). Make sure, that also ULS is fulfilled
     elif criterion == "SLS2":
         if to_opt == "GWP":
-            to_minimize = member.section.co2*(1+penalty3)
+            to_minimize = member.section.co2*(1+penalty3) + penalty_bw_scaled
         elif to_opt == "h":
-            to_minimize = member.section.h*(1+penalty3)
+            to_minimize = member.section.h*(1+penalty3) + penalty_bw_scaled
 
     # optimize fire resistance only
     elif criterion == "FIRE":
         if to_opt == "GWP":
-            return member.section.co2*(1+penalty4)
+            return member.section.co2*(1+penalty4) + penalty_bw_scaled
         elif to_opt == "h":
-            return member.section.h * (1+penalty4)
+            return member.section.h * (1+penalty4) + penalty_bw_scaled
 
     # optimize solution, which fulfills all requirements (ULS, SLS1 and SLS2, FIRE)
     elif criterion == "ENV":
         if to_opt == "GWP":
-            to_minimize = member.section.co2*(1+penalty1+penalty2+penalty3+penalty4)
+            to_minimize = member.section.co2*(1+penalty1+penalty2+penalty3+penalty4) + penalty_bw_scaled
         elif to_opt == "h":
-            to_minimize = member.section.h*(1+penalty1+penalty2+penalty3+penalty4)
+            to_minimize = member.section.h*(1+penalty1+penalty2+penalty3+penalty4) + penalty_bw_scaled
     else:
         to_minimize = 99
         print("criterion " + criterion + " is not defined")
