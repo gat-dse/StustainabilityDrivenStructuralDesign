@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 import sqlite3
 import numpy as np
 import pandas as pd
@@ -290,6 +291,7 @@ inquiry = ("""
         SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
         WHERE DENSITY IS NOT NULL
         AND "MATERIAL" LIKE '%Steel_reinforcing_bar%'
+        AND "MECH_PROP" NOT LIKE '%B500B%'
         AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
         AND ValidEPD = 1
         AND Man_Ausschluss = 1 """
@@ -349,166 +351,7 @@ print(dfPosttension["Total_GWP_m3"])
 print(dfPosttension["MECH_PROP"])
 
 
-#________________________________________________________________________________________________________________________
-#           SINGLE     PLOT       TOTAL GWP
-#________________________________________________________________________________________________________________________
 
-
-# -----------------------
-# Kategorien (Y-Positionen)
-# -----------------------
-y_positions = {
-    "C20/25": 17,
-    "C25/30": 16,
-    "C30/37": 15,
-    "CLT": 13,
-    "KVH": 11,
-    "BSH": 9,
-    "B500B": 7,
-    "Bewehrungsstahl allg.": 6,
-    "Baustahl": 4,
-    "Spannstahl": 2,
-}
-"""
-# -----------------------
-# Plot
-# -----------------------
-plt.figure(figsize=(6.3, 4))
-
-# Beton (grün)
-
-def jitter(y, n):
-    return y + np.random.uniform(-0.1, 0.1, n)
-
-
-plt.scatter(dfC2025["Total_GWP"], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
-plt.scatter(dfC2530["Total_GWP"], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
-plt.scatter(dfC3037["Total_GWP"], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
-#plt.scatter(dfC3037["Total_GWP"], jitter(y_positions["C30/37"], len(dfC3037)), color="dark green")
-# Holz (orange)
-plt.scatter(dfCLT["Total_GWP"], np.full(len(dfCLT), y_positions["CLT"]), color="orange")
-plt.scatter(dfKVHC24["Total_GWP"], np.full(len(dfKVHC24), y_positions["KVH"]), color="orange")
-plt.scatter(dfBSH["Total_GWP"], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
-
-# Bewehrungsstahl (blau)
-plt.scatter(dfRebar["Total_GWP"], np.full(len(dfRebar), y_positions["B500B"]), color="lightblue")
-
-# Baustahl:
-plt.scatter(dfSteel["Total_GWP"], np.full(len(dfSteel), y_positions["Steel"]), color="darkblue")
-
-
-# -----------------------
-# Achsen & Labels
-# -----------------------
-plt.yticks(list(y_positions.values()), list(y_positions.keys()))
-plt.xlabel("Total GWP [kg CO₂-eq / t]")
-plt.ylabel("Material")
-
-# Trennlinien (wie in Skizze)
-plt.axhline(9, linestyle="--", color="grey")   # zwischen Beton und Holz
-plt.axhline(5, linestyle="--", color="grey")   # zwischen Holz und Bewehrungsstahl
-plt.axhline(3, linestyle="--", color="grey")   # zwischen Bewehrungsstahl und Stahl
-
-plt.grid(axis="x", linestyle=":", alpha=0.5)
-
-plt.tight_layout()
-plt.show()
-
-#________________________________________________________________________________________________________________________
-#           BOTH     PLOTS       TOTAL GWP and TOTAL GWP M3
-#________________________________________________________________________________________________________________________
-
-import matplotlib.pyplot as plt
-import numpy as np
-
-# -----------------------
-# Kategorien (Y-Positionen)
-# -----------------------
-y_positions = {
-    
-    "C20/25": 17,
-    "C25/30": 16,
-    "C30/37": 15,
-    "CLT": 13,
-    "KVH": 11,
-    "BSH": 9,
-    "B500B": 7,
-    "Bewehrungsstahl allg.": 6,
-    "Baustahl": 4,
-    "Spannstahl": 2,
-}
-
-# -----------------------
-# Figure mit 2 Subplots
-# -----------------------
-fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharey=True)
-
-# ==========================================================
-# LINKS: Total_GWP
-# ==========================================================
-ax = axes[0]
-
-# Beton
-ax.scatter(dfC2025["Total_GWP"], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
-ax.scatter(dfC2530["Total_GWP"], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
-ax.scatter(dfC3037["Total_GWP"], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
-
-# Holz
-ax.scatter(dfCLT["Total_GWP"], np.full(len(dfCLT), y_positions["CLT"]), color="orange")
-ax.scatter(dfKVHC24["Total_GWP"], np.full(len(dfKVHC24), y_positions["KVH"]), color="orange")
-ax.scatter(dfBSH["Total_GWP"], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
-
-# Stahl
-ax.scatter(dfRebar["Total_GWP"], np.full(len(dfRebar), y_positions["B500B"]), color="lightblue")
-ax.scatter(dfSteel["Total_GWP"], np.full(len(dfSteel), y_positions["Steel"]), color="darkblue")
-
-# Formatierung
-ax.set_title("Total GWP [kg CO₂-eq / t]")
-ax.set_xlabel("GWP")
-ax.set_yticks(list(y_positions.values()))
-ax.set_yticklabels(list(y_positions.keys()))
-
-ax.axhline(9, linestyle="--", color="grey")
-ax.axhline(5, linestyle="--", color="grey")
-ax.axhline(3, linestyle="--", color="grey")
-
-ax.grid(axis="x", linestyle=":", alpha=0.5)
-
-# ==========================================================
-# RECHTS: Total_GWP_m3
-# ==========================================================
-ax = axes[1]
-
-# Beton
-ax.scatter(dfC2025["Total_GWP_m3"], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
-ax.scatter(dfC2530["Total_GWP_m3"], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
-ax.scatter(dfC3037["Total_GWP_m3"], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
-
-# Holz
-ax.scatter(dfCLT["Total_GWP_m3"], np.full(len(dfCLT), y_positions["CLT"]), color="orange")
-ax.scatter(dfKVHC24["Total_GWP_m3"], np.full(len(dfKVHC24), y_positions["KVH"]), color="orange")
-ax.scatter(dfBSH["Total_GWP_m3"], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
-
-# Stahl
-ax.scatter(dfRebar["Total_GWP_m3"], np.full(len(dfRebar), y_positions["B500B"]), color="lightblue")
-ax.scatter(dfSteel["Total_GWP_m3"], np.full(len(dfSteel), y_positions["Steel"]), color="darkblue")
-
-# Formatierung
-ax.set_title("Total GWP [kg CO₂-eq / m³]")
-ax.set_xlabel("GWP")
-
-ax.axhline(9, linestyle="--", color="grey")
-ax.axhline(5, linestyle="--", color="grey")
-ax.axhline(3, linestyle="--", color="grey")
-
-ax.grid(axis="x", linestyle=":", alpha=0.5)
-
-# -----------------------
-# Layout
-# -----------------------
-plt.tight_layout()
-plt.show()
-"""
 #________________________________________________________________________________________________________________________
 #           BOTH     PLOTS       TOTAL GWP and TOTAL GWP M3 as 2 x 2 Plot
 #________________________________________________________________________________________________________________________
@@ -516,16 +359,16 @@ plt.show()
 
 
 y_positions = {
-    "C20/25": 15,
-    "C25/30": 14,
-    "C30/37": 13,
-    "BSP": 11,
-    "KVH": 10,
-    "BSH": 9,
-    "B500B": 7,
-    "Bewehrungsstahl allg.": 6,
-    "Baustahl": 4,
-    "Spannstahl": 2,
+    "C20/25 (2)": 15,
+    "C25/30 (8)": 14,
+    "C30/37 (23)": 13,
+    "BSP (9)": 11,
+    "KVH (5)": 10,
+    "BSH (11)": 9,
+    "B500B (9)": 7,
+    "Bewehrungsstahl (4)": 6,
+    "Baustahl (10)": 4,
+    "Spannstahl (5)": 2,
 }
 def jitter(y, n):
     return y + np.random.uniform(-0.1, 0.1, n)
@@ -533,25 +376,25 @@ def jitter(y, n):
 def plot_data(ax, x_col):
     # Beton
 
-    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
-    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
-    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
+    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25 (2)"]), color="lightgreen")
+    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30 (8)"]), color="green")
+    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37 (23)"]), color="darkgreen")
     #plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")6
 
     # Holz
-    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP"]), color="red")
-    ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH"]), color="darkorange")
-    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
+    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP (9)"]), color="red")
+    ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH (5)"]), color="darkorange")
+    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH (11)"]), color="orange")
 
     # Bewehrungsstahl
-    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["B500B"]), color="lightblue")
-    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["Bewehrungsstahl allg."]), color="blue")
+    ax.scatter(dfB500B[x_col], np.full(len(dfB500B), y_positions["B500B (9)"]), color="lightblue")
+    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["Bewehrungsstahl (4)"]), color="blue")
 
     #Baustahl
-    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl"]), color="darkblue")
+    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl (10)"]), color="darkblue")
 
     #Spannstahl
-    ax.scatter(dfPosttension[x_col], np.full(len(dfSteel), y_positions["Spannstahl"]), color="darkblue")
+    ax.scatter(dfPosttension[x_col], np.full(len(dfPosttension), y_positions["Spannstahl (5)"]), color="grey")
 
 
     # Linien
@@ -572,7 +415,7 @@ plt.rcParams.update({
 # -----------------------
 # Figure 2x2
 # -----------------------
-fig, axes = plt.subplots(3, 2, figsize=(12, 8), sharey=False,gridspec_kw={"height_ratios": [2, 1, 1]})
+fig, axes = plt.subplots(3, 2, figsize=(12, 10), sharey=False,gridspec_kw={"height_ratios": [3, 1, 1]})
 
 
 
@@ -591,8 +434,8 @@ plot_data(axes[0, 0], "Total_GWP")
 #axes[0, 0].set_title("Total GWP [kg CO₂-eq / t]")
 #axes[0, 0].set_ylabel("Material")
 axes[0, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
-axes[0, 0].set_xlim(0, 1400)
-axes[0, 0].set_ylim(0, 13.5)
+axes[0, 0].set_xlim(0, 1500)
+axes[0, 0].set_ylim(0, 15.5)
 
 # -----------------------
 # OBEN RECHTS
@@ -601,14 +444,14 @@ plot_data(axes[0, 1], "Total_GWP_m3")
 #axes[0, 1].set_title("Total GWP [kg CO₂-eq / m³]")
 axes[0, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 axes[0, 1].set_xlim(0, 10000)
-axes[0, 1].set_ylim(0, 13.5)
+axes[0, 1].set_ylim(0, 15.5)
 
 # -----------------------
 # Mitte LINKS zoom Beton
 # -----------------------
 plot_data(axes[1, 0], "Total_GWP")
 axes[1, 0].set_xlim(0, 130)
-axes[1, 0].set_ylim(9, 13.5)
+axes[1, 0].set_ylim(12.5, 15.5)
 axes[1, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
 
 # -----------------------
@@ -616,7 +459,7 @@ axes[1, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
 # -----------------------
 plot_data(axes[1, 1], "Total_GWP_m3")
 axes[1, 1].set_xlim(0, 350)
-axes[1, 1].set_ylim(9, 13.5)
+axes[1, 1].set_ylim(12.5, 15.5)
 axes[1, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 
 # -----------------------
@@ -624,15 +467,15 @@ axes[1, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 # -----------------------
 plot_data(axes[2, 0], "Total_GWP")
 axes[2, 0].set_xlim(0, 500)
-axes[2, 0].set_ylim(5, 9)
+axes[2, 0].set_ylim(8.5, 12)
 axes[2, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
 
 # -----------------------
 # unten RECHTS zoom Holz
 # -----------------------
 plot_data(axes[2, 1], "Total_GWP_m3")
-axes[2, 1].set_xlim(0, 350)
-axes[2, 1].set_ylim(5, 9)
+axes[2, 1].set_xlim(0, 280)
+axes[2, 1].set_ylim(8.5, 12)
 axes[2, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 
 
@@ -650,8 +493,76 @@ add_label(axes[1, 1], "d)")
 add_label(axes[2, 0], "e)")
 add_label(axes[2, 1], "f)")
 
+# Box um Ergebnisse:
+def add_box(ax, x_min, x_max, y_min, y_max, color, lw=1.5):
+    rect = Rectangle(
+        (x_min, y_min),
+        x_max - x_min,
+        y_max - y_min,
+        linewidth=lw,
+        edgecolor=color,
+        facecolor='none'
+    )
+    ax.add_patch(rect)
+
+ax = axes[0, 0]
+
+# Beton (grün)
+add_box(ax, 1, 150, 12.5, 15.3, "green")
+
+# Holz (rot)
+add_box(ax, 1, 650, 8.5, 11.8, "red")
+
+
+ax = axes[0, 1]
+
+add_box(ax, 0, 800, 12.5, 15.5, "green")
+add_box(ax, 0, 1200, 8.5, 11.8, "red")
+
+
+ax = axes[1, 0]
+add_box(ax, 2, 129, 12.6, 15.4, "green")
+
+
+ax = axes[1, 1]
+add_box(ax, 5, 345, 12.6, 15.4, "green")
+
+
+ax = axes[2, 0]
+add_box(ax, 5, 495, 8.6, 11.9, "red")
+
+
+ax = axes[2, 1]
+add_box(ax, 5, 275, 8.6, 11.9, "red")
+
+
 # -----------------------
 # Layout
 # -----------------------
 plt.tight_layout()
 plt.show()
+
+
+
+print("Anzahl EPDs pro Datensatz:")
+
+print(f"C20/25: {len(dfC2025)}")
+print(f"C25/30: {len(dfC2530)}")
+print(f"C30/37: {len(dfC3037)}")
+print(f"Hochbaubeton: {len(dfHochbaubeton)}")
+
+print(f"GL24: {len(dfGL24)}")
+print(f"GL28: {len(dfGL28)}")
+print(f"GL30: {len(dfGL30)}")
+print(f"GL32: {len(dfGL32)}")
+print(f"BSH (alle): {len(dfBSH)}")
+
+print(f"KVH C24: {len(dfKVHC24)}")
+print(f"CLT / BSP: {len(dfCLT)}")
+
+print(f"B500B: {len(dfB500B)}")
+print(f"Bewehrungsstahl gesamt: {len(dfRebar)}")
+
+print(f"Baustahl: {len(dfSteel)}")
+
+print(f"Spannstahl: {len(dfPosttension)}")
