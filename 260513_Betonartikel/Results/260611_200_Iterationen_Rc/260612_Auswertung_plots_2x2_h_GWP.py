@@ -1,53 +1,48 @@
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+import matplotlib as mpl
 
 # ==============================================================================
 # GLOBALE EINSTELLUNGEN
 # ==============================================================================
-# Option 1: 'kurz' -> 3 bis 8 m | Option 2: 'lang' -> 3 bis 12 m
-SPANNWEITEN_MODUS = 'lang'
-
+SPANNWEITEN_MODUS = 'kurz'
 excel_file = "260611_1515_Members.xlsx"
+
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = ['Times New Roman']
+mpl.rcParams['font.size'] = 14
+mpl.rcParams['axes.labelsize'] = 14
+mpl.rcParams['axes.titlesize'] = 14
+mpl.rcParams['xtick.labelsize'] = 14
+mpl.rcParams['ytick.labelsize'] = 14
+mpl.rcParams['legend.fontsize'] = 12  # Etwas kleiner, damit es besser passt
 
 # ==============================================================================
 # DATA LOADING & PREPARATION
 # ==============================================================================
 df = pd.read_excel(excel_file)
-
 x_achse = 'l_tot [m]'
 y_struc_co2 = 'co2 Struktur [kgCO2eq/m2]'
 y_floor_co2 = 'co2 Bodenaufbau [kgCO2eq/m2]'
 y_struc_h = 'h_QS [m]'
 y_total_h = 'h_tot [m]'
-
 kategorie_1 = 'plot_label'
 kategorie_2 = 'Bodenaufbau'
 
-# GWP Total berechnen
 df['co2 Total_berechnet [kgCO2eq/m2]'] = df[y_struc_co2] + df[y_floor_co2]
 
-# Datentypen erzwingen
 df[x_achse] = pd.to_numeric(df[x_achse], errors='coerce')
 df[y_struc_co2] = pd.to_numeric(df[y_struc_co2], errors='coerce')
 df['co2 Total_berechnet [kgCO2eq/m2]'] = pd.to_numeric(df['co2 Total_berechnet [kgCO2eq/m2]'], errors='coerce')
 df[y_struc_h] = pd.to_numeric(df[y_struc_h], errors='coerce')
 df[y_total_h] = pd.to_numeric(df[y_total_h], errors='coerce')
 
-# Bereinigen
-pflicht_spalten = [x_achse, kategorie_1, kategorie_2, y_struc_co2, 'co2 Total_berechnet [kgCO2eq/m2]', y_struc_h,
-                   y_total_h]
-df_clean = df.dropna(subset=pflicht_spalten).copy()
+df_clean = df.dropna(
+    subset=[x_achse, kategorie_1, kategorie_2, y_struc_co2, 'co2 Total_berechnet [kgCO2eq/m2]', y_struc_h,
+            y_total_h]).copy()
 
-if SPANNWEITEN_MODUS == 'lang':
-    x_min, x_max = 3, 12
-else:
-    x_min, x_max = 3, 8
-
+x_min, x_max = (3, 12) if SPANNWEITEN_MODUS == 'lang' else (3, 8)
 df_filtered = df_clean[df_clean[x_achse].between(x_min, x_max)]
-
-# Mittelwerte aggregieren
 df_grouped = df_filtered.groupby([x_achse, kategorie_1, kategorie_2], as_index=False)[[
     y_struc_co2, 'co2 Total_berechnet [kgCO2eq/m2]', y_struc_h, y_total_h
 ]].mean()
@@ -56,55 +51,31 @@ df_grouped = df_filtered.groupby([x_achse, kategorie_1, kategorie_2], as_index=F
 # DESIGN-MAPPINGS
 # ==============================================================================
 farb_mapping = {
-    # Durchlaufträger (Schwarz als Referenz)
-    'BeamContinuousSupEl_rc_rec_Schuettung': '#000000',
-    'BeamContinuousSupEl_rc_rec_massiv': '#000000',
-
-    # Einfeldträger
-    'BeamSimpleSup_rc_rec_Schuettung': '#2ca02c',  # Grün (Rechteck)
-    'BeamSimpleSup_rc_rec_massiv': '#2ca02c',
-    'BeamSimpleSup_rc_rib_Schuettung': '#9370db',  # Violett (Plattenbalken/Rippe)
-    'BeamSimpleSup_rc_rib_massiv': '#9370db',
-
-    # Plattensysteme
-    'Slab_LL-eingespannt_rc_rec_massiv': '#ffa042',  # helleres Orange (Eingespannt)
-    'Slab_LL-eingespannt_rc_rec_Schuettung': '#ffa042',
-    'Slab_LL-frei_rc_rec_massiv': '#8b0000',  # dunkelrot (Frei aufliegend)
-    'Slab_LL-frei_rc_rec_Schuettung': '#8b0000'
+    'BeamContinuousSupEl_rc_rec_Schuettung': '#000000', 'BeamContinuousSupEl_rc_rec_massiv': '#000000',
+    'BeamSimpleSup_rc_rec_Schuettung': '#2ca02c', 'BeamSimpleSup_rc_rec_massiv': '#2ca02c',
+    'BeamSimpleSup_rc_rib_Schuettung': '#9370db', 'BeamSimpleSup_rc_rib_massiv': '#9370db',
+    'Slab_LL-eingespannt_rc_rec_massiv': '#ffa042', 'Slab_LL-eingespannt_rc_rec_Schuettung': '#ffa042',
+    'Slab_LL-frei_rc_rec_massiv': '#8b0000', 'Slab_LL-frei_rc_rec_Schuettung': '#8b0000'
 }
 
-# Absolut identische Geometrie für alle Linien und Marker
-L_WIDTH_GLOBAL = 0.8
-M_SIZE_GLOBAL = 4.5
+
+def get_linestyle(bodenaufbau): return '-' if 'massiv' in str(bodenaufbau).lower() else '--'
 
 
-# Linienstil-Logik (massiv = durchgezogen, Schüttung = gestrichelt)
-def get_linestyle(bodenaufbau):
-    if 'massiv' in str(bodenaufbau).lower():
-        return '-'
-    else:
-        return '--'
-
-
-# Marker-Logik (1D/Beam = Kreis, 2D/Slab = Dreieck)
-def get_marker_type(label):
-    if 'Slab' in str(label):
-        return '^'
-    else:
-        return 'o'
+def get_marker_type(label): return '^' if 'Slab' in str(label) else 'o'
 
 
 legend_label_mapping = {
-    'BeamContinuousSupEl_rc_rec_Schuettung': 'Durchlaufträger, Rechteck (+ Schüttung)',
-    'BeamContinuousSupEl_rc_rec_massiv': 'Durchlaufträger, Rechteck',
-    'BeamSimpleSup_rc_rec_Schuettung': 'Einfeldträger, Rechteck (+ Schüttung)',
-    'BeamSimpleSup_rc_rec_massiv': 'Einfeldträger, Rechteck',
-    'BeamSimpleSup_rc_rib_Schuettung': 'Einfeldträger, Plattenbalken (+ Schüttung)',
-    'BeamSimpleSup_rc_rib_massiv': 'Einfeldträger, Plattenbalken',
-    'Slab_LL-eingespannt_rc_rec_Schuettung': 'Platte, eingespannt (+ Schüttung)',
-    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte, eingespannt',
-    'Slab_LL-frei_rc_rec_Schuettung': 'Platte, frei aufliegend (+ Schüttung)',
-    'Slab_LL-frei_rc_rec_massiv': 'Platte, frei aufliegend'
+    'BeamContinuousSupEl_rc_rec_massiv': 'Plattenstreifen, eingespannt\n(Standardaufbau)',
+    'BeamContinuousSupEl_rc_rec_Schuettung': 'Plattenstreifen, eingespannt\n(Standardaufbau + Schüttung)',
+    'BeamSimpleSup_rc_rec_massiv': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_Schuettung': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau + Schüttung)',
+    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, frei aufgelegt\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_Schuettung': 'Plattenbalken, frei aufgelegt\n(Standardaufbau + Schüttung)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte liniengelagert, eingespannt\n(Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_Schuettung': 'Platte liniengelagert, eingespannt\n(Standardaufbau + Schüttung)',
+    'Slab_LL-frei_rc_rec_massiv': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_Schuettung': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau + Schüttung)'
 }
 
 
@@ -112,103 +83,56 @@ legend_label_mapping = {
 # SUBPLOT GENERATOR
 # ==============================================================================
 def generate_kriterien_matrix(data_subset, system_filter_string, haupt_titel):
-    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(15, 11), sharex='col', sharey='row')
-    sns.set_theme(style="whitegrid")
-
-    ax_h_struc = axes[0, 0]
-    ax_h_tot = axes[0, 1]
-    ax_gwp_str = axes[1, 0]
-    ax_gwp_tot = axes[1, 1]
+    fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 10), sharex='col', sharey='row')
+    ax_list = [axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]]
 
     df_plot = data_subset[data_subset[kategorie_1].str.contains(system_filter_string)].copy()
-    df_plot = df_plot.sort_values(by=[kategorie_1, x_achse])
-
-    system_handles = []
+    system_handles = {}
 
     for label, g in df_plot.groupby(kategorie_1):
         bodenaufbau = g[kategorie_2].iloc[0]
         farbe = farb_mapping.get(label, '#7f7f7f')
-        schoener_name = legend_label_mapping.get(label, label)
+        l_s, m_t = get_linestyle(bodenaufbau), get_marker_type(label)
+        leg_text = legend_label_mapping.get(label, label)
 
-        l_style = get_linestyle(bodenaufbau)
-        m_type = get_marker_type(label)
+        h, = axes[0, 0].plot(g[x_achse], g[y_struc_h], marker=m_t, markersize=4, markeredgewidth=0.5,
+                             markeredgecolor='black', color=farbe, linestyle=l_s, label=leg_text)
+        axes[0, 1].plot(g[x_achse], g[y_total_h], marker=m_t, markersize=4, markeredgewidth=0.5,
+                        markeredgecolor='black', color=farbe, linestyle=l_s)
+        axes[1, 0].plot(g[x_achse], g[y_struc_co2], marker=m_t, markersize=4, markeredgewidth=0.5,
+                        markeredgecolor='black', color=farbe, linestyle=l_s)
+        axes[1, 1].plot(g[x_achse], g['co2 Total_berechnet [kgCO2eq/m2]'], marker=m_t, markersize=4,
+                        markeredgewidth=0.5, markeredgecolor='black', color=farbe, linestyle=l_s)
+        system_handles[leg_text] = h
 
-        # --- 1. h_struc (Oben Links) ---
-        h_line, = ax_h_struc.plot(g[x_achse], g[y_struc_h], marker=m_type, markersize=M_SIZE_GLOBAL,
-                                  markeredgewidth=0.5, markeredgecolor='black', markerfacecolor=farbe,
-                                  color=farbe, linestyle=l_style, linewidth=L_WIDTH_GLOBAL, label=schoener_name)
-
-        # --- 2. h_tot (Oben Rechts) ---
-        ax_h_tot.plot(g[x_achse], g[y_total_h], marker=m_type, markersize=M_SIZE_GLOBAL,
-                      markeredgewidth=0.5, markeredgecolor='black', markerfacecolor=farbe,
-                      color=farbe, linestyle=l_style, linewidth=L_WIDTH_GLOBAL)
-
-        # --- 3. GWP Struktur (Unten Links) ---
-        ax_gwp_str.plot(g[x_achse], g[y_struc_co2], marker=m_type, markersize=M_SIZE_GLOBAL,
-                        markeredgewidth=0.5, markeredgecolor='black', markerfacecolor=farbe,
-                        color=farbe, linestyle=l_style, linewidth=L_WIDTH_GLOBAL)
-
-        # --- 4. GWP Total (Unten Rechts) ---
-        ax_gwp_tot.plot(g[x_achse], g['co2 Total_berechnet [kgCO2eq/m2]'], marker=m_type, markersize=M_SIZE_GLOBAL,
-                        markeredgewidth=0.5, markeredgecolor='black', markerfacecolor=farbe,
-                        color=farbe, linestyle=l_style, linewidth=L_WIDTH_GLOBAL)
-
-        system_handles.append(h_line)
-
-    # Titel & Achsenbeschriftungen
-    ax_h_struc.set_title("Höhe Struktur $h_{struc}$", fontsize=12, fontweight='bold', color='#2c3e50',
-                         pad=8)
-    ax_h_tot.set_title("Gesamthöhe System $h_{total}$", fontsize=12, fontweight='bold', color='#2c3e50', pad=8)
-    ax_gwp_str.set_title("GWP Struktur", fontsize=12, fontweight='bold', color='#2c3e50', pad=8)
-    ax_gwp_tot.set_title("GWP Total", fontsize=12, fontweight='bold', color='#2c3e50', pad=8)
-
-    ax_h_struc.set_ylabel("Höhe [m]", fontsize=11, fontweight='bold')
-    ax_gwp_str.set_ylabel(r"GWP [kg CO$_{2}$-eq / m$^2$]", fontsize=11, fontweight='bold')
-
-    ax_gwp_str.set_xlabel("Spannweite [m]", fontsize=11, fontweight='bold')
-    ax_gwp_tot.set_xlabel("Spannweite [m]", fontsize=11, fontweight='bold')
-
-    for ax in [ax_h_struc, ax_h_tot, ax_gwp_str, ax_gwp_tot]:
+    for ax, lbl in zip(ax_list, ['a)', 'b)', 'c)', 'd)']):
+        ax.text(-0.01, 1.02, lbl, transform=ax.transAxes, va='bottom', ha='right', clip_on=False)
         ax.set_xlim(x_min, x_max)
         ax.set_ylim(bottom=0)
         ax.grid(True, linestyle='-', color='#e0e0e0', linewidth=0.4)
+        ax.set_axisbelow(True)
+        ax.tick_params(axis='both', which='major', labelsize=14, labelbottom=True, labelleft=True)
 
-    # Eindeutige Systemkurven filtern & sortieren
-    eindeutige_systeme = dict(zip([h.get_label() for h in system_handles], system_handles))
-    sortierte_labels = sorted(eindeutige_systeme.keys())
-    sortierte_handles = [eindeutige_systeme[lbl] for lbl in sortierte_labels]
+    axes[0, 0].set_ylabel("h$_{structure}$ [m]")
+    axes[0, 1].set_ylabel("h$_{total}$ [m]")
+    axes[1, 0].set_ylabel("GWP$_{structure}$ [kg CO$_{2}$-eq / m$^2$]")
+    axes[1, 1].set_ylabel("GWP$_{total}$ [kg CO$_{2}$-eq / m$^2$]")
+    axes[1, 0].set_xlabel("Spannweite [m]")
+    axes[1, 1].set_xlabel("Spannweite [m]")
 
-    # Reduzierte Legende unter den Plots
-    fig.legend(
-        sortierte_handles,
-        sortierte_labels,
-        title="Betrachtete Bauteil-Systeme",
-        loc='upper center',
-        bbox_to_anchor=(0.5, 0.13),
-        ncol=2,
-        fontsize='small',
-        frameon=True
-    )
+    desired_order = list(legend_label_mapping.values())
+    ordered_labels = [l for l in desired_order if l in system_handles]
+    ordered_handles = [system_handles[l] for l in ordered_labels]
 
-    # Spannweite direkt formatiert in den Haupttitel integrieren
-    voller_titel = f"{haupt_titel} ({x_min}-{x_max}m)"
-    fig.suptitle(voller_titel, fontsize=14, fontweight='bold', y=0.97)
-    plt.tight_layout(rect=[0, 0.14, 1, 0.94])
+    fig.legend(ordered_handles, ordered_labels, loc='upper center', bbox_to_anchor=(0.5, 0.08), ncol=3, frameon=False)
+    fig.suptitle(f"{haupt_titel} ({x_min}-{x_max}m)", y=0.98)
+    plt.tight_layout(rect=[0, 0.12, 1, 0.95])
 
-    # --- AUTOMATISCHES SPEICHERN DER PLOTS ---
-    # Erstellt einen sauberen Dateinamen inklusive der Spannweitenbegrenzung
-    safe_title = haupt_titel.replace(' ', '_')
-    filename = f"Kriterienmatrix_{safe_title}_{x_min}-{x_max}m.png"
+    filename = f"Kriterienmatrix_{haupt_titel.replace(' ', '_')}_{x_min}-{x_max}m.png"
     plt.savefig(filename, dpi=300, bbox_inches='tight')
-    print(f"Diagramm erfolgreich gespeichert unter: {filename}")
+    print(f"Gespeichert unter: {filename}")
 
 
-# ==============================================================================
-# PLOTS AUSFÜHREN
-# ==============================================================================
-generate_kriterien_matrix(df_grouped, 'BeamContinuous|BeamSimpleSup',
-                          "Einfeldträger vs. Durchlaufträger")
-generate_kriterien_matrix(df_grouped, 'BeamContinuous|Slab',
-                          "Plattensysteme vs. Durchlaufträger")
-
+generate_kriterien_matrix(df_grouped, 'BeamContinuous|BeamSimpleSup', "Einfeldträger vs. Durchlaufträger")
+generate_kriterien_matrix(df_grouped, 'BeamContinuous|Slab', "Plattensysteme vs. Durchlaufträger")
 plt.show()
