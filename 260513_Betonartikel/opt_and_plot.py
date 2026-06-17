@@ -170,8 +170,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
                 #TODO eventuell sind 3 d 16 eine bessere Startbewehrung im Sten (di_x_w und n_x_w), weil nur der Durchmesser, nicht aber die Anzahl Stäbe optimiert wird, oder wir nehmen noch die anzahl Stäbe in die Optimierung rein.
                 # create initial cross-sections
-                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.018, 3, 0.008, 0.15, 2)
-                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15,0.008, 0.15, 0.018, 3, 0.008, 0.15, 2)
+                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.018, 5, 0.008, 0.15, 2)
+                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15,0.008, 0.15, 0.018, 5, 0.008, 0.15, 2)
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
                 line_i1 = [section_01, floorstruc]
@@ -770,7 +770,7 @@ def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50
                 # create a Rebar material object
                 rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name)
                 # create initial wooden rectangular cross-section
-                section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.0, 0.14, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.02, 3, 0.008, 0.15, 2)
+                section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.5, 0.14, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.02, 5, 0.008, 0.15, 2)
                 color = 'mediumseagreen'
 ## XXXXXXXXXXX neuen Querschnittstyp initialisieren
             else:

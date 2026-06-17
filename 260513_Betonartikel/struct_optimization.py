@@ -421,14 +421,20 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     # define bounds of variables
     if m.floorstruc.name == 'massiv':
         h_min_schall = 0.16
-        bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+        h_fix = max(0.08,m.section.hmin_c, h_min_schall)
+        bh_f = (h_fix, h_fix)
+        #bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
 
     elif m.floorstruc.name == 'Schuettung':
         h_min_schall = 0.13
-        bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+        h_fix = max(0.08, m.section.hmin_c, h_min_schall)
+        bh_f = (h_fix, h_fix)
+        #bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
 
     else:
-        bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
+        h_fix = max(0.08, m.section.hmin_c)
+        bh_f = (h_fix, h_fix)
+        #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
 
     #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
     bh_w = (0.04, 1.2)  # height between 10 cm and 2.0 m
@@ -446,8 +452,8 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     #bb_w = (max(0.15, b_w_min_c), 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
 
 
-    #bb = (0.4, 2.5)  # rib spacing between 0.4 and 2.5 m
-    bb = (0.4, 3.8) # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
+    #bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
+    bb = (1.0 , 1.0) # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
 
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb, bdi_pb_bw]
 
