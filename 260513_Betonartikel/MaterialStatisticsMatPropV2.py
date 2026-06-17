@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib.ticker import ScalarFormatter
 plt.rcParams["font.family"] = "Times New Roman"
 import sqlite3
 import numpy as np
@@ -8,7 +9,7 @@ import struct_analysis  # file with code for structural analysis
 import os
 
 # define database
-database_name = "database_260610_Hochbau.db"
+database_name = "database_260617_Hochbau.db"
 #connect to the database
 connection = sqlite3.connect(database_name)
 # create cursor object
@@ -181,7 +182,7 @@ print(dfGL32["MECH_PROP"])
 inquiry = (""" 
         SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME, ID, "Copy for strength" FROM products
         WHERE DENSITY IS NOT NULL
-        AND "PRODUCT_NAME" LIKE '%KVH%'
+        AND ("PRODUCT_NAME" LIKE '%KVH%' OR "PRODUCT_NAME" LIKE "Balkenschichtholz")
         AND ValidEPD = 1
         AND Man_Ausschluss = 1 """
            )
@@ -226,6 +227,7 @@ inquiry = ("""
         SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME, ID, "Copy for strength" FROM products
         WHERE DENSITY IS NOT NULL
         AND "MATERIAL" LIKE '%Steel_reinforcing_bar%'
+        AND "MECH_PROP" NOT LIKE '%B500B%'
         AND ValidEPD = 1
         AND Man_Ausschluss = 1 """
            )
@@ -233,13 +235,34 @@ cursor.execute(inquiry)
 result = cursor.fetchall()
 
 dfRebar = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME", "ID", "Copy for strength"])
-print("alle Bewehrungsstähle:")
+print("Bewehrungsstahl ihne B500B:")
 print(dfRebar["PRO_ID"])
 print(dfRebar["DENSITY"])
 print(dfRebar["Total_GWP"])
 print(dfRebar["Total_GWP_m3"])
 print(dfRebar["MECH_PROP"])
 
+#------------------------------------------------------------------------------------------------------------------------
+#extract values for reinforcing steel
+#
+inquiry = (""" 
+        SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME, ID, "Copy for strength" FROM products
+        WHERE DENSITY IS NOT NULL
+        AND "MATERIAL" LIKE '%Steel_reinforcing_bar%'
+        AND MECH_PROP LIKE '%B500B%'
+        AND ValidEPD = 1
+        AND Man_Ausschluss = 1 """
+           )
+cursor.execute(inquiry)
+result = cursor.fetchall()
+
+dfB500B = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME", "ID", "Copy for strength"])
+print("B500B:")
+print(dfB500B["PRO_ID"])
+print(dfB500B["DENSITY"])
+print(dfB500B["Total_GWP"])
+print(dfB500B["Total_GWP_m3"])
+print(dfB500B["MECH_PROP"])
 #------------------------------------------------------------------------------------------------------------------------
 #extract values for structural steel
 #
@@ -260,7 +283,25 @@ print(dfSteel["DENSITY"])
 print(dfSteel["Total_GWP"])
 print(dfSteel["Total_GWP_m3"])
 print(dfSteel["MECH_PROP"])
+#------------------------------------------------------------------------------------------------------------------------
+#extract values for posttensioning steel
+#
+inquiry = (""" 
+        SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME, ID, "Copy for strength" FROM products
+        WHERE "MATERIAL" LIKE '%prestressing steel%'
+        AND ValidEPD = 1
+        AND Man_Ausschluss = 1 """
+           )
+cursor.execute(inquiry)
+result = cursor.fetchall()
 
+dfPosttension = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME", "ID", "Copy for strength"])
+print("alle Baustähle:")
+print(dfPosttension["PRO_ID"])
+print(dfPosttension["DENSITY"])
+print(dfPosttension["Total_GWP"])
+print(dfPosttension["Total_GWP_m3"])
+print(dfPosttension["MECH_PROP"])
 
 #_______________________________________________________________________________________________________________________
 #_______________________________________________________________________________________________________________________
@@ -272,7 +313,7 @@ dfs = [
     dfC2025, dfC2530, dfC3037,
     dfGL24, dfGL28, dfGL30, dfGL32,
     dfKVH, dfCLT,
-    dfRebar, dfSteel
+    dfRebar,dfB500B, dfSteel, dfPosttension
 ]
 
 # MECH_PROP zusammenziehen
@@ -338,10 +379,16 @@ print(dfCLT["MECH_PROP"])
 print(dfCLT["fcd"])
 
 dfRebar = add_material_properties(dfRebar, df_mat)
+dfB500B = add_material_properties(dfB500B, df_mat)
+
 dfSteel = add_material_properties(dfSteel, df_mat)
 
+dfPosttension = add_material_properties(dfPosttension, df_mat)
 
-
+print("check merge2 dfPosttension")
+print(dfPosttension["PRO_ID"])
+print(dfPosttension["MECH_PROP"])
+print(dfPosttension["fcd"])
 
 # ----------------------------------------
 # Normierte Werte berechnen
@@ -349,8 +396,8 @@ dfSteel = add_material_properties(dfSteel, df_mat)
 dfs_all = [
     dfC2025, dfC2530, dfC3037,
     dfGL24, dfGL28, dfGL30, dfGL32,
-    dfKVH, dfCLT,
-    dfRebar, dfSteel
+    dfKVH, dfCLT, dfB500B,
+    dfRebar, dfSteel, dfPosttension
 ]
 
 for df in dfs_all:
@@ -371,47 +418,68 @@ dfBSH = pd.concat([dfGL24, dfGL28, dfGL30, dfGL32])
 # Y-Positionen
 # ----------------------------------------
 y_positions = {
-    "C20/25": 10,
-    "C25/30": 11,
-    "C30/37": 12,
-    "BSP": 8,
-    "KVH": 7,
-    "BSH": 6,
-    "Bewehrungsstahl": 4,
-    "Baustahl": 2
+    "C20/25 (#2)": 15,
+    "C25/30 (#8)": 14,
+    "C30/37 (#23)": 13,
+    "BSP (#24)": 11,
+    "KVH (#5)": 10,
+    "BSH (#8)": 9,
+    "B500B (#11)": 7,
+    "andere BSt (#6)": 6,
+    "Baustahl (#22)": 4,
+    "Spannstahl (#2)": 2,
 }
+
+
 
 # ----------------------------------------
 # Plot-Funktion
 # ----------------------------------------
 def plot_data(ax, x_col):
-
     # Beton
-    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
-    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
-    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
+
+    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25 (#2)"]), color="lightgreen")
+    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30 (#8)"]), color="green")
+    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37 (#23)"]), color="darkgreen")
+    # plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")6
 
     # Holz
-    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP"]), color="red")
-    ax.scatter(dfKVH[x_col], np.full(len(dfKVH), y_positions["KVH"]), color="darkorange")
-    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
+    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP (#24)"]), color="red")
+    ax.scatter(dfKVH[x_col], np.full(len(dfKVH), y_positions["KVH (#5)"]), color="darkorange")
+    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH (#8)"]), color="orange")
 
     # Stahl
-    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["Bewehrungsstahl"]), color="lightblue")
-    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl"]), color="darkblue")
+    ax.scatter(dfB500B[x_col], np.full(len(dfB500B), y_positions["B500B (#11)"]), color="lightblue")
+    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["andere BSt (#6)"]), color="blue")
+
+    # Baustahl
+    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl (#22)"]), color="darkblue")
+
+    # Spannstahl
+    ax.scatter(dfPosttension[x_col], np.full(len(dfPosttension), y_positions["Spannstahl (#2)"]), color="grey")
 
     # Linien
-    ax.axhline(9, linestyle="--", color="grey")
+    ax.axhline(12, linestyle="--", color="grey")
+    ax.axhline(8, linestyle="--", color="grey")
     ax.axhline(5, linestyle="--", color="grey")
     ax.axhline(3, linestyle="--", color="grey")
 
     ax.grid(axis="x", linestyle=":", alpha=0.5)
 
+plt.rcParams["font.family"] = "Times New Roman"
 
+#  Math-Schrift auf Times setzen
+plt.rcParams["mathtext.fontset"] = "stix"
+plt.rcParams["mathtext.rm"] = "Times New Roman"
+plt.rcParams["mathtext.it"] = "Times New Roman:italic"
+
+plt.rcParams.update({
+    "font.size": 14
+})
 # ----------------------------------------
 # Figure 2x2 auf t bezogen
 # ----------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(6.3, 4), sharey=False)
+fig, axes = plt.subplots(3, 2, figsize=(12, 12), sharey=False)
 
 # ----------------------------------------
 # Achsen formatieren
@@ -419,7 +487,7 @@ fig, axes = plt.subplots(2, 2, figsize=(6.3, 4), sharey=False)
 for ax in axes.flatten():
     ax.set_yticks(list(y_positions.values()))
     ax.set_yticklabels(list(y_positions.keys()))
-    ax.set_ylim(0, 13.5)
+    ax.set_ylim(0, 15.5)
 
 # ----------------------------------------
 # Subplot 1: GWP / fcd
@@ -431,76 +499,78 @@ axes[0, 0].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$
 # ----------------------------------------
 # Subplot 2: GWP / ftd
 # ----------------------------------------
-plot_data(axes[0, 1], "GWP_ftd")
-axes[0, 1].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[1, 0], "GWP_ftd")
+axes[1, 0].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
 #axes[0, 1].set_title("Normierung mit ftd")
 
 # ----------------------------------------
 # Subplot 3: GWP / E-Modul
 # ----------------------------------------
-plot_data(axes[1, 0], "GWP_E")
-axes[1, 0].set_xlabel(r"GWP / $E$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[2, 0], "GWP_E")
+axes[2, 0].set_xlabel(r"GWP / $E$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
 #axes[1, 0].set_title("Normierung mit E-Modul")
 
-# ----------------------------------------
-# Subplot 4: GWP pro m³
-# ----------------------------------------
-plot_data(axes[1, 1], "Total_GWP")
-axes[1, 1].set_xlabel(r"GWP [kg CO₂-eq / t]")
-#axes[1, 1].set_title("GWP pro Volumen")
-axes[1, 1].set_xlim(0, 1400)
 
-# ----------------------------------------
-# Layout
-# ----------------------------------------
-plt.tight_layout()
-plt.show()
-
-
-# ----------------------------------------
-# Figure 2x2 auf m3 bezogen
-# ----------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(6.3, 4), sharey=False)
-
-# ----------------------------------------
-# Achsen formatieren
-# ----------------------------------------
-for ax in axes.flatten():
-    ax.set_yticks(list(y_positions.values()))
-    ax.set_yticklabels(list(y_positions.keys()))
-    ax.set_ylim(0, 13.5)
 
 # ----------------------------------------
 # Subplot 1: GWP / fcd
 # ----------------------------------------
-plot_data(axes[0, 0], "GWP_fcd_m3")
-axes[0, 0].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[0, 1], "GWP_fcd_m3")
+axes[0, 1].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
 #axes[0, 0].set_title("Normierung mit fcd")
 
 # ----------------------------------------
 # Subplot 2: GWP / ftd
 # ----------------------------------------
-plot_data(axes[0, 1], "GWP_ftd_m3")
-axes[0, 1].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[1, 1], "GWP_ftd_m3")
+axes[1, 1].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
 #axes[0, 1].set_title("Normierung mit ftd")
 
 # ----------------------------------------
 # Subplot 3: GWP / E-Modul
 # ----------------------------------------
-plot_data(axes[1, 0], "GWP_E_m3")
-axes[1, 0].set_xlabel(r"GWP / $E$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[2, 1], "GWP_E_m3")
+axes[2, 1].set_xlabel(r"GWP / $E$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
 #axes[1, 0].set_title("Normierung mit E-Modul")
 
-# ----------------------------------------
-# Subplot 4: GWP pro m³
-# ----------------------------------------
-plot_data(axes[1, 1], "Total_GWP_m3")
-axes[1, 1].set_xlabel(r"GWP [kg CO₂-eq / m³]")
-axes[1, 1].set_xlim(0, 10000)
-#axes[1, 1].set_title("GWP pro Volumen")
+def add_label(ax, label):
+    ax.text(
+        -0.08, 1.02, label,
+        transform=ax.transAxes,
+        fontsize=14,
+    )
+
+add_label(axes[0, 0], "a)")
+add_label(axes[0, 1], "b)")
+add_label(axes[1, 0], "c)")
+add_label(axes[1, 1], "d)")
+add_label(axes[2, 0], "e)")
+add_label(axes[2, 1], "f)")
+
+#scientific numbers
+for ax in axes.flatten():
+    formatter = ScalarFormatter(useMathText=True)
+    formatter.set_scientific(True)
+    formatter.set_powerlimits((0, 0))
+    ax.xaxis.set_major_formatter(formatter)
+
 
 # ----------------------------------------
 # Layout
 # ----------------------------------------
 plt.tight_layout()
+
+# Dateiname
+filename = "GWP_plot_normiert"
+
+# Speicherung als PDF (vektorbasiert → perfekt für Paper)
+plt.savefig(f"{filename}.pdf",
+            bbox_inches="tight",
+            dpi=300)
+
+# Speicherung als JPG (für Bericht / Präsentation)
+plt.savefig(f"{filename}.jpg",
+            bbox_inches="tight",
+            dpi=300)
+
 plt.show()
