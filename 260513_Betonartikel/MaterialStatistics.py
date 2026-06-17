@@ -359,16 +359,16 @@ print(dfPosttension["MECH_PROP"])
 
 
 y_positions = {
-    "C20/25 (2)": 15,
-    "C25/30 (8)": 14,
-    "C30/37 (23)": 13,
-    "BSP (9)": 11,
-    "KVH (5)": 10,
-    "BSH (11)": 9,
-    "B500B (9)": 7,
-    "Bewehrungsstahl (4)": 6,
-    "Baustahl (10)": 4,
-    "Spannstahl (5)": 2,
+    "C20/25 (#2)": 15,
+    "C25/30 (#8)": 14,
+    "C30/37 (#23)": 13,
+    "BSP (#9)": 11,
+    "KVH (#5)": 10,
+    "BSH (#11)": 9,
+    "B500B (#9)": 7,
+    "andere BSt (#4)": 6,
+    "Baustahl (#10)": 4,
+    "Spannstahl (#5)": 2,
 }
 def jitter(y, n):
     return y + np.random.uniform(-0.1, 0.1, n)
@@ -376,25 +376,25 @@ def jitter(y, n):
 def plot_data(ax, x_col):
     # Beton
 
-    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25 (2)"]), color="lightgreen")
-    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30 (8)"]), color="green")
-    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37 (23)"]), color="darkgreen")
+    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25 (#2)"]), color="lightgreen")
+    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30 (#8)"]), color="green")
+    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37 (#23)"]), color="darkgreen")
     #plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")6
 
     # Holz
-    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP (9)"]), color="red")
-    ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH (5)"]), color="darkorange")
-    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH (11)"]), color="orange")
+    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP (#9)"]), color="red")
+    ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH (#5)"]), color="darkorange")
+    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH (#11)"]), color="orange")
 
     # Bewehrungsstahl
-    ax.scatter(dfB500B[x_col], np.full(len(dfB500B), y_positions["B500B (9)"]), color="lightblue")
-    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["Bewehrungsstahl (4)"]), color="blue")
+    ax.scatter(dfB500B[x_col], np.full(len(dfB500B), y_positions["B500B (#9)"]), color="lightblue")
+    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["andere BSt (#4)"]), color="blue")
 
     #Baustahl
-    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl (10)"]), color="darkblue")
+    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl (#10)"]), color="darkblue")
 
     #Spannstahl
-    ax.scatter(dfPosttension[x_col], np.full(len(dfPosttension), y_positions["Spannstahl (5)"]), color="grey")
+    ax.scatter(dfPosttension[x_col], np.full(len(dfPosttension), y_positions["Spannstahl (#5)"]), color="grey")
 
 
     # Linien
@@ -434,7 +434,7 @@ plot_data(axes[0, 0], "Total_GWP")
 #axes[0, 0].set_title("Total GWP [kg CO₂-eq / t]")
 #axes[0, 0].set_ylabel("Material")
 axes[0, 0].set_xlabel("Total GWP [kg CO₂-eq / t]")
-axes[0, 0].set_xlim(0, 1500)
+axes[0, 0].set_xlim(0, 3000)
 axes[0, 0].set_ylim(0, 15.5)
 
 # -----------------------
@@ -443,7 +443,7 @@ axes[0, 0].set_ylim(0, 15.5)
 plot_data(axes[0, 1], "Total_GWP_m3")
 #axes[0, 1].set_title("Total GWP [kg CO₂-eq / m³]")
 axes[0, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
-axes[0, 1].set_xlim(0, 10000)
+axes[0, 1].set_xlim(0, 30000)
 axes[0, 1].set_ylim(0, 15.5)
 
 # -----------------------
@@ -501,25 +501,53 @@ def add_box(ax, x_min, x_max, y_min, y_max, color, lw=1.5):
         y_max - y_min,
         linewidth=lw,
         edgecolor=color,
-        facecolor='none'
+        facecolor='none',
+        linestyle=':'
     )
     ax.add_patch(rect)
 
 ax = axes[0, 0]
 
-# Beton (grün)
-add_box(ax, 1, 150, 12.5, 15.3, "green")
+# Beton
+add_box(ax, 1, 150, 12.5, 15.3, "black")
 
-# Holz (rot)
-add_box(ax, 1, 650, 8.5, 11.8, "red")
+ax.text(
+    200, 14,          # x, y → Position (leicht rechts vom Rahmen)
+    "siehe c)",
+    fontsize=12,
+    color="black",
+    va="center"
+)
 
+# Holz
+add_box(ax, 1, 650, 8.5, 11.8, "black")
+ax.text(
+    700, 10,          # x, y → Position (leicht rechts vom Rahmen)
+    "siehe e)",
+    fontsize=12,
+    color="black",
+    va="center"
+)
 
 ax = axes[0, 1]
 
-add_box(ax, 0, 800, 12.5, 15.5, "green")
-add_box(ax, 0, 1200, 8.5, 11.8, "red")
-
-
+add_box(ax, 10, 800, 12.5, 15.3, "black")
+ax.text(
+    1200, 14,          # x, y → Position (leicht rechts vom Rahmen)
+    "siehe d)",
+    fontsize=12,
+    color="black",
+    va="center"
+)
+add_box(ax, 10, 1200, 8.5, 11.8, "black")
+ax.text(
+    2000, 10,          # x, y → Position (leicht rechts vom Rahmen)
+    "siehe f)",
+    fontsize=12,
+    color="black",
+    va="center"
+)
+"""
 ax = axes[1, 0]
 add_box(ax, 2, 129, 12.6, 15.4, "green")
 
@@ -534,12 +562,26 @@ add_box(ax, 5, 495, 8.6, 11.9, "red")
 
 ax = axes[2, 1]
 add_box(ax, 5, 275, 8.6, 11.9, "red")
-
+"""
 
 # -----------------------
 # Layout
 # -----------------------
 plt.tight_layout()
+
+# Dateiname
+filename = "GWP_plot"
+
+# Speicherung als PDF (vektorbasiert → perfekt für Paper)
+plt.savefig(f"{filename}.pdf",
+            bbox_inches="tight",
+            dpi=300)
+
+# Speicherung als JPG (für Bericht / Präsentation)
+plt.savefig(f"{filename}.jpg",
+            bbox_inches="tight",
+            dpi=300)
+
 plt.show()
 
 
