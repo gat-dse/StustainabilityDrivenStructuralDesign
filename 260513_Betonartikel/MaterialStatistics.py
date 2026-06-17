@@ -327,6 +327,28 @@ print(dfSteel["Total_GWP"])
 print(dfSteel["Total_GWP_m3"])
 print(dfSteel["MECH_PROP"])
 
+#------------------------------------------------------------------------------------------------------------------------
+#extract values for prestressing steel
+#
+inquiry = (""" 
+        SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
+        WHERE "MATERIAL" LIKE '%prestressing steel%'
+        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+        AND ValidEPD = 1
+        AND Man_Ausschluss = 1 """
+           )
+cursor.execute(inquiry)
+result = cursor.fetchall()
+
+dfPosttension = pd.DataFrame(result, columns=["PRO_ID", "DENSITY", "Total_GWP", "Total_GWP_m3", "MECH_PROP", "PRODUCT_NAME"])
+print("alle Spannstähle:")
+print(dfPosttension["PRO_ID"])
+print(dfPosttension["DENSITY"])
+print(dfPosttension["Total_GWP"])
+print(dfPosttension["Total_GWP_m3"])
+print(dfPosttension["MECH_PROP"])
+
+
 #________________________________________________________________________________________________________________________
 #           SINGLE     PLOT       TOTAL GWP
 #________________________________________________________________________________________________________________________
@@ -336,14 +358,16 @@ print(dfSteel["MECH_PROP"])
 # Kategorien (Y-Positionen)
 # -----------------------
 y_positions = {
-    "C20/25": 10,
-    "C25/30": 11,
-    "C30/37": 12,
-    "CLT": 8,
-    "KVH": 7,
-    "BSH": 6,
-    "B500B": 4,
-    "Steel": 2
+    "C20/25": 17,
+    "C25/30": 16,
+    "C30/37": 15,
+    "CLT": 13,
+    "KVH": 11,
+    "BSH": 9,
+    "B500B": 7,
+    "Bewehrungsstahl allg.": 6,
+    "Baustahl": 4,
+    "Spannstahl": 2,
 }
 """
 # -----------------------
@@ -401,14 +425,17 @@ import numpy as np
 # Kategorien (Y-Positionen)
 # -----------------------
 y_positions = {
-    "C20/25": 10,
-    "C25/30": 11,
-    "C30/37": 12,
-    "CLT": 8,
-    "KVH": 7,
-    "BSH": 6,
-    "B500B": 4,
-    "Steel": 2
+    
+    "C20/25": 17,
+    "C25/30": 16,
+    "C30/37": 15,
+    "CLT": 13,
+    "KVH": 11,
+    "BSH": 9,
+    "B500B": 7,
+    "Bewehrungsstahl allg.": 6,
+    "Baustahl": 4,
+    "Spannstahl": 2,
 }
 
 # -----------------------
@@ -489,15 +516,16 @@ plt.show()
 
 
 y_positions = {
-    "C20/25": 10,
-    "C25/30": 11,
-    "C30/37": 12,
-   # "Hochbaubeton": 10,
-    "BSP": 8,
-    "KVH": 7,
-    "BSH": 6,
-    "Bewehrungsstahl": 4,
-    "Baustahl": 2
+    "C20/25": 15,
+    "C25/30": 14,
+    "C30/37": 13,
+    "BSP": 11,
+    "KVH": 10,
+    "BSH": 9,
+    "B500B": 7,
+    "Bewehrungsstahl allg.": 6,
+    "Baustahl": 4,
+    "Spannstahl": 2,
 }
 def jitter(y, n):
     return y + np.random.uniform(-0.1, 0.1, n)
@@ -508,29 +536,45 @@ def plot_data(ax, x_col):
     ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25"]), color="lightgreen")
     ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30"]), color="green")
     ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37"]), color="darkgreen")
-    #plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")
+    #plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")6
 
     # Holz
     ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP"]), color="red")
     ax.scatter(dfKVHC24[x_col], np.full(len(dfKVHC24), y_positions["KVH"]), color="darkorange")
     ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH"]), color="orange")
 
-    # Stahl
-    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["Bewehrungsstahl"]), color="lightblue")
+    # Bewehrungsstahl
+    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["B500B"]), color="lightblue")
+    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["Bewehrungsstahl allg."]), color="blue")
+
+    #Baustahl
     ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl"]), color="darkblue")
 
+    #Spannstahl
+    ax.scatter(dfPosttension[x_col], np.full(len(dfSteel), y_positions["Spannstahl"]), color="darkblue")
+
+
     # Linien
-    ax.axhline(9, linestyle="--", color="grey")
+    ax.axhline(12, linestyle="--", color="grey")
+    ax.axhline(8, linestyle="--", color="grey")
     ax.axhline(5, linestyle="--", color="grey")
     ax.axhline(3, linestyle="--", color="grey")
 
     ax.grid(axis="x", linestyle=":", alpha=0.5)
 
+plt.rcParams["font.family"] = "Times New Roman"
+
+plt.rcParams.update({
+    "font.size": 14
+})
+
 
 # -----------------------
 # Figure 2x2
 # -----------------------
-fig, axes = plt.subplots(3, 2, figsize=(6.3, 4), sharey=False,gridspec_kw={"height_ratios": [2, 1, 1]})
+fig, axes = plt.subplots(3, 2, figsize=(12, 8), sharey=False,gridspec_kw={"height_ratios": [2, 1, 1]})
+
+
 
 # -----------------------
 # Achsenbeschriftung
@@ -591,7 +635,20 @@ axes[2, 1].set_xlim(0, 350)
 axes[2, 1].set_ylim(5, 9)
 axes[2, 1].set_xlabel("Total GWP [kg CO₂-eq / m³]")
 
-plt.rcParams["font.family"] = "Times New Roman"
+
+def add_label(ax, label):
+    ax.text(
+        -0.08, 1.02, label,
+        transform=ax.transAxes,
+        fontsize=14,
+    )
+
+add_label(axes[0, 0], "a)")
+add_label(axes[0, 1], "b)")
+add_label(axes[1, 0], "c)")
+add_label(axes[1, 1], "d)")
+add_label(axes[2, 0], "e)")
+add_label(axes[2, 1], "f)")
 
 # -----------------------
 # Layout

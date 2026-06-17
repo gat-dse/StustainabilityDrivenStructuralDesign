@@ -7,7 +7,7 @@ import struct_analysis  # file with code for structural analysis
 import os
 
 # define database
-database_name = "database_260610_Hochbau_neu.db"
+database_name = "database_260617_Hochbau.db"
 #connect to the database
 connection = sqlite3.connect(database_name)
 # create cursor object
