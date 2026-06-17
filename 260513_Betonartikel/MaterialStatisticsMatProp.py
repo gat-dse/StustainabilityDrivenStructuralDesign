@@ -411,7 +411,7 @@ def plot_data(ax, x_col):
 # ----------------------------------------
 # Figure 2x2 auf t bezogen
 # ----------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharey=False)
+fig, axes = plt.subplots(2, 2, figsize=(6.3, 4), sharey=False)
 
 # ----------------------------------------
 # Achsen formatieren
@@ -460,7 +460,7 @@ plt.show()
 # ----------------------------------------
 # Figure 2x2 auf m3 bezogen
 # ----------------------------------------
-fig, axes = plt.subplots(2, 2, figsize=(12, 8), sharey=False)
+fig, axes = plt.subplots(2, 2, figsize=(6.3, 4), sharey=False)
 
 # ----------------------------------------
 # Achsen formatieren

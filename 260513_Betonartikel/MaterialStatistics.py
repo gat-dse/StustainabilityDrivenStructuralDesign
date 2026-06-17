@@ -7,7 +7,7 @@ import struct_analysis  # file with code for structural analysis
 import os
 
 # define database
-database_name = "database_260610_Hochbau_neu.db"
+database_name = "database_260617_Hochbau.db"
 #connect to the database
 connection = sqlite3.connect(database_name)
 # create cursor object
@@ -221,7 +221,7 @@ print(dfBSH["MECH_PROP"])
 inquiry = (""" 
         SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
         WHERE DENSITY IS NOT NULL
-        AND "PRODUCT_NAME" LIKE '%KVH%'
+        AND ("PRODUCT_NAME" LIKE '%KVH%' OR "PRODUCT_NAME" LIKE "Balkenschichtholz")
         AND MECH_PROP LIKE '%C24%'
         AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
         AND ValidEPD = 1
@@ -349,7 +349,7 @@ y_positions = {
 # -----------------------
 # Plot
 # -----------------------
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(6.3, 4))
 
 # Beton (grün)
 
@@ -530,7 +530,7 @@ def plot_data(ax, x_col):
 # -----------------------
 # Figure 2x2
 # -----------------------
-fig, axes = plt.subplots(3, 2, figsize=(12, 8), sharey=False,gridspec_kw={"height_ratios": [2, 1, 1]})
+fig, axes = plt.subplots(3, 2, figsize=(6.3, 4), sharey=False,gridspec_kw={"height_ratios": [2, 1, 1]})
 
 # -----------------------
 # Achsenbeschriftung
