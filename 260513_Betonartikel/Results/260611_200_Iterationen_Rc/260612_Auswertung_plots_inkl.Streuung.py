@@ -3,12 +3,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import matplotlib as mpl
 
 # ==============================================================================
 # GLOBALE EINSTELLUNGEN & DATENPREPARATION
 # ==============================================================================
 excel_file = "260611_1515_Members.xlsx"
 df = pd.read_excel(excel_file)
+
+mpl.rcParams['font.family'] = 'serif'
+mpl.rcParams['font.serif'] = ['Times New Roman']
+mpl.rcParams['font.size'] = 14
+mpl.rcParams['axes.labelsize'] = 14
+mpl.rcParams['axes.titlesize'] = 14
+mpl.rcParams['xtick.labelsize'] = 14
+mpl.rcParams['ytick.labelsize'] = 14
+mpl.rcParams['legend.fontsize'] = 14
 
 x_achse = 'l_tot [m]'
 y_struc_co2 = 'co2 Struktur [kgCO2eq/m2]'
@@ -48,15 +58,15 @@ marker_mapping = {
 }
 
 legend_label_mapping = {
-    'BeamContinuousSupEl_rc_rec_massiv': 'Durchlaufträger, Rechteck',
-    'BeamSimpleSup_rc_rec_massiv': 'Einfeldträger, Rechteck',
-    'BeamSimpleSup_rc_rib_massiv': 'Einfeldträger, Plattenbalken',
-    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte, eingespannt',
-    'Slab_LL-frei_rc_rec_massiv': 'Platte, frei aufliegend'
-}
+    'BeamContinuousSupEl_rc_rec_massiv': 'Plattenstreifen, eingespannt\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_massiv': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte liniengelagert, eingespannt\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_massiv': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, frei aufgelegt\n(Standardaufbau)'
+    }
 
 L_WIDTH_GLOBAL = 1.0
-M_SIZE_GLOBAL = 5.0
+M_SIZE_GLOBAL = 4.0
 
 
 def apply_clean_grid(ax):
@@ -72,8 +82,7 @@ df_band = df_filtered.groupby([x_achse, kategorie_1], as_index=False)[y_struc_co
 # ==============================================================================
 def generate_streuung_plot(filter_keywords, title_text, filename):
     # Erhöhte Figure-Höhe für den Legendenplatz unten
-    fig = plt.figure(figsize=(11, 8.5))
-    sns.set_theme(style="whitegrid")
+    fig = plt.figure(figsize=(12, 9))
 
     # GridSpec: Zeile 0 für das Diagramm, Zeile 1 exklusiv für die Legende
     gs = fig.add_gridspec(nrows=2, ncols=1, height_ratios=[1, 0.15],
@@ -102,19 +111,22 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
 
     ax.set_xlim(3, 12)
     ax.set_ylim(bottom=0)
-    ax.set_title(title_text, fontsize=13, fontweight='bold', pad=15)
-    ax.set_xlabel("Spannweite [m]", fontsize=11)
-    ax.set_ylabel(r"GWP$_{Struktur}$ [kg CO$_{2eq}$ / m$^2$]", fontsize=11)
+    ax.set_title(title_text, pad=15)
+    ax.set_xlabel("Spannweite [m]")
+    ax.set_ylabel(r"GWP$_{structure}$ [kg CO$_{2eq}$ / m$^2$]")
 
     apply_clean_grid(ax)
 
     # Legende im unteren Slot zentrieren (mehrspaltig falls nötig)
     handles, labels = ax.get_legend_handles_labels()
-    ax_leg.legend(handles, labels, title="Tragsystem (Bodenaufbau: massiv)",
-                  loc="upper center", ncol=2, fontsize='medium', title_fontsize='medium', frameon=True)
+    ax_leg.legend(handles, labels,
+                  loc="upper center", ncol=3, frameon=False)
 
     # Speichern und Schließen
-    plt.savefig(filename, dpi=300)
+    plt.savefig(filename, dpi=600)
+    # Speichern als PDF (für die wissenschaftliche Arbeit / Vektor-Qualität)
+    plt.savefig(f"{filename}.pdf", bbox_inches='tight')
+
     print(f"Plot erfolgreich gespeichert unter: {filename}")
 
 
@@ -125,16 +137,24 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
 # Plot 1: 1D-Systeme (Einfeldträger & Durchlaufträger)
 generate_streuung_plot(
     filter_keywords='BeamSimpleSup|BeamContinuous',
-    title_text="GWP Struktur inkl. Datenstreuung für 1D-Systeme (3-12m, massiv)",
+    title_text="GWP Struktur inkl. Datenstreuung für 1D-Systeme (Bodenaufbau Standard)",
     filename="GWP_Struktur_1D_Systeme_Streuung.png"
 )
 
 # Plot 2: 2D-Systeme (Platten & Durchlaufträger als Referenz)
 generate_streuung_plot(
     filter_keywords='Slab|BeamContinuous',
-    title_text="GWP Struktur inkl. Datenstreuung für 2D-Systeme & Referenz (3-12m, massiv)",
+    title_text="GWP Struktur inkl. Datenstreuung für 2D-Systeme & Referenz (Bodenaufbau Standard)",
     filename="GWP_Struktur_2D_Systeme_Streuung.png"
 )
+
+# Plot 3: Alle Systeme (Platten & Durchlaufträger als Referenz)
+generate_streuung_plot(
+    filter_keywords='Slab|Beam',
+    title_text="GWP Struktur inkl. Datenstreuung für 2D-Systeme & Referenz (Bodenaufbau Standard)",
+    filename="GWP_Struktur_Alle_Systeme_Streuung.png"
+)
+
 
 # Plots anzeigen
 plt.show()
