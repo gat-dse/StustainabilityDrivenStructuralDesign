@@ -162,7 +162,7 @@ inquiry = ("""
         SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
         WHERE DENSITY IS NOT NULL
         AND "MATERIAL" LIKE '%Structural_steel_profile%'
-        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+        AND "MECH_PROP" LIKE '%S355%'
         AND ValidEPD = 1
         AND Man_Ausschluss = 1 """
            )
@@ -183,7 +183,7 @@ print(dfSteel["MECH_PROP"])
 inquiry = (""" 
         SELECT PRO_ID, DENSITY, Total_GWP, Total_GWP_m3, MECH_PROP, PRODUCT_NAME FROM products
         WHERE "MATERIAL" LIKE '%prestressing steel%'
-        AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+        AND "MECH_PROP" LIKE '%Y1860%'
         AND ValidEPD = 1
         AND Man_Ausschluss = 1 """
            )
@@ -204,23 +204,23 @@ def print_stats(df, name):
     print(f"\nStatistik für {name}:")
 
     # Mittelwert
-    mean_gwp = df["Total_GWP"].median()
-    mean_gwp_m3 = df["Total_GWP_m3"].median()
+    mean_gwp = df["Total_GWP"].mean()
+    mean_gwp_m3 = df["Total_GWP_m3"].mean()
 
     # Quantile
-    q10_gwp = df["Total_GWP"].min()
-    q90_gwp = df["Total_GWP"].max()
+    q10_gwp = df["Total_GWP"].quantile(0.10)
+    q90_gwp = df["Total_GWP"].quantile(0.90)
 
-    q10_gwp_m3 = df["Total_GWP_m3"].min()
-    q90_gwp_m3 = df["Total_GWP_m3"].max()
+    q10_gwp_m3 = df["Total_GWP_m3"].quantile(0.10)
+    q90_gwp_m3 = df["Total_GWP_m3"].quantile(0.90)
 
     print("Total_GWP:")
-    print(f"  Median: {mean_gwp}")
+    print(f"  Mittelwert: {mean_gwp}")
     print(f"  10%-Quantil: {q10_gwp}")
     print(f"  90%-Quantil: {q90_gwp}")
 
     print("Total_GWP_m3:")
-    print(f"  Median: {mean_gwp_m3}")
+    print(f"  Mittelwert: {mean_gwp_m3}")
     print(f"  10%-Quantil: {q10_gwp_m3}")
     print(f"  90%-Quantil: {q90_gwp_m3}")
 

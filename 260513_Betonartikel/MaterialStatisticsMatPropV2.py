@@ -350,6 +350,12 @@ df_mat = df_mat.rename(columns={
 })
 
 
+# Liste der betroffenen Materialien
+target = ["C20/25", "C25/30", "C30/37"]
+
+df_mat.loc[df_mat["MECH_PROP"].isin(target), "ftd"] = 0
+
+
 #mergen
 def add_material_properties(df, df_mat):
     return df.merge(df_mat, on="MECH_PROP", how="left")
@@ -435,28 +441,28 @@ y_positions = {
 # ----------------------------------------
 # Plot-Funktion
 # ----------------------------------------
-def plot_data(ax, x_col):
+def plot_data(ax, x_col, factor = 1.0):
     # Beton
 
-    ax.scatter(dfC2025[x_col], np.full(len(dfC2025), y_positions["C20/25 (#2)"]), color="lightgreen")
-    ax.scatter(dfC2530[x_col], np.full(len(dfC2530), y_positions["C25/30 (#8)"]), color="green")
-    ax.scatter(dfC3037[x_col], np.full(len(dfC3037), y_positions["C30/37 (#23)"]), color="darkgreen")
-    # plt.scatter(dfC3037[x_col], jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")6
+    ax.scatter(dfC2025[x_col] * factor, np.full(len(dfC2025), y_positions["C20/25 (#2)"]), color="lightgreen")
+    ax.scatter(dfC2530[x_col] * factor, np.full(len(dfC2530), y_positions["C25/30 (#8)"]), color="green")
+    ax.scatter(dfC3037[x_col] * factor, np.full(len(dfC3037), y_positions["C30/37 (#23)"]), color="darkgreen")
+    # plt.scatter(dfC3037[x_col] * factor, jitter(y_positions["Hochbaubeton"], len(dfC3037)), color="darkgreen")6
 
     # Holz
-    ax.scatter(dfCLT[x_col], np.full(len(dfCLT), y_positions["BSP (#24)"]), color="red")
-    ax.scatter(dfKVH[x_col], np.full(len(dfKVH), y_positions["KVH (#5)"]), color="darkorange")
-    ax.scatter(dfBSH[x_col], np.full(len(dfBSH), y_positions["BSH (#8)"]), color="orange")
+    ax.scatter(dfCLT[x_col] * factor, np.full(len(dfCLT), y_positions["BSP (#24)"]), color="red")
+    ax.scatter(dfKVH[x_col] * factor, np.full(len(dfKVH), y_positions["KVH (#5)"]), color="darkorange")
+    ax.scatter(dfBSH[x_col] * factor, np.full(len(dfBSH), y_positions["BSH (#8)"]), color="orange")
 
     # Stahl
-    ax.scatter(dfB500B[x_col], np.full(len(dfB500B), y_positions["B500B (#11)"]), color="lightblue")
-    ax.scatter(dfRebar[x_col], np.full(len(dfRebar), y_positions["andere BSt (#6)"]), color="blue")
+    ax.scatter(dfB500B[x_col] * factor, np.full(len(dfB500B), y_positions["B500B (#11)"]), color="lightblue")
+    ax.scatter(dfRebar[x_col] * factor, np.full(len(dfRebar), y_positions["andere BSt (#6)"]), color="blue")
 
     # Baustahl
-    ax.scatter(dfSteel[x_col], np.full(len(dfSteel), y_positions["Baustahl (#22)"]), color="darkblue")
+    ax.scatter(dfSteel[x_col] * factor, np.full(len(dfSteel), y_positions["Baustahl (#22)"]), color="darkblue")
 
     # Spannstahl
-    ax.scatter(dfPosttension[x_col], np.full(len(dfPosttension), y_positions["Spannstahl (#2)"]), color="grey")
+    ax.scatter(dfPosttension[x_col] * factor, np.full(len(dfPosttension), y_positions["Spannstahl (#2)"]), color="grey")
 
     # Linien
     ax.axhline(12, linestyle="--", color="grey")
@@ -492,22 +498,23 @@ for ax in axes.flatten():
 # ----------------------------------------
 # Subplot 1: GWP / fcd
 # ----------------------------------------
-plot_data(axes[0, 0], "GWP_fcd")
-axes[0, 0].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
+factor = 1e6  # N/m² → MPa
+plot_data(axes[0, 0], "GWP_fcd", factor)
+axes[0, 0].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq $\cdot$ t$^{-1}$ / MPa]")
 #axes[0, 0].set_title("Normierung mit fcd")
 
 # ----------------------------------------
 # Subplot 2: GWP / ftd
 # ----------------------------------------
-plot_data(axes[1, 0], "GWP_ftd")
-axes[1, 0].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[1, 0], "GWP_ftd", factor)
+axes[1, 0].set_xlabel(r"GWP / ${f_{ct}}$ [kg CO₂-eq $\cdot$ t$^{-1}$ / MPa]")
 #axes[0, 1].set_title("Normierung mit ftd")
 
 # ----------------------------------------
 # Subplot 3: GWP / E-Modul
 # ----------------------------------------
-plot_data(axes[2, 0], "GWP_E")
-axes[2, 0].set_xlabel(r"GWP / $E$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[2, 0], "GWP_E", 1e9)
+axes[2, 0].set_xlabel(r"GWP / $E$ [kg CO₂-eq $\cdot$ t$^{-1}$ / GPa]")
 #axes[1, 0].set_title("Normierung mit E-Modul")
 
 
@@ -515,22 +522,22 @@ axes[2, 0].set_xlabel(r"GWP / $E$ [kg CO₂-eq / t $\cdot$ N$\cdot$ m$^2$]")
 # ----------------------------------------
 # Subplot 1: GWP / fcd
 # ----------------------------------------
-plot_data(axes[0, 1], "GWP_fcd_m3")
-axes[0, 1].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[0, 1], "GWP_fcd_m3", factor)
+axes[0, 1].set_xlabel(r"GWP / ${f_{cd}}$ [kg CO₂-eq $\cdot$ m$^{-3}$ / MPa)]")
 #axes[0, 0].set_title("Normierung mit fcd")
 
 # ----------------------------------------
 # Subplot 2: GWP / ftd
 # ----------------------------------------
-plot_data(axes[1, 1], "GWP_ftd_m3")
-axes[1, 1].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[1, 1], "GWP_ftd_m3", factor)
+axes[1, 1].set_xlabel(r"GWP / ${f_{td}}$ [kg CO₂-eq $\cdot$ m$^{-3}$ / MPa]")
 #axes[0, 1].set_title("Normierung mit ftd")
 
 # ----------------------------------------
 # Subplot 3: GWP / E-Modul
 # ----------------------------------------
-plot_data(axes[2, 1], "GWP_E_m3")
-axes[2, 1].set_xlabel(r"GWP / $E$ [kg CO₂-eq / m³ $\cdot$ N$\cdot$ m$^2$]")
+plot_data(axes[2, 1], "GWP_E_m3",1e9)
+axes[2, 1].set_xlabel(r"GWP / $E$ [kg CO₂-eq $\cdot$ m$^{-3}$ / GPa]")
 #axes[1, 0].set_title("Normierung mit E-Modul")
 
 def add_label(ax, label):
@@ -546,14 +553,14 @@ add_label(axes[1, 0], "c)")
 add_label(axes[1, 1], "d)")
 add_label(axes[2, 0], "e)")
 add_label(axes[2, 1], "f)")
-
+"""
 #scientific numbers
 for ax in axes.flatten():
     formatter = ScalarFormatter(useMathText=True)
     formatter.set_scientific(True)
     formatter.set_powerlimits((0, 0))
     ax.xaxis.set_major_formatter(formatter)
-
+"""
 
 # ----------------------------------------
 # Layout
