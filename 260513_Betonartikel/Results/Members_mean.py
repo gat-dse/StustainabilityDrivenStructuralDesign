@@ -3,8 +3,8 @@ import pandas as pd
 # ==============================================================================
 # CONFIGURATION & FILE HANDLING
 # ==============================================================================
-input_file = "260611_1515_Members.xlsx"
-output_file = "260611_1515_Members_Mean.xlsx"
+input_file = "260625_1654_Members.xlsx"
+output_file = "260625_1654_Members_Mean.xlsx"
 
 print(f"Lese Master-Datenbank ein: {input_file}")
 df = pd.read_excel(input_file)

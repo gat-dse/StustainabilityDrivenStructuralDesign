@@ -84,16 +84,16 @@ def get_marker_type(label):
 
 
 legend_label_mapping = {
-    'BeamContinuousSupEl_rc_rec_Schuettung': 'Durchlaufträger, Rechteck (+ Schüttung)',
-    'BeamContinuousSupEl_rc_rec_massiv': 'Durchlaufträger, Rechteck',
-    'BeamSimpleSup_rc_rec_Schuettung': 'Einfeldträger, Rechteck (+ Schüttung)',
-    'BeamSimpleSup_rc_rec_massiv': 'Einfeldträger, Rechteck',
-    'BeamSimpleSup_rc_rib_Schuettung': 'Einfeldträger, Plattenbalken (+ Schüttung)',
-    'BeamSimpleSup_rc_rib_massiv': 'Einfeldträger, Plattenbalken',
-    'Slab_LL-eingespannt_rc_rec_Schuettung': 'Platte, eingespannt (+ Schüttung)',
-    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte, eingespannt',
-    'Slab_LL-frei_rc_rec_Schuettung': 'Platte, frei aufliegend (+ Schüttung)',
-    'Slab_LL-frei_rc_rec_massiv': 'Platte, frei aufliegend'
+    'BeamContinuousSupEl_rc_rec_massiv': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'BeamContinuousSupEl_rc_rec_Schuettung': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau + Schüttung)',
+    'BeamSimpleSup_rc_rec_massiv': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_Schuettung': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau + Schüttung)',
+    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_Schuettung': 'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau + Schüttung)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_Schuettung': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau + Schüttung)',
+    'Slab_LL-frei_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_Schuettung': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau + Schüttung)'
 }
 
 

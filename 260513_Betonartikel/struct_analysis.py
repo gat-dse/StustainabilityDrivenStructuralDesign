@@ -1384,7 +1384,7 @@ class Slab:
         self.ly = length_y
         self.li_max = max(length_x, length_y)
         self.l_tot = max(length_x, length_y)
-        conn = sqlite3.connect("slab_properties.db")
+        conn = sqlite3.connect("260625_slab_properties.db")
         cursor = conn.cursor()
         # get mechanical properties from database
         result = cursor.execute(

@@ -58,12 +58,12 @@ marker_mapping = {
 }
 
 legend_label_mapping = {
-    'BeamContinuousSupEl_rc_rec_massiv': 'Plattenstreifen, eingespannt\n(Standardaufbau)',
-    'BeamSimpleSup_rc_rec_massiv': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau)',
-    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte liniengelagert, eingespannt\n(Standardaufbau)',
-    'Slab_LL-frei_rc_rec_massiv': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau)',
-    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, frei aufgelegt\n(Standardaufbau)'
-    }
+    'BeamContinuousSupEl_rc_rec_massiv': 'Vollplatte, einachsig tragend,\ndurchlaufend (Standardaufbau)',
+    'BeamSimpleSup_rc_rec_massiv': 'Vollplatte, einachsig tragend,\neinfach gelagert (Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Vollplatte, zweiachsig tragend,\ndurchlaufend (Standardaufbau)',
+    'Slab_LL-frei_rc_rec_massiv': 'Vollplatte, zweiachsig tragend,\neinfach gelagert (Standardaufbau)',
+    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, einachsig tragend,\neinfach gelagert (Standardaufbau)'
+}
 
 L_WIDTH_GLOBAL = 1.0
 M_SIZE_GLOBAL = 4.0
@@ -117,10 +117,25 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
 
     apply_clean_grid(ax)
 
-    # Legende im unteren Slot zentrieren (mehrspaltig falls nötig)
+    # Legenden-Logik (Dubletten entfernen & sortieren)
     handles, labels = ax.get_legend_handles_labels()
-    ax_leg.legend(handles, labels,
-                  loc="upper center", ncol=3, frameon=False)
+    unique_dict = {l: h for h, l in zip(handles, labels)}
+
+    wunsch_reihenfolge = [
+        'Vollplatte, einachsig tragend,\neinfach gelagert (Standardaufbau)',
+        'Vollplatte, einachsig tragend,\ndurchlaufend (Standardaufbau)',
+        'Vollplatte, zweiachsig tragend,\neinfach gelagert (Standardaufbau)',
+        'Vollplatte, zweiachsig tragend,\ndurchlaufend (Standardaufbau)',
+        'Plattenbalken, einachsig tragend,\neinfach gelagert (Standardaufbau)'
+    ]
+
+    ordered_handles = [unique_dict[l] for l in wunsch_reihenfolge if l in unique_dict]
+    ordered_labels = [l for l in wunsch_reihenfolge if l in unique_dict]
+
+    ax_leg.legend(ordered_handles, ordered_labels, loc="upper center", ncol=3,
+                  frameon=False, handletextpad=0.5, columnspacing=1.0)
+
+
 
     # Speichern und Schließen
     plt.savefig(filename, dpi=600)

@@ -43,7 +43,7 @@ df_grouped = df_filtered.groupby([x_achse, kategorie_1], as_index=False)[[y_stru
 farb_mapping = {
     'BeamContinuousSupEl_rc_rec_massiv': '#000000',
     'BeamSimpleSup_rc_rec_massiv': '#2ca02c',
-    'BeamSimpleSup_rc_rib_massiv': '#9370db',
+    'BeamSimpleSup_rc_rib_massiv': '#d8bfd8',
     'Slab_LL-eingespannt_rc_rec_massiv': '#ffa042',
     'Slab_LL-frei_rc_rec_massiv': '#8b0000'
 }
@@ -57,11 +57,11 @@ marker_mapping = {
 }
 
 legend_label_mapping = {
-    'BeamContinuousSupEl_rc_rec_massiv': 'Plattenstreifen, eingespannt\n(Standardaufbau)',
-    'BeamSimpleSup_rc_rec_massiv': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau)',
-    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte liniengelagert, eingespannt\n(Standardaufbau)',
-    'Slab_LL-frei_rc_rec_massiv': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau)',
-    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, frei aufgelegt\n(Standardaufbau)'
+    'BeamContinuousSupEl_rc_rec_massiv': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_massiv': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau)'
 }
 
 # ==============================================================================
@@ -88,13 +88,13 @@ for label, g in df_grouped.groupby(kategorie_1):
 
     # Flanschhöhe für Plattenbalken
     if 'rib' in label:
-        ax.plot(g[x_achse], g['h_f [m]'], color='#d8bfd8',
-                linestyle='-', linewidth=1.0, label='Plattenbalken, frei aufgelegt\n(Standardaufbau), Flanschhöhe')
+        ax.plot(g[x_achse], g['h_f [m]'], color='#9370db',
+                linestyle='-', linewidth=1.0, label='Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau), Flanschhöhe')
 
 # Schallschutz-Referenz
 h_schallschutz = 0.24
 ax.axhline(y=h_schallschutz, color='#d32f2f', linestyle='--', linewidth=1.2,
-           label='Mindeststärke Schallschutz für erhöhte\nAnforderungen (24 cm)')
+           label='Mindeststärke für erhöhte\nSchallschutzanforderungen (24 cm)')
 
 # Achsen-Design
 ax.set_ylim(bottom=0)
@@ -110,14 +110,15 @@ handles, labels = ax.get_legend_handles_labels()
 unique_dict = {l: h for h, l in zip(handles, labels)}
 
 wunsch_reihenfolge = [
-    'Plattenstreifen, eingespannt\n(Standardaufbau)',
-    'Plattenstreifen, frei aufgelegt\n(Standardaufbau)',
-    'Mindeststärke Schallschutz für erhöhte\nAnforderungen (24 cm)',
-    'Platte liniengelagert, eingespannt\n(Standardaufbau)',
-    'Platte liniengelagert, frei aufgelegt\n(Standardaufbau)',
-    'Plattenbalken, frei aufgelegt\n(Standardaufbau)',
-    'Plattenbalken, frei aufgelegt\n(Standardaufbau), Flanschhöhe'
+    'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Mindeststärke für erhöhte\nSchallschutzanforderungen (24 cm)',
+    'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau), Flanschhöhe'
 ]
+
 
 ordered_handles = [unique_dict[l] for l in wunsch_reihenfolge if l in unique_dict]
 ordered_labels = [l for l in wunsch_reihenfolge if l in unique_dict]

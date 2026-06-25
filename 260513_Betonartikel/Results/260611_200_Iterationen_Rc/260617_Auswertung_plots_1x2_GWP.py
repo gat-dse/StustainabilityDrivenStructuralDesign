@@ -65,16 +65,16 @@ def get_marker_type(label): return '^' if 'Slab' in str(label) else 'o'
 
 
 legend_label_mapping = {
-    'BeamContinuousSupEl_rc_rec_massiv': 'Plattenstreifen, eingespannt\n(Standardaufbau)',
-    'BeamContinuousSupEl_rc_rec_Schuettung': 'Plattenstreifen, eingespannt\n(Standardaufbau + Schüttung)',
-    'BeamSimpleSup_rc_rec_massiv': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau)',
-    'BeamSimpleSup_rc_rec_Schuettung': 'Plattenstreifen, frei aufgelegt\n(Standardaufbau + Schüttung)',
-    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, frei aufgelegt\n(Standardaufbau)',
-    'BeamSimpleSup_rc_rib_Schuettung': 'Plattenbalken, frei aufgelegt\n(Standardaufbau + Schüttung)',
-    'Slab_LL-eingespannt_rc_rec_massiv': 'Platte liniengelagert, eingespannt\n(Standardaufbau)',
-    'Slab_LL-eingespannt_rc_rec_Schuettung': 'Platte liniengelagert, eingespannt\n(Standardaufbau + Schüttung)',
-    'Slab_LL-frei_rc_rec_massiv': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau)',
-    'Slab_LL-frei_rc_rec_Schuettung': 'Platte liniengelagert, frei aufgelegt\n(Standardaufbau + Schüttung)'
+    'BeamContinuousSupEl_rc_rec_massiv': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'BeamContinuousSupEl_rc_rec_Schuettung': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau + Schüttung)',
+    'BeamSimpleSup_rc_rec_massiv': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_Schuettung': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau + Schüttung)',
+    'BeamSimpleSup_rc_rib_massiv': 'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_Schuettung': 'Plattenbalken, einachsig tragend, einfach gelagert\n(Standardaufbau + Schüttung)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_Schuettung': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau + Schüttung)',
+    'Slab_LL-frei_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_Schuettung': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau + Schüttung)'
 }
 
 
