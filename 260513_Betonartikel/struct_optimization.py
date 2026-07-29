@@ -3,7 +3,7 @@ import struct_analysis
 from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion aus dem SyiPy-Paket
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
-
+import optuna
 
 
 class RandomDisplacementBounds(object):
@@ -47,7 +47,7 @@ bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, databa
 # ----------------------------------------------------------------------------------------------------------------------
 # OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 # .......................................................................................................................
-def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
+def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="basinhoppin"):
     # Definition des stabilen, spanweitenabhängigen Startwerts L/25
     l0 = m.li_max
     h0 = l0 / 25
@@ -58,113 +58,406 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
     # Dann wird mit fixem h die Bewehrung über der Stütze optimiert
     # =========================================================================
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
-        # --- STUFE 1: Erst Geometrie (h) und Feldbewehrung (di_xu) im Feld optimieren ---
-        optimise_stufe1 = "feld"
 
-        # Statisch solider Schätzwert für die Stütze, gekoppelt an die Spannweite
-        di_xo_schätzwert = max(0.012, min(0.032, 0.008 + (l0 - 4.0) * 0.002))
-        di_xu0 = m.section.bw[0][0]
+        if alg == "basinhoppin":
+            print("basinhoppin")
+            # --- STUFE 1: Erst Geometrie (h) und Feldbewehrung (di_xu) im Feld optimieren ---
+            optimise_stufe1 = "feld"
 
-        var0_stufe1 = [h0, di_xu0]
+            # Statisch solider Schätzwert für die Stütze, gekoppelt an die Spannweite
+            di_xo_schätzwert = max(0.012, min(0.032, 0.008 + (l0 - 4.0) * 0.002))
+            di_xu0 = m.section.bw[0][0]
 
+            var0_stufe1 = [h0, di_xu0]
 
-        if m.floorstruc.name == 'massiv':
-            h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) # h_max_dynamisch)
+            if m.floorstruc.name == 'massiv':
+                h_min_schall = 0.16
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
 
-        elif m.floorstruc.name == 'Schuettung':
-            h_min_schall = 0.13
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8) # h_max_dynamisch)
+            elif m.floorstruc.name == 'Schuettung':
+                h_min_schall = 0.13
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
 
-        else:
-            bh = (max(0.08, m.section.hmin_c), 0.8) # h_max_dynamisch)
+            else:
+                bh = (max(0.08, m.section.hmin_c), 0.8)  # h_max_dynamisch)
 
+            bdi_xu = (
+            max(0.008, m.section.di_xu_min), 0.04)  # Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
+            bounds_stufe1 = [bh, bdi_xu]
 
-        bdi_xu = (max(0.008, m.section.di_xu_min), 0.04) #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
-        bounds_stufe1 = [bh, bdi_xu]
-
-        # Fixe Werte aus dem Querschnitt auslesen
-        b = m.section.b
-        s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
-        di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-        co, st = m.section.concrete_type, m.section.rebar_type
-
-
-        # Übergabe-Argumente für Stufe 1
-        add_arg_stufe1 = [m.system, co, st, b, s_xu, di_xo_schätzwert, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
+            # Fixe Werte aus dem Querschnitt auslesen
+            b = m.section.b
+            s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
+            di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
+            di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+            phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+            co, st = m.section.concrete_type, m.section.rebar_type
+            # Übergabe-Argumente für Stufe 1
+            add_arg_stufe1 = [m.system, co, st, b, s_xu, di_xo_schätzwert, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
                           m.requirements, to_opt, criterion, m.g2k, m.qk, optimise_stufe1]
 
-        bounded_step_1 = RandomDisplacementBounds(np.array([b[0] for b in bounds_stufe1]),
+            bounded_step_1 = RandomDisplacementBounds(np.array([b[0] for b in bounds_stufe1]),
                                                   np.array([b[1] for b in bounds_stufe1]))
 
-        # T=0.1 zwingt das Basinhopping, nahe an der physikalisch sinnvollen Vordimensionierung zu suchen
-        opt_1 = basinhopping(rc_rqs, var0_stufe1, niter=max_iter, T=0.1,
+            # T=0.1 zwingt das Basinhopping, nahe an der physikalisch sinnvollen Vordimensionierung zu suchen
+            opt_1 = basinhopping(rc_rqs, var0_stufe1, niter=max_iter, T=0.1,
                              minimizer_kwargs={"args": (add_arg_stufe1,), "bounds": bounds_stufe1, "method": "Powell"},
                              take_step=bounded_step_1)
 
-        h_opt, di_xu_opt = opt_1.x
+            h_opt, di_xu_opt = opt_1.x
 
-        # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Stützenbewehrung (di_xo) ermitteln ---
-        optimise_stufe2 = "stuetze_fix_h"
-        var0_stufe2 = [di_xo_schätzwert]
-        bounds_stufe2 = [(max(0.008, m.section.di_xo_min), 0.04)] #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
+            # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Stützenbewehrung (di_xo) ermitteln ---
+            optimise_stufe2 = "stuetze_fix_h"
+            var0_stufe2 = [di_xo_schätzwert]
+            bounds_stufe2 = [(max(0.008, m.section.di_xo_min), 0.04)] #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
 
-        add_arg_stufe2 = [m.system, co, st, b, s_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
+            add_arg_stufe2 = [m.system, co, st, b, s_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc,
                           m.requirements, to_opt, criterion, m.g2k, m.qk, h_opt, di_xu_opt, optimise_stufe2]
 
-        bounded_step_2 = RandomDisplacementBounds(np.array([b[0] for b in bounds_stufe2]),
+            bounded_step_2 = RandomDisplacementBounds(np.array([b[0] for b in bounds_stufe2]),
                                                   np.array([b[1] for b in bounds_stufe2]))
 
-        opt_2 = basinhopping(rc_rqs, var0_stufe2, niter=max_iter, T=0.1,
+            opt_2 = basinhopping(rc_rqs, var0_stufe2, niter=max_iter, T=0.1,
                              minimizer_kwargs={"args": (add_arg_stufe2,), "bounds": bounds_stufe2, "method": "Powell"},
                              take_step=bounded_step_2)
+            # Resultate stabil zusammenführen
+            h = h_opt
+            di_xu = di_xu_opt
+            di_xo = opt_2.x[0]
 
-        # Resultate stabil zusammenführen
-        h = h_opt
-        di_xu = di_xu_opt
-        di_xo = opt_2.x[0]
+        elif alg == "TPE":
+            print("optuna")
+            # --- STUFE 1: Erst Geometrie (h) und Feldbewehrung (di_xu) im Feld optimieren ---
+            optimise_stufe1 = "feld"
+
+            # Statisch solider Schätzwert für die Stütze, gekoppelt an die Spannweite
+            di_xo_schätzwert = max(0.012, min(0.032, 0.008 + (l0 - 4.0) * 0.002))
+            di_xu0 = m.section.bw[0][0]
+
+            if m.floorstruc.name == 'massiv':
+                h_min_schall = 0.16
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
+
+            elif m.floorstruc.name == 'Schuettung':
+                h_min_schall = 0.13
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
+
+            else:
+                bh = (max(0.08, m.section.hmin_c), 0.8)
+
+            bdi_xu = (max(0.008, m.section.di_xu_min), 0.04)
+            bounds_stufe1 = [bh, bdi_xu]
+
+            # Fixe Werte aus dem Querschnitt auslesen
+            b = m.section.b
+            s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
+            di_yu, s_yu = m.section.bw[2][0], m.section.bw[2][1]
+            di_yo, s_yo = m.section.bw[3][0], m.section.bw[3][1]
+            di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+            phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+            co, st = m.section.concrete_type, m.section.rebar_type
+
+            add_arg_stufe1 = [
+                m.system, co, st, b,
+                s_xu, di_xo_schätzwert, s_xo,
+                di_yu, s_yu, di_yo, s_yo,
+                m.floorstruc, m.requirements,
+                to_opt, criterion,
+                m.g2k, m.qk,
+                optimise_stufe1
+            ]
+
+            # Zulässige Durchmesser filtern
+            BEWEHRUNG_D = [
+                0.006, 0.008, 0.010, 0.012, 0.014,
+                0.016, 0.018, 0.020, 0.022,
+                0.026, 0.030, 0.034, 0.040
+            ]
+            ABSTAENDE = [
+                0.040, 0.050, 0.075, 0.083, 0.091,
+                0.100, 0.111, 0.120, 0.125,
+                0.143, 0.150, 0.167,
+                0.200, 0.250, 0.300
+            ]
+
+            di_xu_kandidaten = [
+                d for d in BEWEHRUNG_D
+                if bounds_stufe1[1][0] <= d <= bounds_stufe1[1][1]
+            ]
+
+            def objective_stufe1(trial):
+
+                h = trial.suggest_float(
+                    "h",
+                    bounds_stufe1[0][0],
+                    bounds_stufe1[0][1],
+                    step=0.01
+                )
+
+                di_xu = trial.suggest_categorical(
+                    "di_xu",
+                    di_xu_kandidaten
+                )
+
+                s_xu = trial.suggest_categorical(
+                    "s_xu",
+                    ABSTAENDE
+                )
+
+                try:
+                    return rc_rqs([h, di_xu, s_xu], add_arg_stufe1, alg)
+                except Exception:
+                    return 1e20
+
+            study1 = optuna.create_study(
+                direction="minimize",
+                sampler=optuna.samplers.TPESampler(
+                    seed=42,
+                    multivariate=True
+                )
+            )
+
+            # Startpunkt wie beim Basinhopping
+            study1.enqueue_trial({
+                "h": round(h0 / 0.01) * 0.01,
+                "di_xu": min(di_xu_kandidaten, key=lambda d: abs(d - di_xu0)),
+                "s_xu": s_xu
+            })
+
+            study1.optimize(
+                objective_stufe1,
+                n_trials=max_iter
+            )
+
+            h_opt = study1.best_params["h"]
+            di_xu_opt = study1.best_params["di_xu"]
+            s_xu_opt = study1.best_params["s_xu"]
+
+            # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Stützenbewehrung (di_xo) ermitteln ---
+            optimise_stufe2 = "stuetze_fix_h"
+
+            bounds_stufe2 = [
+                (max(0.008, m.section.di_xo_min), 0.04)
+            ]
+
+            add_arg_stufe2 = [
+                m.system, co, st, b,
+                s_xu_opt, s_xo,
+                di_yu, s_yu,
+                di_yo, s_yo,
+                m.floorstruc,
+                m.requirements,
+                to_opt, criterion,
+                m.g2k, m.qk,
+                h_opt, di_xu_opt,
+                optimise_stufe2
+            ]
+
+            di_xo_kandidaten = [
+                d for d in BEWEHRUNG_D
+                if bounds_stufe2[0][0] <= d <= bounds_stufe2[0][1]
+            ]
+
+            def objective_stufe2(trial):
+
+                di_xo = trial.suggest_categorical(
+                    "di_xo",
+                    di_xo_kandidaten
+                )
+
+                s_xo = trial.suggest_categorical(
+                    "s_xo",
+                    ABSTAENDE
+                )
+
+                try:
+                    return rc_rqs([di_xo, s_xo], add_arg_stufe2, alg)
+                except Exception:
+                    return 1e20
+
+            study2 = optuna.create_study(
+                direction="minimize",
+                sampler=optuna.samplers.TPESampler(
+                    seed=42,
+                    multivariate=True
+                )
+            )
+
+            # Startwerte
+            study2.enqueue_trial({
+                "di_xo": min(
+                    di_xo_kandidaten,
+                    key=lambda d: abs(d - di_xo_schätzwert)
+                ),
+                "s_xo": s_xo
+            })
+
+            study2.optimize(
+                objective_stufe2,
+                n_trials=max_iter
+            )
+
+            #Ergebnisse auslesen:
+            di_xo_opt = study2.best_params["di_xo"]
+            s_xo_opt = study2.best_params["s_xo"]
+
+            # Resultate stabil zusammenführen
+            h = h_opt
+            di_xu = di_xu_opt
+            s_xu = s_xu_opt
+
+            di_xo = di_xo_opt
+            s_xo = s_xo_opt
+
+        else:
+            print("Algorithm not defined")
+
+
 
     # =========================================================================
     # FALL 2: SIMPLE BEAM / EINFELDTRÄGER
     # =========================================================================
     else:
-        optimise = "unten"
-        di_xu0 = m.section.bw[0][0]
-        var0 = [h0, di_xu0]
+        if alg == "basinhoppin":
+            optimise = "unten"
+            di_xu0 = m.section.bw[0][0]
+            var0 = [h0, di_xu0]
 
-        if m.floorstruc.name == 'massiv':
-            h_min_schall = 0.16
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+            if m.floorstruc.name == 'massiv':
+                h_min_schall = 0.16
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
 
-        elif m.floorstruc.name == 'Schuettung':
-            h_min_schall = 0.13
-            bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
+            elif m.floorstruc.name == 'Schuettung':
+                h_min_schall = 0.13
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)  # h_max_dynamisch)
 
-        else:
-            bh = (max(0.08, m.section.hmin_c), 0.8)  # h_max_dynamisch)
+            else:
+                bh = (max(0.08, m.section.hmin_c), 0.8)  # h_max_dynamisch)
 
-        bdi_xu = (max(0.008, m.section.di_xu_min), 0.04) #Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
-        bounds = [bh, bdi_xu]
+            bdi_xu = (
+            max(0.008, m.section.di_xu_min), 0.04)  # Durchmesser muss immer jeweils der Mindestbewehrung entsprechen
+            bounds = [bh, bdi_xu]
 
-        # Fixe Werte aus dem Querschnitt auslesen
-        b = m.section.b
-        s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
-        di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0] , m.section.bw[3][1]
-        di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
-        phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
-        co, st = m.section.concrete_type, m.section.rebar_type
+            # Fixe Werte aus dem Querschnitt auslesen
+            b = m.section.b
+            s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
+            di_yu, s_yu, di_yo, s_yo = m.section.bw[2][0], m.section.bw[2][1], m.section.bw[3][0], m.section.bw[3][1]
+            di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+            phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+            co, st = m.section.concrete_type, m.section.rebar_type
 
-        add_arg = [m.system, co, st, b, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements,
-                   to_opt, criterion, m.g2k, m.qk, optimise]
+            add_arg = [m.system, co, st, b, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements,
+                       to_opt, criterion, m.g2k, m.qk, optimise]
 
-        bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-        opt = basinhopping(rc_rqs, var0, niter=max_iter, T=0.1,
-                           minimizer_kwargs={"args": (add_arg,), "bounds": bounds, "method": "Powell"},
-                           take_step=bounded_step)
+            bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
+            opt = basinhopping(rc_rqs, var0, niter=max_iter, T=0.1,
+                               minimizer_kwargs={"args": (add_arg,), "bounds": bounds, "method": "Powell"},
+                               take_step=bounded_step)
 
-        h, di_xu = opt.x
+            h, di_xu = opt.x
+
+        elif alg == "TPE":
+            optimise = "unten"
+            di_xu0 = m.section.bw[0][0]
+
+            if m.floorstruc.name == 'massiv':
+                h_min_schall = 0.16
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
+
+            elif m.floorstruc.name == 'Schuettung':
+                h_min_schall = 0.13
+                bh = (max(0.08, m.section.hmin_c, h_min_schall), 0.8)
+
+            else:
+                bh = (max(0.08, m.section.hmin_c), 0.8)
+
+            bdi_xu = (max(0.008, m.section.di_xu_min), 0.04)
+
+            bounds = [bh, bdi_xu]
+
+            # Fixe Werte aus dem Querschnitt auslesen
+            b = m.section.b
+            s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
+            di_yu, s_yu = m.section.bw[2][0], m.section.bw[2][1]
+            di_yo, s_yo = m.section.bw[3][0], m.section.bw[3][1]
+            di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
+            phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
+            co, st = m.section.concrete_type, m.section.rebar_type
+
+            add_arg = [
+                m.system, co, st, b,
+                s_xu, di_xo, s_xo,
+                di_yu, s_yu,
+                di_yo, s_yo,
+                m.floorstruc, m.requirements,
+                to_opt, criterion,
+                m.g2k, m.qk,
+                optimise
+            ]
+
+            BEWEHRUNG_D = [
+                0.006, 0.008, 0.010, 0.012, 0.014,
+                0.016, 0.018, 0.020, 0.022,
+                0.026, 0.030, 0.034, 0.040
+            ]
+
+            ABSTAENDE = [
+                0.040, 0.050, 0.075, 0.083, 0.091,
+                0.100, 0.111, 0.120, 0.125,
+                0.143, 0.150, 0.167,
+                0.200, 0.250, 0.300
+            ]
+
+            di_xu_kandidaten = [
+                d for d in BEWEHRUNG_D
+                if bounds[1][0] <= d <= bounds[1][1]
+            ]
+
+            def objective(trial):
+
+                h = trial.suggest_float(
+                    "h",
+                    bounds[0][0],
+                    bounds[0][1],
+                    step=0.01
+                )
+
+                di_xu = trial.suggest_categorical(
+                    "di_xu",
+                    di_xu_kandidaten
+                )
+
+                s_xu = trial.suggest_categorical(
+                    "s_xu",
+                    ABSTAENDE
+                )
+
+                try:
+                    return rc_rqs([h, di_xu, s_xu], add_arg, alg)
+                except Exception:
+                    return 1e20
+
+            study = optuna.create_study(
+                direction="minimize",
+                sampler=optuna.samplers.TPESampler(seed=42)
+            )
+
+            study.enqueue_trial({
+                "h": round(h0 / 0.01) * 0.01,
+                "di_xu": min(di_xu_kandidaten, key=lambda d: abs(d - di_xu0)),
+                "s_xu": s_xu
+            })
+
+            study.optimize(
+                objective,
+                n_trials=max_iter
+            )
+
+            h = study.best_params["h"]
+            di_xu = study.best_params["di_xu"]
+            s_xu = study.best_params["s_xu"]
+
+
 
     # Generierung des optimierten End-Querschnitts
     optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo,
@@ -229,55 +522,143 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2):
 #     return optimized_section
 
 
-# inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
-def rc_rqs(var, add_arg):
+# inner function for optimizing reinforced concrete section
+def rc_rqs(var, add_arg, alg="basinhoppin"):
+
     optimise = add_arg[-1]
 
-    # Variablenzuordnung je nach Optimierungs-Schritt
-    if optimise == "feld":
-        # Stufe 1 beim Durchlaufträger: h und di_xu veränderlich
-        h, di_xu = var
-        di_xo = add_arg[5]  # Obere Bewehrung bleibt fixiert auf Startwert
-    elif optimise == "stuetze_fix_h":
-        # Stufe 2 beim Durchlaufträger: Nur di_xo veränderlich
-        di_xo = var[0]
-        h = add_arg[-3]     # h_opt aus Stufe 1 auslesen
-        di_xu = add_arg[-2] # di_xu_opt aus Stufe 1 auslesen
-    elif optimise == "unten":
-        # Klassischer Einfeldträger: h und di_xu veränderlich
-        h, di_xu = var
-        di_xo = add_arg[5]  # Keine Stützenbewehrung benötigt
-    else:
-        h, di_xu = var[0], var[1]
-        di_xo = add_arg[5]
+    # =====================================================================
+    # BASINHOPPING
+    # =====================================================================
+    if alg == "basinhoppin":
 
-    system = add_arg[0]
-    concrete = add_arg[1]
-    reinfsteel = add_arg[2]
-    b = add_arg[3]
-    s_xu = add_arg[4]
+        if optimise == "feld":
+            h, di_xu = var
+            di_xo = add_arg[5]
 
-    # Dynamisches Entpacken der restlichen Argumente je nach Länge des add_arg-Vektors
-    if optimise == "stuetze_fix_h":
-        s_xo = add_arg[5]
-        di_yu, s_yu = add_arg[6:8]
-        di_yo, s_yo = add_arg[8:10]
-        floorstruc = add_arg[10]
-        criteria = add_arg[11]
-        to_opt = add_arg[12]
-        criterion = add_arg[13]
-        g2k = add_arg[14]
-        qk = add_arg[15]
-    else:
-        s_xo = add_arg[6]
-        di_yu, s_yu = add_arg[7:9]
-        di_yo, s_yo = add_arg[9:11]
-        floorstruc = add_arg[11]
-        criteria = add_arg[12]
-        to_opt = add_arg[13]
-        criterion = add_arg[14]
-        g2k = add_arg[15]
-        qk = add_arg[16]
+        elif optimise == "stuetze_fix_h":
+            di_xo = var[0]
+            h = add_arg[-3]
+            di_xu = add_arg[-2]
+
+        elif optimise == "unten":
+            h, di_xu = var
+            di_xo = add_arg[5]
+
+        else:
+            h, di_xu = var[0], var[1]
+            di_xo = add_arg[5]
+
+        system = add_arg[0]
+        concrete = add_arg[1]
+        reinfsteel = add_arg[2]
+        b = add_arg[3]
+        s_xu = add_arg[4]
+
+        if optimise == "stuetze_fix_h":
+            s_xo = add_arg[5]
+            di_yu, s_yu = add_arg[6:8]
+            di_yo, s_yo = add_arg[8:10]
+            floorstruc = add_arg[10]
+            criteria = add_arg[11]
+            to_opt = add_arg[12]
+            criterion = add_arg[13]
+            g2k = add_arg[14]
+            qk = add_arg[15]
+
+        else:
+            s_xo = add_arg[6]
+            di_yu, s_yu = add_arg[7:9]
+            di_yo, s_yo = add_arg[9:11]
+            floorstruc = add_arg[11]
+            criteria = add_arg[12]
+            to_opt = add_arg[13]
+            criterion = add_arg[14]
+            g2k = add_arg[15]
+            qk = add_arg[16]
+
+    # =====================================================================
+    # TPE / OPTUNA
+    # =====================================================================
+    elif alg == "TPE":
+
+        if optimise == "feld":
+
+            # Stufe 1:
+            # h, di_xu und s_xu variabel
+            h, di_xu, s_xu = var
+
+            di_xo = add_arg[5]
+            s_xo = add_arg[6]
+
+            system = add_arg[0]
+            concrete = add_arg[1]
+            reinfsteel = add_arg[2]
+            b = add_arg[3]
+
+            di_yu, s_yu = add_arg[7:9]
+            di_yo, s_yo = add_arg[9:11]
+
+            floorstruc = add_arg[11]
+            criteria = add_arg[12]
+            to_opt = add_arg[13]
+            criterion = add_arg[14]
+            g2k = add_arg[15]
+            qk = add_arg[16]
+
+        elif optimise == "stuetze_fix_h":
+
+            # Stufe 2:
+            # di_xo und s_xo variabel
+            di_xo, s_xo = var
+
+            system = add_arg[0]
+            concrete = add_arg[1]
+            reinfsteel = add_arg[2]
+            b = add_arg[3]
+
+            s_xu = add_arg[4]
+
+            di_yu, s_yu = add_arg[6:8]
+            di_yo, s_yo = add_arg[8:10]
+
+            floorstruc = add_arg[10]
+            criteria = add_arg[11]
+            to_opt = add_arg[12]
+            criterion = add_arg[13]
+            g2k = add_arg[14]
+            qk = add_arg[15]
+
+            h = add_arg[-3]
+            di_xu = add_arg[-2]
+
+        elif optimise == "unten":
+
+            # Einfeldträger:
+            # h, di_xu und s_xu variabel
+            h, di_xu, s_xu = var
+
+            system = add_arg[0]
+            concrete = add_arg[1]
+            reinfsteel = add_arg[2]
+            b = add_arg[3]
+
+            di_xo = add_arg[5]
+            s_xo = add_arg[6]
+
+            di_yu, s_yu = add_arg[7:9]
+            di_yo, s_yo = add_arg[9:11]
+
+            floorstruc = add_arg[11]
+            criteria = add_arg[12]
+            to_opt = add_arg[13]
+            criterion = add_arg[14]
+            g2k = add_arg[15]
+            qk = add_arg[16]
+
+        else:
+            raise ValueError(f"Unbekannter Optimierungsmodus: {optimise}")
+
 
     # Querschnitt erzeugen
     section = struct_analysis.RectangularConcrete(concrete, reinfsteel, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu,
@@ -332,6 +713,13 @@ def rc_rqs(var, add_arg):
     pen_a = 0
     pen_w = 0
     pen_v = 0
+
+    if isinstance(member.f1, complex):
+        print("Komplexe f1!")
+        print("h =", h)
+        print("di_xu =", di_xu)
+        print("di_xo =", di_xo)
+
     if member.f1 < member.requirements.f1:
         penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
     else:
@@ -791,11 +1179,11 @@ def wd_rib_rqs(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter):
+def get_optimized_section(member, criterion, to_opt, max_iter, alg):
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rec(member, to_opt, criterion, max_iter)
+        return opt_rc_rec(member, to_opt, criterion, max_iter, 0.2, alg)
     elif member.section.section_type == "wd_rec":
         # available criterion arguments: "ULS", "SLS1", "SLS2"
         return opt_gzt_wd_rqs(member, criterion=criterion)

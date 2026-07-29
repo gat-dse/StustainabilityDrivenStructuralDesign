@@ -18,7 +18,7 @@ from scipy.spatial import ConvexHull
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam"):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin"):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1)
@@ -251,7 +251,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                         opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
                                                                                            max_iter)
                     else:
-                        opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter)
+                        opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg)
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
                     # Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
                     # search for an alternative solution for rectangular concrete section with lower minimal h and fill in floorstructure
@@ -334,8 +334,11 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 vrfctn_members[1].append(i)
         sec_typ, mat, cri, opt, floor_name = legend[i]
         # set line color
-        if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
+        if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv" and alg == "basinhoppin":
             color = 'darkgreen'
+
+        elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv" and alg == "TPE":
+            color = 'red'
 
         elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "Schuettung":
             color = 'darkolivegreen'
@@ -345,6 +348,9 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
         elif sec_typ == "rc_rec" and system == "Simple Beam":
             color = 'darkgreen'
+
+        elif sec_typ == "rc_rec" and system == "Continuous 1D" and alg == "TPE":
+            color = 'red'
 
         elif sec_typ == "rc_rec" and system == "Continuous 1D":
             color = 'lightgreen'
