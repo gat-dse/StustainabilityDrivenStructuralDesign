@@ -337,7 +337,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv" and alg == "basinhoppin":
             color = 'darkgreen'
 
-        elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv" and alg == "TPE":
+        elif sec_typ == "rc_rec" and system == "Simple Beam" and alg == "TPE":
             color = 'red'
 
         elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "Schuettung":

@@ -8,13 +8,13 @@ import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,8,12]
+lengths = [4,12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 30
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
@@ -62,7 +62,7 @@ alg = "basinhoppin"
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section simple beam
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc,"Continuous 1D", alg )
+                                                              idx_vrc,"Simple Beam", alg )
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
@@ -70,7 +70,7 @@ alg = "TPE"
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section simple beam
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc,"Continuous 1D", alg )
+                                                              idx_vrc,"Simple Beam", alg )
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
