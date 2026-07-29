@@ -1471,7 +1471,7 @@ class Member1D:
                 #)
 
         elif self.requirements.install == "brittle": #Lastfall selten und w < L/500
-            self.w_install = unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
+            self.w_install = self.unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
                 # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
