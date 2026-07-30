@@ -6,6 +6,7 @@
 import struct_analysis  # file with code for structural analysis
 import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
+import time
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
 lengths = [8,9,10]
@@ -59,6 +60,9 @@ def max_of_arrays(existing_data, new_data):
 data_max = [0, 0, 0, 0]
 vrfctn_members = []
 
+# Start der Optimierung
+start = time.time()
+
 #-----------------------------------------------------------------------------------------------------------------------
 # CREATE AND PLOT DATASET FOR RECTANGULAR AND RIBBED WOODEN CROSS-SECTIONS
 
@@ -110,3 +114,11 @@ for idx, info in enumerate(plotted_data):
 
 # SHOW FIGURE
 plt.show()
+
+#Ende der Optimierung
+ende = time.time()
+dauer = ende - start
+
+print(f"Die Optimierung dauerte {round(dauer, 2)} Sekunden.")
+
+
