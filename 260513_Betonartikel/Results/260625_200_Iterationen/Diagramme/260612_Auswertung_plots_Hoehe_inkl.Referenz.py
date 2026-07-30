@@ -8,6 +8,9 @@ import numpy as np
 # GLOBALE EINSTELLUNGEN & DATENPREPARATION
 # ==============================================================================
 excel_file = "260625_1654_Members.xlsx"
+Sprache = 'en' #Wahl Sprache: 'en' oder 'de'
+
+
 df = pd.read_excel(excel_file)
 
 mpl.rcParams['font.family'] = 'serif'
@@ -56,13 +59,26 @@ marker_mapping = {
     'Slab_LL-frei_rc_rec_massiv': '^'
 }
 
-legend_label_mapping = {
+legend_label_mapping_EN = {
     'BeamContinuousSupEl_rc_rec_massiv': 'Solid slab, single-axis load-bearing,\ncontinuous (standard superstructure)',
     'BeamSimpleSup_rc_rec_massiv': 'Solid slab, single-axis load-bearing,\nsimply supported (standard superstructure)',
     'Slab_LL-eingespannt_rc_rec_massiv': 'Solid slab, two-axis load-bearing,\ncontinuous (standard superstructure)',
     'Slab_LL-frei_rc_rec_massiv': 'Solid slab, two-axis load-bearing,\nsimply supported (standard superstructure)',
     'BeamSimpleSup_rc_rib_massiv': 'Ribbed plate, single-axis load-bearing,\nsimply supported,\n(standard superstructure)'
 }
+
+legend_label_mapping_DE = {
+    'BeamContinuousSupEl_rc_rec_massiv': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_massiv': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_massiv': 'Rippenplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+}
+
+if Sprache == 'en':
+    legend_label_mapping = legend_label_mapping_EN
+elif Sprache == 'de':
+    legend_label_mapping = legend_label_mapping_DE
 
 # ==============================================================================
 # PLOT GENERIEREN
@@ -87,14 +103,23 @@ for label, g in df_grouped.groupby(kategorie_1):
             linestyle='-', linewidth=1.0, label=schoener_name)
 
     # Flanschhöhe für Plattenbalken
-    if 'rib' in label:
-        ax.plot(g[x_achse], g['h_f [m]'], color='#9370db',
+    if Sprache == 'en':
+        if 'rib' in label:
+            ax.plot(g[x_achse], g['h_f [m]'], color='#9370db',
                 linestyle='-', linewidth=1.0, label='Ribbed plate, single-axis load-bearing,\nsimply supported,\n(standard superstructure), flange height')
+    elif Sprache == 'de':
+        if 'rib' in label:
+            ax.plot(g[x_achse], g['h_f [m]'], color='#9370db',
+                linestyle='-', linewidth=1.0, label='Rippenplatte, einachsig tragend, einfach gelagert\n(Standardaufbau), Flanschhöhe')
 
 # Schallschutz-Referenz
 h_schallschutz = 0.24
-ax.axhline(y=h_schallschutz, color='#d32f2f', linestyle='--', linewidth=1.2,
+if Sprache == 'en':
+    ax.axhline(y=h_schallschutz, color='#d32f2f', linestyle='--', linewidth=1.2,
            label='construction height to meet higher\nsound insulation requirements (24 cm)')
+elif Sprache == 'de':
+    ax.axhline(y=h_schallschutz, color='#d32f2f', linestyle='--', linewidth=1.2,
+           label='Mindeststärke für erhöhte\nSchallschutzanforderungen (24 cm)')
 
 # Achsen-Design
 ax.set_ylim(bottom=0)
@@ -102,14 +127,17 @@ ax.set_xlim(3, 12)
 ax.grid(True, linestyle='-', color='#e0e0e0', linewidth=0.4)
 ax.set_axisbelow(True)
 ax.set_title("Höhe Struktur $h_{struc}$ für Systeme mit Standardbodenaufbau", pad=15)
-ax.set_xlabel("Span [m]")
 ax.set_ylabel("$h_{structure}$ [m]")
+if Sprache == 'en':
+    ax.set_xlabel("Span [m]")
+elif Sprache == 'de':
+    ax.set_xlabel("Spannweite [m]")
 
 # Legenden-Logik (Dubletten entfernen & sortieren)
 handles, labels = ax.get_legend_handles_labels()
 unique_dict = {l: h for h, l in zip(handles, labels)}
 
-wunsch_reihenfolge = [
+wunsch_reihenfolge_EN = [
     'Solid slab, single-axis load-bearing,\nsimply supported (standard superstructure)',
     'Solid slab, single-axis load-bearing,\ncontinuous (standard superstructure)',
     'construction height to meet higher\nsound insulation requirements (24 cm)',
@@ -119,6 +147,22 @@ wunsch_reihenfolge = [
     'Ribbed plate, single-axis load-bearing,\nsimply supported,\n(standard superstructure), flange height'
 ]
 
+wunsch_reihenfolge_DE = [
+    'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Mindeststärke für erhöhte\nSchallschutzanforderungen (24 cm)',
+    'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Rippenplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'Rippenplatte, einachsig tragend, einfach gelagert\n(Standardaufbau), Flanschhöhe'
+]
+
+if Sprache == 'en':
+    wunsch_reihenfolge = wunsch_reihenfolge_EN
+elif Sprache == 'de':
+    wunsch_reihenfolge = wunsch_reihenfolge_DE
+
+
 ordered_handles = [unique_dict[l] for l in wunsch_reihenfolge if l in unique_dict]
 ordered_labels = [l for l in wunsch_reihenfolge if l in unique_dict]
 
@@ -126,6 +170,8 @@ ax_leg.legend(ordered_handles, ordered_labels, loc="upper center", ncol=3,
               frameon=False, handletextpad=0.5, columnspacing=1.0)
 
 # Speichern
-plt.savefig("Strukturhoehe_Systemvergleich.png", dpi=600)
-plt.savefig("Strukturhoehe_Systemvergleich.pdf", bbox_inches='tight')
+filenamepng = f"Strukturhoehe_Systemvergleich_{Sprache}.png"
+filenamepdf = f"Strukturhoehe_Systemvergleich_{Sprache}.pdf"
+plt.savefig(filenamepng, dpi=600)
+plt.savefig(filenamepdf, bbox_inches='tight')
 plt.show()

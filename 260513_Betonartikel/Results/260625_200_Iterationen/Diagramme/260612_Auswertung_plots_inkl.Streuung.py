@@ -9,6 +9,9 @@ import matplotlib as mpl
 # GLOBALE EINSTELLUNGEN & DATENPREPARATION
 # ==============================================================================
 excel_file = "260625_1654_Members.xlsx"
+Sprache = 'de' #Wahl Sprache: 'en' oder 'de'
+
+
 df = pd.read_excel(excel_file)
 
 mpl.rcParams['font.family'] = 'serif'
@@ -57,13 +60,26 @@ marker_mapping = {
     'Slab_LL-frei_rc_rec_massiv': '^'
 }
 
-legend_label_mapping = {
+legend_label_mapping_EN = {
     'BeamContinuousSupEl_rc_rec_massiv': 'Solid slab, single-axis load-bearing,\ncontinuous (standard superstructure)',
     'BeamSimpleSup_rc_rec_massiv': 'Solid slab, single-axis load-bearing,\nsimply supported (standard superstructure)',
     'Slab_LL-eingespannt_rc_rec_massiv': 'Solid slab, two-axis load-bearing,\ncontinuous (standard superstructure)',
     'Slab_LL-frei_rc_rec_massiv': 'Solid slab, two-axis load-bearing,\nsimply supported (standard superstructure)',
     'BeamSimpleSup_rc_rib_massiv': 'Ribbed plate, single-axis load-bearing,\nsimply supported,\n(standard superstructure)'
 }
+
+legend_label_mapping_DE = {
+    'BeamContinuousSupEl_rc_rec_massiv': 'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rec_massiv': 'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+    'BeamSimpleSup_rc_rib_massiv': 'Rippenplatte, einachsig tragend\neinfach gelagert, (Standardaufbau)',
+    'Slab_LL-eingespannt_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+    'Slab_LL-frei_rc_rec_massiv': 'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+}
+
+if Sprache == 'en':
+    legend_label_mapping = legend_label_mapping_EN
+elif Sprache == 'de':
+    legend_label_mapping = legend_label_mapping_DE
 
 
 L_WIDTH_GLOBAL = 1.0
@@ -113,8 +129,12 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
     ax.set_xlim(3, 12)
     ax.set_ylim(bottom=0)
     ax.set_title(title_text, pad=15)
-    ax.set_xlabel("Span [m]")
     ax.set_ylabel(r"GWP$_{structure}$ [kg CO$_{2eq}$ / m$^2$]")
+
+    if Sprache == 'en':
+        ax.set_xlabel("Span [m]")
+    elif Sprache == 'de':
+        ax.set_xlabel("Spannweite [m]")
 
     apply_clean_grid(ax)
 
@@ -122,7 +142,7 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
     handles, labels = ax.get_legend_handles_labels()
     unique_dict = {l: h for h, l in zip(handles, labels)}
 
-    wunsch_reihenfolge = [
+    wunsch_reihenfolge_EN = [
         'Solid slab, single-axis load-bearing,\nsimply supported (standard superstructure)',
         'Solid slab, single-axis load-bearing,\ncontinuous (standard superstructure)',
         'Solid slab, two-axis load-bearing,\nsimply supported (standard superstructure)',
@@ -130,7 +150,18 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
         'Ribbed plate, single-axis load-bearing,\nsimply supported,\n(standard superstructure)'
     ]
 
+    wunsch_reihenfolge_DE = [
+        'Vollplatte, einachsig tragend, einfach gelagert\n(Standardaufbau)',
+        'Vollplatte, einachsig tragend, durchlaufend\n(Standardaufbau)',
+        'Vollplatte, zweiachsig tragend, einfach gelagert\n(Standardaufbau)',
+        'Vollplatte, zweiachsig tragend, durchlaufend\n(Standardaufbau)',
+        'Rippenplatte, einachsig tragend\neinfach gelagert, (Standardaufbau)'
+    ]
 
+    if Sprache == 'en':
+        wunsch_reihenfolge = wunsch_reihenfolge_EN
+    elif Sprache == 'de':
+        wunsch_reihenfolge = wunsch_reihenfolge_DE
 
     ordered_handles = [unique_dict[l] for l in wunsch_reihenfolge if l in unique_dict]
     ordered_labels = [l for l in wunsch_reihenfolge if l in unique_dict]
@@ -143,34 +174,35 @@ def generate_streuung_plot(filter_keywords, title_text, filename):
     # Speichern und Schließen
     plt.savefig(filename, dpi=600)
     # Speichern als PDF (für die wissenschaftliche Arbeit / Vektor-Qualität)
-    plt.savefig(f"{filename}.pdf", bbox_inches='tight')
+    pdf_filename = os.path.splitext(filename)[0] + ".pdf"
+    plt.savefig(pdf_filename, bbox_inches='tight')
 
-    print(f"Plot erfolgreich gespeichert unter: {filename}")
+    print(f"Plot erfolgreich gespeichert unter: {filename} und {pdf_filename}")
 
 
 # ==============================================================================
 # PLOTS GENERIEREN
 # ==============================================================================
-
+'''
 # Plot 1: 1D-Systeme (Einfeldträger & Durchlaufträger)
 generate_streuung_plot(
     filter_keywords='BeamSimpleSup|BeamContinuous',
     title_text="GWP Struktur inkl. Datenstreuung für 1D-Systeme (Bodenaufbau Standard)",
-    filename="GWP_Struktur_1D_Systeme_Streuung.png"
+    filename=f"GWP_Struktur_1D_Systeme_Streuung_{Sprache}.png"
 )
 
 # Plot 2: 2D-Systeme (Platten & Durchlaufträger als Referenz)
 generate_streuung_plot(
     filter_keywords='Slab|BeamContinuous',
     title_text="GWP Struktur inkl. Datenstreuung für 2D-Systeme & Referenz (Bodenaufbau Standard)",
-    filename="GWP_Struktur_2D_Systeme_Streuung.png"
-)
+    filename=f"GWP_Struktur_2D_Systeme_Streuung_{Sprache}.png"
+)'''
 
 # Plot 3: Alle Systeme (Platten & Durchlaufträger als Referenz)
 generate_streuung_plot(
     filter_keywords='Slab|Beam',
     title_text="GWP Struktur inkl. Datenstreuung für 2D-Systeme & Referenz (Bodenaufbau Standard)",
-    filename="GWP_Struktur_Alle_Systeme_Streuung.png"
+    filename=f"GWP_Struktur_Alle_Systeme_Streuung_{Sprache}.png"
 )
 
 
