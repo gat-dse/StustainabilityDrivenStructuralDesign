@@ -4,6 +4,7 @@ from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion a
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
 import optuna
+import math
 
 
 class RandomDisplacementBounds(object):
@@ -1166,7 +1167,7 @@ def opt_gzt_wd_rqs(member, criterion="ULS"):
     h_0 = member.section.h
     bnds = [(0.1, 1.2)]
     minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
-    h_opt = minimal_h.x[0]
+    h_opt = math.ceil(minimal_h.x[0]*1000)/1000
     if h_opt >=  0.24:
         h_opt = 0.0001      #TODO Code anpassen, sodass gar keine Ausgabe mehr für h>24 cm erfolgt.
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
