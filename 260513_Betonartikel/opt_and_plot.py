@@ -31,7 +31,33 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     cursor = connection.cursor()
     for mat_name in mat_names:
         # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
-        inquiry = ("""
+        # Für Holz (wd_rec) nur MECH_PROP auswählen, die 'GL24' enthalten und nur die Produkte mit minimaler und maximaler Total_GWP zurückgeben
+        if crsec_type == "wd_rec":
+            inquiry = ("""
+                SELECT PRO_ID FROM products
+                WHERE DENSITY IS NOT NULL
+                  AND MECH_PROP IS NOT NULL
+                  AND MECH_PROP LIKE '%GL24%'
+                  AND ValidEPD = 1
+                  AND Man_Ausschluss = 1
+                  AND CAST(Total_GWP AS REAL) IN (
+                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products
+                      WHERE MECH_PROP LIKE '%GL24%'
+                        AND DENSITY IS NOT NULL
+                        AND MECH_PROP IS NOT NULL
+                        AND ValidEPD = 1
+                        AND Man_Ausschluss = 1
+                      UNION
+                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products
+                      WHERE MECH_PROP LIKE '%GL24%'
+                        AND DENSITY IS NOT NULL
+                        AND MECH_PROP IS NOT NULL
+                        AND ValidEPD = 1
+                        AND Man_Ausschluss = 1
+                  )
+                """)
+        else:
+            inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL
                 AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
