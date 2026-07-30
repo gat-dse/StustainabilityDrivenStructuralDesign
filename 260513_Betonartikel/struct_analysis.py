@@ -29,7 +29,7 @@
 import sqlite3  # import modul for SQLite
 import numpy as np
 from scipy.optimize import minimize
-
+import math
 
 #DEFINITONS OF MATERIAL PROPERTIES--------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
@@ -771,7 +771,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         # Definition Bewehrung für Initial-QS
         self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung (1. & 4. Lage)
         self.bw_bg = [0, 0.15, 2]  # Allow for no slab shear reinforcement
-        self.bw_r = [di_x_w, n_x_w]  # Longitudinal reinforcement in rib
+        self.bw_r = [di_x_w, n_x_w, 1]  # Longitudinal reinforcement in rib: Diameter, total number, number of layers
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
 
         #Rissmoment und statische Höhe für Platte und Plattenbalken
@@ -807,6 +807,28 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.bw[1][0] = max(0.008, self.di_xo_min, di_xo)  # 4. Lage
 
         #Update Statische Höhe
+        # check, ob die Längsbewehrung in den Steg passt
+        # print("check: bwerforderlich:")
+        # print(self.b_w_min_c)
+        # print("bw vorhanden")
+        # print(self.b_w)
+        if self.b_w_min_c > self.b_w:
+            # überprüfen, ob die Bewehrung in 2 Lagen passt
+            # Mindestbreite Flansch 2-Lagig
+            self.b_w_min_c2 = (2 * self.c_nom +  # 2 * Überdeckung
+                              0.032 * (math.ceil(self.bw_r[1]/2) - 1)  # (n/2-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
+                              + 2 * self.bw_bg_r[0]  # 2 * Bügeldurchmesser
+                              + self.bw_r[0] * math.ceil(self.bw_r[1]/2)  # n/2 * Durchmesser
+                              )
+            if self.b_w_min_c2 < self.b_w:
+                self.bw_r[2] = 2 # zwei lagen
+            else:
+                self.b_w = math.ceil(self.b_w_min_c2 * 1000) / 1000
+                self.bw_r[2] = 2  # zwei lagen
+                super().__init__(section_type, b, self.b_w, h, h_f, l0, phi)
+                # print("Anpassung bw:")
+                # print(self.b_w)
+
         [self.d, self.ds, self.d_PB, self.ds_PB] = self.calc_d()
 
         #Berechnung Statische Höhe, Mu (Biegewiderstand charak.) und Bew.-Gehalt für Platte (Slab) & Plattenbalken
@@ -861,8 +883,12 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     def calc_d(self):
         d = self.h_f - self.c_nom - self.bw[0][0] / 2  # Statische Höhe 1. Lage Platte
         ds = self.h_f - self.c_nom - self.bw[1][0] / 2  # Statische Höhe 4. Lage Platte
-        d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[0] / 2  # Nur eine Lage Längsbewehrung implementiert. ACHTUNG: Check implementieren, ob genug Platz für Längsbewehrung vorhanden!!
-        ds_PB = self.h - self.h_f/2   # Mittlere statische Höhe azûf Mitte Platte (obere Lagen unter Zug)
+        if self.bw_r[2]==1: # Fall einlagige Hauptbiegebewehrung im Steg
+            d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[  0] / 2
+            ds_PB = self.h - self.h_f / 2  # Mittlere statische Höhe azûf Mitte Platte (obere Lagen unter Zug)
+        elif self.bw_r[2]==2: # Fall zweilagige Hauptbiegebewehrung im Steg
+            d_PB = self.h - self.c_nom - self.bw_bg_r[0] - self.bw_r[0] * 3 / 2 - self.c_nom
+            ds_PB = self.h - self.h_f / 2  # Mittlere statische Höhe azûf Mitte Platte (obere Lagen unter Zug)
         return d, ds, d_PB, ds_PB
 
     #Slab = Platte in Querrichtung. ACHTUNG: DURCHLAUFWIRKUNG MUSS NOCH IMPLEMENTIERT WERDEN!
