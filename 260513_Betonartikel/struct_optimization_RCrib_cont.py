@@ -270,7 +270,7 @@ def rc_rqs(var, add_arg, history_list):
 
 #OPTIMIZATION OF RIB CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
-def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
+def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"):
     # definition of initial values for variables, which are going to be optimized
     b_w0 = m.section.b_w
 
@@ -660,7 +660,7 @@ def wd_rib_rqs(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.2):
+def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.2, alg="basinhoppin"):
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
@@ -671,7 +671,7 @@ def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.2):
     elif member.section.section_type == "rc_rib":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rib(member, to_opt, criterion, max_iter)
+        return opt_rc_rib(member, to_opt, criterion, max_iter,alg)
     elif member.section.section_type == "wd_rib":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"

@@ -249,7 +249,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
                     if system == "Continuous 1D" and crsec_type == "rc_rib":
                         opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
-                                                                                           max_iter)
+                                                                                           max_iter,alg)
                     else:
                         opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg)
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
@@ -358,11 +358,17 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         elif sec_typ == "wd_rec":
             color = 'saddlebrown'
 
-        elif sec_typ == "rc_rib" and system == "Simple Beam":
+        elif sec_typ == "rc_rib" and system == "Simple Beam" and alg == "TPE":
+            color = 'red'
+
+        elif sec_typ == "rc_rib" and system == "Simple Beam" and alg == "basinhoppin":
             color = 'limegreen'
 
-        elif sec_typ == "rc_rib" and system == "Continuous 1D":
+        elif sec_typ == "rc_rib" and system == "Continuous 1D" and alg == "basinhoppin":
             color = 'yellow'
+
+        elif sec_typ == "rc_rib" and system == "Continuous 1D" and alg == "TPE":
+            color = 'orange'
 
         elif sec_typ == "wd_rib":
             color = 'sandybrown'

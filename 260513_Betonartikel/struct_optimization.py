@@ -4,6 +4,7 @@ from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion a
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
 import optuna
+import math
 
 
 class RandomDisplacementBounds(object):
@@ -47,7 +48,7 @@ bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, databa
 # ----------------------------------------------------------------------------------------------------------------------
 # OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 # .......................................................................................................................
-def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="basinhoppin"):
+def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="TPE"):
     # Definition des stabilen, spanweitenabhängigen Startwerts L/25
     l0 = m.li_max
     h0 = l0 / 25
@@ -779,113 +780,286 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
 
 #OPTIMIZATION OF RIB CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
-def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
-
-
+def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"):
     # definition of initial values for variables, which are going to be optimized
-    h_w0 = m.section.h-m.section.h_f  # start value for height corresponds to 1/20 of system length
+    h_w0 = m.section.h - m.section.h_f  # start value for height corresponds to 1/20 of system length
     h_f0 = m.section.h_f
     di_x_w0 = m.section.bw_r[0]  # start value for rebar diameter 40 mm
-    di_pb_bw0 = m.section.bw_bg_r[0] #start value for rebar diameter 8 mm
+    di_pb_bw0 = m.section.bw_bg_r[0]  # start value for rebar diameter 8 mm
     b_w0 = m.section.b_w
     b0 = m.section.b
 
     # Fallunterscheidung für Bodenaufbau, falls die Flanchstärke über 16 cm ist (Mindestanforderung Schallschutz)
     # kann der Bodenaufbau reduziert werden auf den Aufbau ohne Schüttung
-    #if m.section.h_f >= 0.16:
+    # if m.section.h_f >= 0.16:
     #    floorstruc = bodenaufbau_rc
     #    m.floorstruc = bodenaufbau_rc
-    #else:
+    # else:
     #    floorstruc = bodenaufbau_rc_rib
     #    m.floorstruc = bodenaufbau_rc_rib
 
-    #Definition von maximaler effektiver Breite beff für Einfeldträger (Optimierung Durchlaufträger aktuell in anderem File)
+    # Definition von maximaler effektiver Breite beff für Einfeldträger (Optimierung Durchlaufträger aktuell in anderem File)
     l0 = m.li_max
-    b_eff_max = 2 * 0.2 * l0 +b_w0 #max.eff. Breite mit l0 =l für Einfeldträger: 2*beff,i + bw und beff,i,max = 0.2*l0
+    b_eff_max = 2 * 0.2 * l0 + b_w0  # max.eff. Breite mit l0 =l für Einfeldträger: 2*beff,i + bw und beff,i,max = 0.2*l0
 
     var0 = [h_w0, h_f0, di_x_w0, b_w0, b0, di_pb_bw0]
-
 
     # define bounds of variables
     if m.floorstruc.name == 'massiv':
         h_min_schall = 0.16
-        h_fix = max(0.08,m.section.hmin_c, h_min_schall)
+        h_fix = max(0.08, m.section.hmin_c, h_min_schall)
         bh_f = (h_fix, h_fix)
-        #bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+        # bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
 
     elif m.floorstruc.name == 'Schuettung':
         h_min_schall = 0.13
         h_fix = max(0.08, m.section.hmin_c, h_min_schall)
         bh_f = (h_fix, h_fix)
-        #bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
+        # bh_f = (max(0.08, m.section.hmin_c, h_min_schall), 0.5)  # h_f_max_dynamisch)
 
     else:
         h_fix = max(0.08, m.section.hmin_c)
         bh_f = (h_fix, h_fix)
-        #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
+        # bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
 
-    #bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
+    # bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
     bh_w = (0.04, 1.2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
-    bdi_pb_bw = (0.008, 0.016) #diameter of rebars between 8mm and 16 mm for stirrups
+    bdi_pb_bw = (0.008, 0.016)  # diameter of rebars between 8mm and 16 mm for stirrups
     # Statische Grenze für Rippenbreite. Das exakte bewehrungsabhängige Minimum wird dynamisch über eine Penalty in der Zielfunktion erzwungen.
     bb_w = (0.15, 0.4)  # 15 cm entspricht Mindeststegbreite für R60
 
-    #Dynamische Grenze für Rippenbreite
-    #b_w_min_c = (2 * m.section.c_nom +  # 2 * Überdeckung
+    # Dynamische Grenze für Rippenbreite
+    # b_w_min_c = (2 * m.section.c_nom +  # 2 * Überdeckung
     #                  0.032 * (m.section.bw_r[1] - 1)  # (n-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
     #                  + 2 * m.section.bw_bg_r[0]  # 2 * Bügeldurchmesser
     #                  + m.section.bw_r[0] * m.section.bw_r[1]  # n * Durchmesser
     #                  +0.03 )
-    #bb_w = (max(0.15, b_w_min_c), 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
+    # bb_w = (max(0.15, b_w_min_c), 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
 
-
-    #bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
-    bb = (1.0 , 1.0) # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
+    # bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
+    bb = (1.0,
+          1.0)  # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
 
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb, bdi_pb_bw]
 
     s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
-    di_xu, di_xo = max(0.008, m.section.di_xu_min, m.section.bw[0][0]), max(0.008, m.section.di_xo_min, m.section.bw[1][0])  #
+    di_xu, di_xo = max(0.008, m.section.di_xu_min, m.section.bw[0][0]), max(0.008, m.section.di_xo_min,
+                                                                            m.section.bw[1][0])  #
 
     s_pb_bw, n_pb_bw = m.section.bw_bg_r[1], m.section.bw_bg_r[2]
     n_x_w = m.section.bw_r[1]
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
     co, st = m.section.concrete_type, m.section.rebar_type
-    add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk, c_nom]
+    add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw, m.floorstruc,
+               m.requirements, to_opt, criterion, m.g2k, m.qk, c_nom]
 
-    # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
-    bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
-                                                                            "method": "Powell"}, take_step=bounded_step)
-    h_w, h_f, di_x_w, b_w, b, di_pb_bw = opt.x
+    if alg == "basinhoppin":
 
-    optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi, jnt_srch)
-    #print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
 
-    return optimized_section
+        # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
+        bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
+        opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1,
+                           minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
+                                             "method": "Powell"}, take_step=bounded_step)
+        h_w, h_f, di_x_w, b_w, b, di_pb_bw = opt.x
 
-# inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
-def rc_rib_rqs(var, add_arg):
-    # input: variables, which have to be optimized, additional info about cross-section and system, optimizing option
-    # output: if criterion == GWP -> co2 of cross-section, punished by delta 10*(qk_zul-qk)
-    # output: if criterion == h -> height of cross-section, punished by delta 1*(qk_zul-qk)
-    h_w, h_f, di_x_w, b_w, b, di_pb_bw = var
-    system = add_arg[0]
-    concrete = add_arg[1]
-    reinfsteel = add_arg[2]
-    l0 = add_arg[3]
-    #h_f = add_arg[4]
-    di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw = add_arg[4:11]
-    floorstruc = add_arg[11]
-    criteria = add_arg[12]
-    to_opt = add_arg[13]
-    criterion = add_arg[14]
-    g2k = add_arg[15]
-    qk = add_arg[16]
-    c_nom = add_arg[17]
+        optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
+                                                           di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi,
+                                                           jnt_srch)
+        # print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+
+        return optimized_section
+
+    elif alg == "TPE":
+        BEWEHRUNG_D = [
+            0.008, 0.010, 0.012, 0.014,
+            0.016, 0.018, 0.020, 0.022,
+            0.026, 0.030, 0.034, 0.040
+        ]
+
+        BUEGEL_D = [
+            0.008, 0.010, 0.012, 0.014, 0.016
+        ]
+
+        N_X_W = [1, 2, 3, 4, 5, 6, 7, 8]
+        # ggf. vergrössern falls konstruktiv zulässig
+
+        di_x_w_kandidaten = [
+            d for d in BEWEHRUNG_D
+            if bdi_x_w[0] <= d <= bdi_x_w[1]
+        ]
+
+        di_pb_bw_kandidaten = [
+            d for d in BUEGEL_D
+            if bdi_pb_bw[0] <= d <= bdi_pb_bw[1]
+        ]
+
+        def objective_rib(trial):
+
+            h_w = trial.suggest_float(
+                "h_w",
+                bh_w[0],
+                bh_w[1],
+                step=0.01
+            )
+
+            h_f = trial.suggest_float(
+                "h_f",
+                bh_f[0],
+                bh_f[1],
+                step=0.01
+            )
+
+            b_w = trial.suggest_float(
+                "b_w",
+                bb_w[0],
+                bb_w[1],
+                step=0.01
+            )
+
+            b = trial.suggest_float(
+                "b",
+                bb[0],
+                bb[1],
+                step=0.01
+            )
+
+            di_x_w = trial.suggest_categorical(
+                "di_x_w",
+                di_x_w_kandidaten
+            )
+
+            di_pb_bw = trial.suggest_categorical(
+                "di_pb_bw",
+                di_pb_bw_kandidaten
+            )
+
+            n_x_w = trial.suggest_categorical(
+                "n_x_w",
+                N_X_W
+            )
+
+            try:
+
+                return rc_rib_rqs(
+                    [
+                        h_w,
+                        h_f,
+                        di_x_w,
+                        b_w,
+                        b,
+                        di_pb_bw,
+                        n_x_w
+                    ],
+                    add_arg,
+                    alg="TPE"
+                )
+
+            except Exception:
+                return 1e20
+
+        study = optuna.create_study(
+            direction="minimize",
+            sampler=optuna.samplers.TPESampler(seed=42)
+        )
+
+        study.enqueue_trial({
+
+            "h_w": round(h_w0 / 0.01) * 0.01,
+            "h_f": round(h_f0 / 0.01) * 0.01,
+
+            "di_x_w": min(
+                di_x_w_kandidaten,
+                key=lambda d: abs(d - di_x_w0)
+            ),
+
+            "b_w": round(b_w0 / 0.01) * 0.01,
+            "b": round(b0 / 0.01) * 0.01,
+
+            "di_pb_bw": min(
+                di_pb_bw_kandidaten,
+                key=lambda d: abs(d - di_pb_bw0)
+            ),
+
+            "n_x_w": n_x_w
+        })
+
+        study.optimize(
+            objective_rib,
+            n_trials=max_iter
+        )
+
+        h_w = study.best_params["h_w"]
+        h_f = study.best_params["h_f"]
+        di_x_w = study.best_params["di_x_w"]
+        b_w = study.best_params["b_w"]
+        b = study.best_params["b"]
+        di_pb_bw = study.best_params["di_pb_bw"]
+        n_x_w = study.best_params["n_x_w"]
+
+        optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
+                                                           di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi,
+                                                           jnt_srch)
+        # print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+
+        return optimized_section
+
+
+# inner function for optimizing reinforced concrete section
+def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
+
+    if alg == "basinhoppin":
+
+        h_w, h_f, di_x_w, b_w, b, di_pb_bw = var
+
+        system = add_arg[0]
+        concrete = add_arg[1]
+        reinfsteel = add_arg[2]
+        l0 = add_arg[3]
+
+        di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw = add_arg[4:11]
+
+        floorstruc = add_arg[11]
+        criteria = add_arg[12]
+        to_opt = add_arg[13]
+        criterion = add_arg[14]
+        g2k = add_arg[15]
+        qk = add_arg[16]
+        c_nom = add_arg[17]
+
+    elif alg == "TPE":
+
+        h_w, h_f, di_x_w, b_w, b, di_pb_bw, n_x_w = var
+
+        system = add_arg[0]
+        concrete = add_arg[1]
+        reinfsteel = add_arg[2]
+        l0 = add_arg[3]
+
+        di_xu = add_arg[4]
+        s_xu = add_arg[5]
+        di_xo = add_arg[6]
+        s_xo = add_arg[7]
+
+        s_pb_bw = add_arg[9]
+        n_pb_bw = add_arg[10]
+
+        floorstruc = add_arg[11]
+        criteria = add_arg[12]
+        to_opt = add_arg[13]
+        criterion = add_arg[14]
+        g2k = add_arg[15]
+        qk = add_arg[16]
+        c_nom = add_arg[17]
+
+    else:
+        raise ValueError(f"Unknown algorithm: {alg}")
+
     #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
+
+
 
     # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
     # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
@@ -896,6 +1070,7 @@ def rc_rib_rqs(var, add_arg):
                         +0.01) #Reserve 10 mm
 
     b_w_erforderlich = max(0.15, b_w_min_c_aktuell)
+
 
     # Wenn b_w zu klein ist, wird ein Geometrie-Strafwert generiert
     penalty_bw = max(b_w_erforderlich - b_w, 0)
@@ -992,7 +1167,7 @@ def opt_gzt_wd_rqs(member, criterion="ULS"):
     h_0 = member.section.h
     bnds = [(0.1, 1.2)]
     minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
-    h_opt = minimal_h.x[0]
+    h_opt = math.ceil(minimal_h.x[0]*1000)/1000
     if h_opt >=  0.24:
         h_opt = 0.0001      #TODO Code anpassen, sodass gar keine Ausgabe mehr für h>24 cm erfolgt.
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
@@ -1190,7 +1365,7 @@ def get_optimized_section(member, criterion, to_opt, max_iter, alg):
     elif member.section.section_type == "rc_rib":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rib(member, to_opt, criterion, max_iter)
+        return opt_rc_rib(member, to_opt, criterion, max_iter, alg)
     elif member.section.section_type == "wd_rib":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
