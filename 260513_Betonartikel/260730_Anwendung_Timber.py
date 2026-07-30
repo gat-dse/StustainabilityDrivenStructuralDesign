@@ -23,7 +23,7 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1,
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = 'database_260610_Hochbau.db'
+database_name = 'database_260730_Hochbau.db'
 
 
 # create floor structure for solid wooden cross-section
