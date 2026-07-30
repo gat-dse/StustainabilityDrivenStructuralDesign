@@ -479,13 +479,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     system_suffix = system_mapping.get(system, f"_{str(system).replace(' ', '_')}")
 
     # 3. Weiche für Export-Klasse und Ordner anhand des Präfixes ('wd' vs. alle anderen)
-    if str(crsec_type).startswith("wd"):
-        filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
-        class_to_excel.members_to_excel(members_1d, filename, folder="Resultate")
-    else:
-        # Betrifft 'rc' und alle anderen Typen, die nicht mit 'wd' beginnen
-        filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
-        class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
+    # Use members_to_excel2 and folder 'Results' for all cross-section types (including wood 'wd')
+    filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
+    class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
+
 
 
     return data_max, vrfctn_members
