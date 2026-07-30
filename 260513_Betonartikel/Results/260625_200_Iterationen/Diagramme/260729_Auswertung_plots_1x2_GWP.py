@@ -7,8 +7,8 @@ import matplotlib as mpl
 # ==============================================================================
 excel_file = "260625_1654_Members.xlsx"
 
-SPANNWEITEN_MODUS = 'kurz' #Wahl Spannweiten: 'lang' -> 3 m bis 12 m, 'kurz' = 3 m bis 8 m
-Sprache = 'en' #Wahl Sprache: 'en' oder 'de'
+SPANNWEITEN_MODUS = 'lang' #Wahl Spannweiten: 'lang' -> 3 m bis 12 m, 'kurz' = 3 m bis 8 m
+Sprache = 'de' #Wahl Sprache: 'en' oder 'de'
 
 
 mpl.rcParams['font.family'] = 'serif'
@@ -206,8 +206,8 @@ def generate_kriterien_matrix(data_subset, system_filter_string, haupt_titel):
     fig.suptitle(f"{haupt_titel} ({x_min}-{x_max}m)", y=0.98)
     plt.tight_layout(rect=[0, 0.12, 1, 0.95])
 
-    filename = f"GWP_Matrix_{haupt_titel.replace(' ', '_')}_{x_min}-{x_max}m_{Sprache}.png"
-    plt.savefig(filename, dpi=600, bbox_inches='tight')
+    filename = f"Matrix_1x2_GWP_{haupt_titel.replace(' ', '_')}_{x_min}-{x_max}m_{Sprache}"
+    plt.savefig(f"{filename}.png", dpi=600, bbox_inches='tight')
     # Speichern als PDF (für die wissenschaftliche Arbeit / Vektor-Qualität)
     plt.savefig(f"{filename}.pdf", bbox_inches='tight')
     print(f"Gespeichert unter: {filename}")
