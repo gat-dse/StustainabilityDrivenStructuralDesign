@@ -794,7 +794,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
                        + max(0.008, self.di_xo_min))  # 3. Lage analog 4. Lage
 
 
-        #Mindestbreite Flanch
+        #Mindestbreite Steg
         self.b_w_min_c = (2 * self.c_nom +               # 2 * Überdeckung
                           0.032 * (self.bw_r[1]-1)       # (n-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
                           + 2 * self.bw_bg_r[0]          # 2 * Bügeldurchmesser
