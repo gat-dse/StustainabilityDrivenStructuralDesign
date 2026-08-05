@@ -33,12 +33,9 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche ein Minimal oder Maximalwert pro Materialgruppe sind.
         inquiry = ("""
                 SELECT PRO_ID FROM products
-                WHERE DENSITY IS NOT NULL
-                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%') --wieso braucht es diese Bedingung?
+                WHERE DENSITY IS NOT NULL                
                 AND MECH_PROP IS NOT NULL
-                AND MECH_PROP IN ('GL24', 'GL24h', 'C24')
                 AND ValidEPD = 1
-                AND  MIN_MAX = 1
                 AND Man_Ausschluss = 1
                 AND "MATERIAL" LIKE """ + mat_name
         )
@@ -56,13 +53,15 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             #            " PRO_ID=" + prod_id_str)
             cursor.execute(inquiry)
             result = cursor.fetchall()
-            mech_prop = "'" + result[0][0] + "'"
-            if mech_prop in ["'GL24'", "'GL24h/c'"]:
-                mech_prop = "'GL24h'"
-            if mech_prop in ["'GL28h/c'", "'GL28'"]:
-                mech_prop = "'GL28h'"
-            if mech_prop in ["'GL32h/c'", "'GL32'"]:
-                mech_prop = "'GL32h'"
+            raw_val = result[0][0].strip()
+
+            #Fall es ein Holz-Querschnitt ist und mech_prop "GL" enthalten ist:
+            #Prüfen, ob mech_prop mit "h" oder "c" endet. Falls nicht, wird jeweils Festigkeit für "c" gewählt (konservativ). z.B. für GL30 --> Gl30c
+            if raw_val.startswith('GL'):
+                if not raw_val.endswith(('h','c')):
+                    raw_val += 'c'
+            mech_prop = f"'{raw_val}'"
+
 
             if crsec_type == "wd_rec":
                 # create a Wood material object
@@ -182,7 +181,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 timber1 = struct_analysis.Wood(mech_prop, database_name, prod_id=prod_id_str)  # create a Wood material object
                 timber1.get_design_values()
 
-                # search database for timber board material (CLT) with lowest and highes emissions
+                # search database for timber board material (CLT) with lowest and highest emissions
                 inquiry = ("""
                                 SELECT PRO_ID FROM products
                                 WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products

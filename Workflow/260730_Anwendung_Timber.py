@@ -10,7 +10,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [3,4,5,6,7,8]
+lengths = [5,8]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -73,7 +73,7 @@ start = time.time()
 
 # RECTANGUALR WOODEN CROSS-SECTION ("BRETTSTAPELDECKE") mit VOLLHOLZ
 # define materials for which date is searched in the database (table products, attribute material)
-mat_names_rc_wd = ["'Glue_laminated_timber'","'Solid_structural_timber'"]
+mat_names_rc_wd = ["'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_solid, req, "wd_rec", mat_names_rc_wd,
@@ -109,15 +109,6 @@ for idx, info in enumerate(plotted_data):
         plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx-1])))
     plt.grid()
 
-# # # plot cross-section of members for verification
-# for mem_group in vrfctn_members:
-#     for i, mem in enumerate(mem_group[0]):
-#         section = mem.section
-#         plot_datasets.plot_section(section)
-#         # Show the plot
-#         plt.title(f'#{mem_group[1][i]}')
-
-# SHOW FIGURE
 plt.show()
 
 #Ende der Optimierung
