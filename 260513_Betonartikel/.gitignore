@@ -1,7 +1,0 @@
-.idea
-__pycache__
-.env
-.venv
-.db
-.xlsx
-*.xlsx
