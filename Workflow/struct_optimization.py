@@ -1163,13 +1163,20 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
 ##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
 # outer function for finding optimal wooden rectangular cross-section
-def opt_gzt_wd_rqs(member, criterion="ULS"):
+def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28):
     h_0 = member.section.h
-    bnds = [(0.1, 1.2)]
+    bnds = [(0.1, h_max)] #h_max enstpricht der maximal verfügbaren Stärke für Massivholzdecken
     minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
     h_opt = math.ceil(minimal_h.x[0]*1000)/1000
-    if h_opt >=  0.24:
-        h_opt = 0.0001      #TODO Code anpassen, sodass gar keine Ausgabe mehr für h>24 cm erfolgt.
+
+    #Check feasibilty: if optimizer hit upper bound, solution may be infeasible:
+    if h_opt >= h_max: #for wd_rec (Massivholzdecken) max available cross section height is 28 cm
+        # Only if it's truly at the max and still fails
+        feasibility = wd_rqs_h(h_opt, [member, criterion])
+        # For ULS: tolerance in kN/m; 0.5 kN/m is reasonable (5% of typical loads)
+        if feasibility > 0.5:  # Much higher tolerance
+            return None
+
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
     return section
 

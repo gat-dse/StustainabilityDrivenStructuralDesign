@@ -10,13 +10,13 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [5,8]
+lengths = [4,5,6,7,8,9,10]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 10
+max_iter = 100
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
@@ -81,7 +81,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
-
+'''
 # RIB WOODEN CROSS-SECTION (Hohlkastendecke) mit Steg aus BSH oder Vollholz und Flanch oben und unten aus 3-Schichtplatte
 # define materials for which date is searched in the database (table products, attribute material)
 
@@ -92,7 +92,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+'''
 
 
 # DEFINE LABELS OF PLOTS

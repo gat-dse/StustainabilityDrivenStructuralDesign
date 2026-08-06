@@ -216,7 +216,7 @@ class SupStrucRectangular(Section):
 
 #........................................................................
 class RectangularWood(SupStrucRectangular, Section):
-    # defines properties of rectangular, wooden cross-section
+    # defines properties of rectangular, wooden cross-section (Brettstapeldecke)
     def __init__(self, wood_type, b, h, phi=0.6, xi=0.02, ei_b=0.0):  # create a rectangular timber object
         #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS (in Excel ergaenzt -> Im Code noch anpassen)
         section_type = "wd_rec"

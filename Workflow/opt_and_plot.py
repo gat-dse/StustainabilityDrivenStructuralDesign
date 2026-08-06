@@ -251,21 +251,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                                                                                            max_iter,alg)
                     else:
                         opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg)
+                    #Handle infeasible solutions (e.g. span too large for wd_rec crosssection)
+                    if opt_section is None:
+                        print(f"Warning:No feasible wood section <= 28 cm for span {length}m")
+                        members.append(None)
+                        continue
+
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
-                    # Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
-                    # search for an alternative solution for rectangular concrete section with lower minimal h and fill in floorstructure
-                    #if section0.section_type == "rc_rec":
-                        # create floor structure for slim reinforced concrete cross-section
-                    #    bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                    #                                ["'Unterlagsboden Zement, 85 mm'", False, False],
-                    #                                ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
-                    #    floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
-                    #    member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
-                    #    opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
-                    #    opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
-                    #    # update opt_member, if alternative solution has lower GWP
-                    #    if opt_member_alt.co2 < opt_member.co2:
-                    #        opt_member = opt_member_alt
+
                     members.append(opt_member)
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
@@ -278,30 +271,50 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     material_lg = "error: section material is not defined"
                 legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name])
 
+    #Filter out None values (infesible solutions):
+    member_list = [[mem for mem in sublist if mem is not None] for sublist in member_list]
+
     # CREATE DATA OF ENVELOPE AREA OF DATASET
     # create data of envelope area for subplot 1: structural height
     h = [[mem.section.h for mem in sublist] for sublist in member_list]
-    h_min = [min(values) for values in zip(*h)]
-    h_max = [max(values) for values in zip(*h)]
-    h_mean = [sum(values) / len(values) for values in list(zip(*h))]
+    h_min = [min(values) if values else None for values in zip(*h)]
+    h_max = [max(values) if values else None for values in zip(*h)]
+    h_mean = [sum(values) / len(values) if values else None for values in list(zip(*h))]
+    
+    # Filter out None values for min/max/mean
+    h_min = [v for v in h_min if v is not None]
+    h_max = [v for v in h_max if v is not None]
+    h_mean = [v for v in h_mean if v is not None]
+    
+    # Update lengths to match the filtered data
+    lengths_filtered = lengths[:len(h_min)]
 
     # create data of envelope area for subplot 2: total height
     h_tot = [[mem.section.h+mem.floorstruc.h_Floor for mem in sublist] for sublist in member_list]
-    h_tot_min = [min(values) for values in zip(*h_tot)]
-    h_tot_max = [max(values) for values in zip(*h_tot)]
-    h_tot_mean = [sum(values) / len(values) for values in list(zip(*h_tot))]
+    h_tot_min = [min(values) if values else None for values in zip(*h_tot)]
+    h_tot_max = [max(values) if values else None for values in zip(*h_tot)]
+    h_tot_mean = [sum(values) / len(values) if values else None for values in list(zip(*h_tot))]
+    h_tot_min = [v for v in h_tot_min if v is not None]
+    h_tot_max = [v for v in h_tot_max if v is not None]
+    h_tot_mean = [v for v in h_tot_mean if v is not None]
 
     # create data of envelope area data subplot 3: co2 of structure
     co2 = [[mem.section.co2 for mem in sublist] for sublist in member_list]
-    co2_min = [min(values) for values in zip(*co2)]
-    co2_max = [max(values) for values in zip(*co2)]
-    co2_mean = [sum(values) / len(values) for values in list(zip(*co2))]
+    co2_min = [min(values) if values else None for values in zip(*co2)]
+    co2_max = [max(values) if values else None for values in zip(*co2)]
+    co2_mean = [sum(values) / len(values) if values else None for values in list(zip(*co2))]
+    co2_min = [v for v in co2_min if v is not None]
+    co2_max = [v for v in co2_max if v is not None]
+    co2_mean = [v for v in co2_mean if v is not None]
 
     # create data of envelope area for subplot 4: total co2
     co2_tot = [[mem.section.co2+mem.floorstruc.co2_Floor for mem in sublist] for sublist in member_list]
-    co2_tot_min = [min(values) for values in zip(*co2_tot)]
-    co2_tot_max = [max(values) for values in zip(*co2_tot)]
-    co2_tot_mean = [sum(values) / len(values) for values in list(zip(*co2_tot))]
+    co2_tot_min = [min(values) if values else None for values in zip(*co2_tot)]
+    co2_tot_max = [max(values) if values else None for values in zip(*co2_tot)]
+    co2_tot_mean = [sum(values) / len(values) if values else None for values in list(zip(*co2_tot))]
+    co2_tot_min = [v for v in co2_tot_min if v is not None]
+    co2_tot_max = [v for v in co2_tot_max if v is not None]
+    co2_tot_mean = [v for v in co2_tot_mean if v is not None]
 
     values_min = [h_min, h_tot_min, co2_min, co2_tot_min]
     values_max = [h_max, h_tot_max, co2_max, co2_tot_max]
@@ -398,7 +411,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         for idx, data in enumerate(plotdata):
             plt.subplot(2, 2, idx + 1)
             # prepare area
-            coords = list(zip(lengths, values_max[idx])) + list(zip(lengths[::-1], values_min[idx][::-1]))
+            coords = list(zip(lengths_filtered, values_max[idx])) + list(zip(lengths_filtered[::-1], values_min[idx][::-1]))
             # create a polygon from the coordinates
             polygon = Polygon(coords)
             # extract the x and y coordinates for plotting
@@ -406,16 +419,16 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             # plot area
             plt.fill(x, y, alpha=0.05, facecolor=color, edgecolor = color, linewidth = 1.5)
             # plot lines
-            #plt.plot(lengths, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
+            #plt.plot(lengths_filtered, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
             data_max[idx] = max(data_max[idx], max(data))
             # # plot points of verification into graph
-            # ver_x, ver_y = lengths[idx_vrfctn], data[idx_vrfctn]
+            # ver_x, ver_y = lengths_filtered[idx_vrfctn], data[idx_vrfctn]
             # plt.plot(ver_x, ver_y, 'o', color='black', markersize=2)
             # plt.annotate(f'#{i}', xy=(ver_x, ver_y),
-            #              xytext=(ver_x + 0.05*lengths[-1], ver_y),
+            #              xytext=(ver_x + 0.05*lengths_filtered[-1], ver_y),
             #              arrowprops=dict(facecolor='black', shrink=0.2, width=0.2, headwidth=2, headlength=4),
             #              fontsize=9, color='black', va='center')
-            plt.plot(lengths, values_mean[idx], color = color, linestyle = linestyle, linewidth = 1.5 )
+            plt.plot(lengths_filtered, values_mean[idx], color = color, linestyle = linestyle, linewidth = 1.5 )
 
 
     # create Excel sheets
