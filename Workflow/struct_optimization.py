@@ -849,213 +849,192 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
 
     s_pb_bw, n_pb_bw = m.section.bw_bg_r[1], m.section.bw_bg_r[2]
     n_x_w = m.section.bw_r[1]
+    n_lagen = 1
     phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
     co, st = m.section.concrete_type, m.section.rebar_type
     add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw, m.floorstruc,
-               m.requirements, to_opt, criterion, m.g2k, m.qk, c_nom]
-
-    if alg == "basinhoppin":
+               m.requirements, to_opt, criterion, m.g2k, m.qk, c_nom, phi, xi, jnt_srch]
 
 
-        # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
-        bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-        opt = basinhopping(rc_rib_rqs, var0, niter=max_iter, T=1,
-                           minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
-                                             "method": "Powell"}, take_step=bounded_step)
-        h_w, h_f, di_x_w, b_w, b, di_pb_bw = opt.x
+    # TPE-Algorithmus mit Optuna
 
-        optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
-                                                           di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi,
-                                                           jnt_srch)
-        # print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+    BEWEHRUNG_D = [
+        0.008, 0.010, 0.012, 0.014,
+        0.016, 0.018, 0.020, 0.022,
+        0.026, 0.030, 0.034, 0.040
+    ]
 
-        return optimized_section
+    BUEGEL_D = [
+        0.008, 0.010, 0.012, 0.014, 0.016
+    ]
 
-    elif alg == "TPE":
-        BEWEHRUNG_D = [
-            0.008, 0.010, 0.012, 0.014,
-            0.016, 0.018, 0.020, 0.022,
-            0.026, 0.030, 0.034, 0.040
-        ]
+    N_X_W = [1, 2, 3, 4, 5, 6, 7, 8]
 
-        BUEGEL_D = [
-            0.008, 0.010, 0.012, 0.014, 0.016
-        ]
+    N_LAGEN = [1, 2]
+    # ggf. vergrössern falls konstruktiv zulässig
 
-        N_X_W = [1, 2, 3, 4, 5, 6, 7, 8]
-        # ggf. vergrössern falls konstruktiv zulässig
+    di_x_w_kandidaten = [
+        d for d in BEWEHRUNG_D
+        if bdi_x_w[0] <= d <= bdi_x_w[1]
+    ]
 
-        di_x_w_kandidaten = [
-            d for d in BEWEHRUNG_D
-            if bdi_x_w[0] <= d <= bdi_x_w[1]
-        ]
+    di_pb_bw_kandidaten = [
+        d for d in BUEGEL_D
+        if bdi_pb_bw[0] <= d <= bdi_pb_bw[1]
+    ]
 
-        di_pb_bw_kandidaten = [
-            d for d in BUEGEL_D
-            if bdi_pb_bw[0] <= d <= bdi_pb_bw[1]
-        ]
 
-        def objective_rib(trial):
+    def objective_rib(trial):
 
-            h_w = trial.suggest_float(
-                "h_w",
-                bh_w[0],
-                bh_w[1],
-                step=0.01
-            )
-
-            h_f = trial.suggest_float(
-                "h_f",
-                bh_f[0],
-                bh_f[1],
-                step=0.01
-            )
-
-            b_w = trial.suggest_float(
-                "b_w",
-                bb_w[0],
-                bb_w[1],
-                step=0.01
-            )
-
-            b = trial.suggest_float(
-                "b",
-                bb[0],
-                bb[1],
-                step=0.01
-            )
-
-            di_x_w = trial.suggest_categorical(
-                "di_x_w",
-                di_x_w_kandidaten
-            )
-
-            di_pb_bw = trial.suggest_categorical(
-                "di_pb_bw",
-                di_pb_bw_kandidaten
-            )
-
-            n_x_w = trial.suggest_categorical(
-                "n_x_w",
-                N_X_W
-            )
-
-            try:
-
-                return rc_rib_rqs(
-                    [
-                        h_w,
-                        h_f,
-                        di_x_w,
-                        b_w,
-                        b,
-                        di_pb_bw,
-                        n_x_w
-                    ],
-                    add_arg,
-                    alg="TPE"
-                )
-
-            except Exception:
-                return 1e20
-
-        study = optuna.create_study(
-            direction="minimize",
-            sampler=optuna.samplers.TPESampler(seed=42)
+        h_w = trial.suggest_float(
+            "h_w",
+            bh_w[0],
+            bh_w[1],
+            step=0.01
         )
 
-        study.enqueue_trial({
-
-            "h_w": round(h_w0 / 0.01) * 0.01,
-            "h_f": round(h_f0 / 0.01) * 0.01,
-
-            "di_x_w": min(
-                di_x_w_kandidaten,
-                key=lambda d: abs(d - di_x_w0)
-            ),
-
-            "b_w": round(b_w0 / 0.01) * 0.01,
-            "b": round(b0 / 0.01) * 0.01,
-
-            "di_pb_bw": min(
-                di_pb_bw_kandidaten,
-                key=lambda d: abs(d - di_pb_bw0)
-            ),
-
-            "n_x_w": n_x_w
-        })
-
-        study.optimize(
-            objective_rib,
-            n_trials=max_iter
+        h_f = trial.suggest_float(
+            "h_f",
+            bh_f[0],
+            bh_f[1],
+            step=0.01
         )
 
-        h_w = study.best_params["h_w"]
-        h_f = study.best_params["h_f"]
-        di_x_w = study.best_params["di_x_w"]
-        b_w = study.best_params["b_w"]
-        b = study.best_params["b"]
-        di_pb_bw = study.best_params["di_pb_bw"]
-        n_x_w = study.best_params["n_x_w"]
+        b_w = trial.suggest_float(
+            "b_w",
+            bb_w[0],
+            bb_w[1],
+            step=0.01
+        )
 
-        optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
-                                                           di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi,
-                                                           jnt_srch)
-        # print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+        b = trial.suggest_float(
+            "b",
+            bb[0],
+            bb[1],
+            step=0.01
+        )
 
-        return optimized_section
+        di_x_w = trial.suggest_categorical(
+            "di_x_w",
+            di_x_w_kandidaten
+        )
+
+        di_pb_bw = trial.suggest_categorical(
+            "di_pb_bw",
+            di_pb_bw_kandidaten
+        )
+
+        n_x_w = trial.suggest_categorical(
+            "n_x_w",
+            N_X_W
+        )
+
+        n_lagen = trial.suggest_categorical(
+            "n_lagen",
+            N_LAGEN
+        )
+
+        try:
+
+            return rc_rib_rqs(
+                [
+                    h_w,
+                    h_f,
+                    di_x_w,
+                    b_w,
+                    b,
+                    di_pb_bw,
+                    n_x_w,
+                    n_lagen
+                ],
+                add_arg,
+                alg="TPE"
+            )
+
+        except Exception:
+            return 1e20
+
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=optuna.samplers.TPESampler(seed=42)
+    )
+
+    study.enqueue_trial({
+
+        "h_w": round(h_w0 / 0.01) * 0.01,
+        "h_f": round(h_f0 / 0.01) * 0.01,
+
+        "di_x_w": min(
+            di_x_w_kandidaten,
+            key=lambda d: abs(d - di_x_w0)
+        ),
+
+        "b_w": round(b_w0 / 0.01) * 0.01,
+        "b": round(b0 / 0.01) * 0.01,
+
+        "di_pb_bw": min(
+            di_pb_bw_kandidaten,
+            key=lambda d: abs(d - di_pb_bw0)
+        ),
+
+        "n_x_w": n_x_w,
+
+        "n_lagen": n_lagen
+    })
+
+    study.optimize(
+        objective_rib,
+        n_trials=max_iter
+    )
+
+    h_w = study.best_params["h_w"]
+    h_f = study.best_params["h_f"]
+    di_x_w = study.best_params["di_x_w"]
+    b_w = study.best_params["b_w"]
+    b = study.best_params["b"]
+    di_pb_bw = study.best_params["di_pb_bw"]
+    n_x_w = study.best_params["n_x_w"]
+    n_lagen = study.best_params["n_lagen"]
+
+    optimized_section = struct_analysis.RibbedConcrete(co, st, l0, b, b_w, h_f + h_w, h_f, di_xu, s_xu, di_xo, s_xo,
+                                                       di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, n_lagen, phi, c_nom, xi,
+                                                       jnt_srch)
+    # print(l0,round(b,5),round(b_w,5), round(h_w,5), round(h_f,5), di_x_w)
+
+    return optimized_section
 
 
 # inner function for optimizing reinforced concrete section
 def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
-    if alg == "basinhoppin":
 
-        h_w, h_f, di_x_w, b_w, b, di_pb_bw = var
+    h_w, h_f, di_x_w, b_w, b, di_pb_bw, n_x_w, n_lagen = var
 
-        system = add_arg[0]
-        concrete = add_arg[1]
-        reinfsteel = add_arg[2]
-        l0 = add_arg[3]
+    system = add_arg[0]
+    concrete = add_arg[1]
+    reinfsteel = add_arg[2]
+    l0 = add_arg[3]
 
-        di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw = add_arg[4:11]
+    di_xu = add_arg[4]
+    s_xu = add_arg[5]
+    di_xo = add_arg[6]
+    s_xo = add_arg[7]
 
-        floorstruc = add_arg[11]
-        criteria = add_arg[12]
-        to_opt = add_arg[13]
-        criterion = add_arg[14]
-        g2k = add_arg[15]
-        qk = add_arg[16]
-        c_nom = add_arg[17]
+    s_pb_bw = add_arg[9]
+    n_pb_bw = add_arg[10]
 
-    elif alg == "TPE":
+    floorstruc = add_arg[11]
+    criteria = add_arg[12]
+    to_opt = add_arg[13]
+    criterion = add_arg[14]
+    g2k = add_arg[15]
+    qk = add_arg[16]
+    c_nom = add_arg[17]
+    phi = add_arg[18]
+    xi = add_arg[19]
+    jnt_srch = add_arg[20]
 
-        h_w, h_f, di_x_w, b_w, b, di_pb_bw, n_x_w = var
-
-        system = add_arg[0]
-        concrete = add_arg[1]
-        reinfsteel = add_arg[2]
-        l0 = add_arg[3]
-
-        di_xu = add_arg[4]
-        s_xu = add_arg[5]
-        di_xo = add_arg[6]
-        s_xo = add_arg[7]
-
-        s_pb_bw = add_arg[9]
-        n_pb_bw = add_arg[10]
-
-        floorstruc = add_arg[11]
-        criteria = add_arg[12]
-        to_opt = add_arg[13]
-        criterion = add_arg[14]
-        g2k = add_arg[15]
-        qk = add_arg[16]
-        c_nom = add_arg[17]
-
-    else:
-        raise ValueError(f"Unknown algorithm: {alg}")
 
     #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
 
@@ -1064,12 +1043,29 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
     # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
     # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
-    b_w_min_c_aktuell = (2 * c_nom +  # 2 * Überdeckung
+    b_w_min_c = (2 * c_nom +  # 2 * Überdeckung
                          0.032 * (n_x_w - 1) +  # (n-1) * Grösstkorn zwischen Längsstäben
                          2 * di_pb_bw +  # 2 * AKTUELLER Bügeldurchmesser
                          di_x_w * n_x_w  # n * AKTUELLER Längsstabdurchmesser
-                        +0.01) #Reserve 10 mm
+                         + 0.01)  # Reserve 10 mm
+    b_w_min_c2 = (2 * c_nom +  # 2 * Überdeckung
+                  0.032 * (math.ceil(
+                n_x_w / 2) - 1)  # (n/2-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
+                  + 2 * di_pb_bw  # 2 * Bügeldurchmesser
+                  + di_x_w * math.ceil(n_x_w / 2)  # n/2 * Durchmesser
+                  )
+
+    if n_lagen == 1:
+        b_w_min_c_aktuell = b_w_min_c
+    elif n_lagen == 2 and n_x_w == 1:
+        b_w_min_c_aktuell = b_w_min_c
+        n_lagen = 1
+    elif n_lagen == 2:
+        b_w_min_c_aktuell = b_w_min_c2
+
+
     #TODO Flanschbreiten check mit 2 Lagen hier einfügen
+
     b_w_erforderlich = max(0.15, b_w_min_c_aktuell)
 
 
@@ -1080,7 +1076,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     penalty_bw_scaled = penalty_bw * 1e5
 
     #create section
-    section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw)
+    section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, n_lagen, phi, c_nom, xi, jnt_srch)
 
      # create member
     member = struct_analysis.Member1D(section, system, floorstruc, criteria, g2k, qk)

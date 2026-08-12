@@ -760,7 +760,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
     #defines properties of a rectangular, reinforced concrete section
     #di_x_w, n_x_w = diameter and number of longitudinal reinforcement in rib
     def __init__(self, concrete_type, rebar_type, l0, b, b_w, h, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w,
-                 di_pb_bw, s_pb_bw, n_pb_bw=2,
+                 di_pb_bw, s_pb_bw, n_pb_bw=2, n_lagen=1,
                  phi=2.0, c_nom=0.02, xi=0.03, jnt_srch=0.15):
         section_type = "rc_rib"
         super().__init__(section_type, b, b_w, h, h_f, l0, phi)
@@ -771,7 +771,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         # Definition Bewehrung für Initial-QS
         self.bw = [[di_xu, s_xu], [di_xo, s_xo]]  # Slab reinforcement in Hauptrichtung (1. & 4. Lage)
         self.bw_bg = [0, 0.15, 2]  # Allow for no slab shear reinforcement
-        self.bw_r = [di_x_w, n_x_w, 1]  # Longitudinal reinforcement in rib: Diameter, total number, number of layers
+        self.bw_r = [di_x_w, n_x_w, n_lagen]  # Longitudinal reinforcement in rib: Diameter, total number, number of layers
         self.bw_bg_r = [di_pb_bw, s_pb_bw, n_pb_bw]  # Shear reinforcement in rib
 
         #Rissmoment und statische Höhe für Platte und Plattenbalken
@@ -800,7 +800,12 @@ class RibbedConcrete(SupStrucRibbedConcrete):
                           + 2 * self.bw_bg_r[0]          # 2 * Bügeldurchmesser
                           + self.bw_r[0] * self.bw_r[1]  # n * Durchmesser
                           )
-
+        self.b_w_min_c2 = (2 * self.c_nom +  # 2 * Überdeckung
+                           0.032 * (math.ceil(
+                    self.bw_r[1] / 2) - 1)  # (n/2-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
+                           + 2 * self.bw_bg_r[0]  # 2 * Bügeldurchmesser
+                           + self.bw_r[0] * math.ceil(self.bw_r[1] / 2)  #   Durchmesser * n/2
+                           )
 
         # Platte (slab): Update Bewehrungsmatrix unter Berücksichtigung von Mindestbewehrung und d,min = 8 mm
         self.bw[0][0] = max(0.008, self.di_xu_min, di_xu)  # 1. Lage
@@ -812,6 +817,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         # print(self.b_w_min_c)
         # print("bw vorhanden")
         # print(self.b_w)
+        """
         if self.b_w_min_c > self.b_w:
             # überprüfen, ob die Bewehrung in 2 Lagen passt
             # Mindestbreite Flansch 2-Lagig
@@ -828,7 +834,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
                 super().__init__(section_type, b, self.b_w, h, h_f, l0, phi)
                 # print("Anpassung bw:")
                 # print(self.b_w)
-
+        """
         [self.d, self.ds, self.d_PB, self.ds_PB] = self.calc_d()
 
         #Berechnung Statische Höhe, Mu (Biegewiderstand charak.) und Bew.-Gehalt für Platte (Slab) & Plattenbalken

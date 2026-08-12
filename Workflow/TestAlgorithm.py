@@ -8,7 +8,7 @@ import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,6]
+lengths = [4,6,10]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -21,7 +21,7 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260617_Hochbau.db"
+database_name = "database_260805.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
@@ -82,7 +82,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               idx_vrc,"Simple Beam", alg )
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
 alg = "TPE"
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section simple beam
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
@@ -90,7 +90,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               idx_vrc,"Simple Beam", alg )
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-"""
+
 
 # DEFINE LABELS OF PLOTS
 plotted_data = [["h$_{struct}$", "[m]"], ["h$_{tot}$", "[m]"], ["GWP$_{struct}$", "[kg-CO$_2$-eq]"], ["GWP$_{tot}$", "[kg-CO$_2$-eq]"]]
