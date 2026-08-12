@@ -346,11 +346,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 vrfctn_members[1].append(i)
         sec_typ, mat, cri, opt, floor_name = legend[i]
         # set line color
-        if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv" and alg == "basinhoppin":
+        if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
             color = 'darkgreen'
-
-        elif sec_typ == "rc_rec" and system == "Simple Beam" and alg == "TPE":
-            color = 'red'
 
         elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "Schuettung":
             color = 'darkolivegreen'
@@ -361,26 +358,17 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         elif sec_typ == "rc_rec" and system == "Simple Beam":
             color = 'darkgreen'
 
-        elif sec_typ == "rc_rec" and system == "Continuous 1D" and alg == "TPE":
-            color = 'red'
-
         elif sec_typ == "rc_rec" and system == "Continuous 1D":
             color = 'lightgreen'
 
         elif sec_typ == "wd_rec":
             color = 'saddlebrown'
 
-        elif sec_typ == "rc_rib" and system == "Simple Beam" and alg == "TPE":
-            color = 'red'
-
-        elif sec_typ == "rc_rib" and system == "Simple Beam" and alg == "basinhoppin":
+        elif sec_typ == "rc_rib" and system == "Simple Beam":
             color = 'limegreen'
 
-        elif sec_typ == "rc_rib" and system == "Continuous 1D" and alg == "basinhoppin":
+        elif sec_typ == "rc_rib" and system == "Continuous 1D" :
             color = 'yellow'
-
-        elif sec_typ == "rc_rib" and system == "Continuous 1D" and alg == "TPE":
-            color = 'orange'
 
         elif sec_typ == "wd_rib":
             color = 'sandybrown'
