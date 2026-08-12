@@ -1,30 +1,30 @@
-# file contains code for generating of example "simple supported beam in wood and reinforced concrete and
-# different cross-sections"
+# file contains code for generating of example "simple supported beam in wood for different cross-sections"
 
 # IMPORT
-# import create_dummy_database  # file for creating a "dummy database", for test propose
+import opt_and_plot  # file with code for plotting results in a standardized wayimport opt_and_plot  # file with code for plotting results in a standardized way
 import struct_analysis  # file with code for structural analysis
-import opt_and_plot  # file with code for plotting results in a standardized way
+#import plot_datasets  # file with code for plotting results in a standardized way
+
 import matplotlib.pyplot as plt
 import time
 
+
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [8,9,10]
+lengths = [4,5,6,7,8,9,10]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 10
+max_iter = 100
 
 #  define content of plot
-criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
+criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260506.db"
-# database_name = "dummy_sustainability.db"  # define database name
-# create_dummy_database.create_database(database_name)  # create database
+database_name = 'database_260805.db'
+
 
 # create floor structure for solid wooden cross-section
 bodenaufbau_vollholzdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
@@ -41,7 +41,7 @@ bodenaufbau_hohlkastendecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", Fal
                                  ["'Kies gebrochen'", 0.12, False], ["'Steinwolle'", h_ins, False],]
 bodenaufbau_wd_rib = struct_analysis.FloorStruc(bodenaufbau_hohlkastendecke, database_name)
 # correct the total height of the floor structure by the height of the insulation within the element
-bodenaufbau_wd_rib.h = bodenaufbau_wd_rib.h - h_ins
+bodenaufbau_wd_rib.h_Floor = bodenaufbau_wd_rib.h_Floor - h_ins
 
 
 
@@ -68,17 +68,22 @@ start = time.time()
 
 # define materials for which date is searched in the database (table products, attribute material)
 #TODO: Achtung 'Glue_laminated_timber_board' heisst jetzt 3- and .....
-#mat_names = ["'Glue_laminated_timber'", "'Glue_laminated_timber_board'", "'Solid_structural_timber'"]
-mat_names = ["'Glue_laminated_timber'"]#, "'3_and_5_plywood'", "'Solid_structural_timber'"]
-
 #TODO: Glue Laminated Timberboard: 3-Schichtplatten / CLT Platten: Prüfen, sind die mech. Eigenschaften und das Trägheitsmoment richtig berücksichtigt? Also z.B: mit Faktor 2/3?
 
+
+# RECTANGUALR WOODEN CROSS-SECTION ("BRETTSTAPELDECKE") mit VOLLHOLZ
+# define materials for which date is searched in the database (table products, attribute material)
+mat_names_rc_wd = ["'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
-                                                              bodenaufbau_wd_solid, req, "wd_rec", mat_names,
+                                                              bodenaufbau_wd_solid, req, "wd_rec", mat_names_rc_wd,
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
+
+'''
+# RIB WOODEN CROSS-SECTION (Hohlkastendecke) mit Steg aus BSH oder Vollholz und Flanch oben und unten aus 3-Schichtplatte
+# define materials for which date is searched in the database (table products, attribute material)
 
 mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
@@ -87,7 +92,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+'''
 
 
 # DEFINE LABELS OF PLOTS
@@ -104,15 +109,6 @@ for idx, info in enumerate(plotted_data):
         plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx-1])))
     plt.grid()
 
-# # # plot cross-section of members for verification
-# for mem_group in vrfctn_members:
-#     for i, mem in enumerate(mem_group[0]):
-#         section = mem.section
-#         plot_datasets.plot_section(section)
-#         # Show the plot
-#         plt.title(f'#{mem_group[1][i]}')
-
-# SHOW FIGURE
 plt.show()
 
 #Ende der Optimierung
@@ -120,5 +116,3 @@ ende = time.time()
 dauer = ende - start
 
 print(f"Die Optimierung dauerte {round(dauer, 2)} Sekunden.")
-
-

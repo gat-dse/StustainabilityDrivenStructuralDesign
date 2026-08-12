@@ -1,7 +1,7 @@
-import struct_analysis  # file with code for structural analysis
-import struct_optimization  # file with code for structural optimization
-import struct_optimization_alt  # file with code for structural optimization
 import sqlite3  # import modul for SQLite
+import struct_analysis  # file with code for structural analysis
+import struct_optimization # file with code for structural optimization
+import struct_optimization_RCrib_cont  # file with code for structural optimization
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,12 +10,15 @@ from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
 import class_to_excel
 import class_to_excel_2
+
+
+import pandas as pd
 from scipy.spatial import ConvexHull
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam"):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin"):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1)
@@ -27,14 +30,16 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
     for mat_name in mat_names:
-        # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche sich gem. Spalte Statistik zwischen dem 10% und 90% Quantil befindet. Wo Source = Betonsortenrechenr, Ecoinvent oder KBOB ist, wird die Zeile nicht gewählt.
+        # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche ein Minimal oder Maximalwert pro Materialgruppe sind.
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL
-                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%') --wieso braucht es diese Bedingung?
                 AND MECH_PROP IS NOT NULL
-                AND MECH_PROP NOT LIKE '%GL30%'
-                AND ValidEPD = 1 
+                AND MECH_PROP IN ('GL24', 'GL24h', 'C24')
+                AND ValidEPD = 1
+                AND  MIN_MAX = 1
+                AND Man_Ausschluss = 1
                 AND "MATERIAL" LIKE """ + mat_name
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
@@ -73,23 +78,34 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
-                # search database for rebar material of type B500B with lowest and highes emissions
+                # search database for rebar material of type B500B with lowest and highest emissions
                 # exclude not epd sources from the data.
-                # only take values, which are inside an 80% confidence interval
-                inquiry = ("""
-                            SELECT PRO_ID FROM products
-                            WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
-                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                AND DENSITY IS NOT NULL
-                                                AND MECH_PROP IS NOT NULL
-                                                AND Statistik = 1)
-                            OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
-                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                AND DENSITY IS NOT NULL
-                                                AND MECH_PROP IS NOT NULL
-                                                AND Statistik = 1)
-                            """
-                           )
+                inquiry = """
+                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
+                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
+                  AND DENSITY IS NOT NULL
+                  AND MECH_PROP = 'B500B'
+                  AND ValidEPD = 1
+                  AND Man_Ausschluss = 1
+                  AND CAST(Total_GWP AS REAL) IN (
+                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+
+                      UNION
+
+                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+                  )
+                """
+
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
                 prod_id_low = result[0]
@@ -101,10 +117,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
                 # create initial cross-sections
                 section_00 = struct_analysis.RectangularConcrete(concrete, rebar_low_em, 1.0, 0.20,
-                                                                0.006, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
+                                                                0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                                 0, 0.15, 2)
                 section_01 = struct_analysis.RectangularConcrete(concrete, rebar_high_em, 1.0, 0.20,
-                                                                 0.006, 0.15, 0.006, 0.15, 0.006, 0.15, 0.006, 0.15,
+                                                                 0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                                  0, 0.15, 2)
 
                 # add sections to content-definition of plot-line
@@ -117,20 +133,31 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highes emissions
-                inquiry = ("""
-                                            SELECT PRO_ID FROM products
-                                            WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
-                                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                                AND DENSITY IS NOT NULL
-                                                                AND MECH_PROP IS NOT NULL
-                                                                AND Statistik = 1)
-                                            OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
-                                                                WHERE "MATERIAL" LIKE '%Steel_reinforcing_bar%'
-                                                                AND DENSITY IS NOT NULL
-                                                                AND MECH_PROP IS NOT NULL
-                                                                AND Statistik = 1)
-                                            """
-                           )
+                inquiry = """
+                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
+                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
+                  AND DENSITY IS NOT NULL
+                  AND MECH_PROP = 'B500B'
+                  AND ValidEPD = 1
+                  AND Man_Ausschluss = 1
+                  AND CAST(Total_GWP AS REAL) IN (
+                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+
+                      UNION
+
+                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
+                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
+                        AND DENSITY IS NOT NULL 
+                        AND MECH_PROP = 'B500B' 
+                        AND ValidEPD = 1 
+                        AND Man_Ausschluss = 1
+                  )
+                """
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
                 prod_id_low = result[0]
@@ -141,11 +168,10 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 # create a rebar material objects with mech prop B500B and low rsp high emission values
                 rebar_low_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_low_str)
                 rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
-
+                #TODO eventuell sind 3 d 16 eine bessere Startbewehrung im Sten (di_x_w und n_x_w), weil nur der Durchmesser, nicht aber die Anzahl Stäbe optimiert wird, oder wir nehmen noch die anzahl Stäbe in die Optimierung rein.
                 # create initial cross-sections
-                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
-                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.01, 0.15,
-                                                            0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
+                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.018, 5, 0.008, 0.15, 2)
+                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15,0.008, 0.15, 0.018, 5, 0.008, 0.15, 2)
                 # add sections to content-definition of plot-line
                 line_i0 = [section_00, floorstruc]
                 line_i1 = [section_01, floorstruc]
@@ -221,23 +247,26 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     section0 = i[0]
                     floorstruc = i[1]
                     member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
-                    opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter)
+                    if system == "Continuous 1D" and crsec_type == "rc_rib":
+                        opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
+                                                                                           max_iter,alg)
+                    else:
+                        opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg)
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
-
-                    #Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
+                    # Anpassung Bodenaufbau bei Systemwahl und nicht innerhalb Optimierung.
                     # search for an alternative solution for rectangular concrete section with lower minimal h and fill in floorstructure
                     #if section0.section_type == "rc_rec":
                         # create floor structure for slim reinforced concrete cross-section
-                        #bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                     #                               ["'Unterlagsboden Zement, 85 mm'", False, False],
-                     #                               ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
-                        #floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
-                        #member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
-                        #opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
-                        #opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
-                        # update opt_member, if alternative solution has lower GWP
-                        #if opt_member_alt.co2 < opt_member.co2:
-                        #    opt_member = opt_member_alt
+                    #    bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                    #                                ["'Unterlagsboden Zement, 85 mm'", False, False],
+                    #                                ["'Glaswolle'", 0.03, False], ["'Kies gebrochen'", 0.06, False]]
+                    #    floorstruc_alt = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
+                    #    member0_alt = struct_analysis.Member1D(section0, sys, floorstruc_alt, requirements, g2k, qk)
+                    #    opt_section_alt = struct_optimization.get_optimized_section(member0_alt, criterion, optimum, max_iter, h_min=0.12)
+                    #    opt_member_alt = struct_analysis.Member1D(opt_section_alt, sys, floorstruc_alt, requirements, g2k, qk)
+                    #    # update opt_member, if alternative solution has lower GWP
+                    #    if opt_member_alt.co2 < opt_member.co2:
+                    #        opt_member = opt_member_alt
                     members.append(opt_member)
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
@@ -248,7 +277,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     material_lg = i[0].wood_type_1.mech_prop
                 else:
                     material_lg = "error: section material is not defined"
-                legend.append([i[0].section_type, material_lg, criterion, optimum])
+                legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name])
 
     # CREATE DATA OF ENVELOPE AREA OF DATASET
     # create data of envelope area for subplot 1: structural height
@@ -258,7 +287,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     h_mean = [sum(values) / len(values) for values in list(zip(*h))]
 
     # create data of envelope area for subplot 2: total height
-    h_tot = [[mem.section.h+mem.floorstruc.h for mem in sublist] for sublist in member_list]
+    h_tot = [[mem.section.h+mem.floorstruc.h_Floor for mem in sublist] for sublist in member_list]
     h_tot_min = [min(values) for values in zip(*h_tot)]
     h_tot_max = [max(values) for values in zip(*h_tot)]
     h_tot_mean = [sum(values) / len(values) for values in list(zip(*h_tot))]
@@ -270,7 +299,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     co2_mean = [sum(values) / len(values) for values in list(zip(*co2))]
 
     # create data of envelope area for subplot 4: total co2
-    co2_tot = [[mem.section.co2+mem.floorstruc.co2 for mem in sublist] for sublist in member_list]
+    co2_tot = [[mem.section.co2+mem.floorstruc.co2_Floor for mem in sublist] for sublist in member_list]
     co2_tot_min = [min(values) for values in zip(*co2_tot)]
     co2_tot_max = [max(values) for values in zip(*co2_tot)]
     co2_tot_mean = [sum(values) / len(values) for values in list(zip(*co2_tot))]
@@ -279,10 +308,16 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     values_max = [h_max, h_tot_max, co2_max, co2_tot_max]
     values_mean = [h_mean, h_tot_mean, co2_mean, co2_tot_mean]
 
+    # CREATE DATASET
+
+
+
     # PLOT DATASET TO FIGURE
     plt.rcParams.update({
         'font.family': 'Times New Roman'
     })
+
+
     plt.figure(1)
     data_max = [0, 0, 0, 0]
     vrfctn_members = [[], []]
@@ -290,27 +325,57 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         plotdata = [[], [], [], []]
         for j, mem in enumerate(members):
             plotdata[0].append(mem.section.h)
-            plotdata[1].append(mem.section.h + mem.floorstruc.h)
+
+            plotdata[1].append(mem.section.h + mem.floorstruc.h_Floor)
             plotdata[2].append(mem.section.co2)
-            plotdata[3].append(mem.section.co2 + mem.floorstruc.co2)
+            plotdata[3].append(mem.section.co2 + mem.floorstruc.co2_Floor)
             if j == idx_vrfctn:
                 vrfctn_members[0].append(mem)
                 vrfctn_members[1].append(i)
-        sec_typ, mat, cri, opt = legend[i]
+        sec_typ, mat, cri, opt, floor_name = legend[i]
         # set line color
-        if sec_typ == "rc_rec" and system == "Simple Beam":
-            color = 'green'  # color for reinforced concrete
+        if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv" and alg == "basinhoppin":
+            color = 'darkgreen'
+
+        elif sec_typ == "rc_rec" and system == "Simple Beam" and alg == "TPE":
+            color = 'red'
+
+        elif sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "Schuettung":
+            color = 'darkolivegreen'
+
+        elif sec_typ == "rc_rec" and system == "Continuous 1D" and floor_name == "Schuettung":
+            color = 'olivedrab'
+
+        elif sec_typ == "rc_rec" and system == "Simple Beam":
+            color = 'darkgreen'
+
+        elif sec_typ == "rc_rec" and system == "Continuous 1D" and alg == "TPE":
+            color = 'red'
+
         elif sec_typ == "rc_rec" and system == "Continuous 1D":
-            color = 'lightgreen'  # color for reinforced concrete
+            color = 'lightgreen'
+
         elif sec_typ == "wd_rec":
-            color = 'saddlebrown'  # color for wood
-        elif sec_typ == "rc_rib":
-            color = 'limegreen'  # color for reinforced concrete
+            color = 'saddlebrown'
+
+        elif sec_typ == "rc_rib" and system == "Simple Beam" and alg == "TPE":
+            color = 'red'
+
+        elif sec_typ == "rc_rib" and system == "Simple Beam" and alg == "basinhoppin":
+            color = 'limegreen'
+
+        elif sec_typ == "rc_rib" and system == "Continuous 1D" and alg == "basinhoppin":
+            color = 'yellow'
+
+        elif sec_typ == "rc_rib" and system == "Continuous 1D" and alg == "TPE":
+            color = 'orange'
+
         elif sec_typ == "wd_rib":
-            color = 'sandybrown'  # color for wood
+            color = 'sandybrown'
 
         else:
             color = "k"
+
         # set linestyle
         if cri == "ULS":
             linestyle = "--"  # line style for ULS
@@ -361,22 +426,63 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         for member in pair
     ]
 
-    if crsec_type == "wd_rec":
+    '''if crsec_type == "wd_rec":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
 
-    elif crsec_type == "rc_rec":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Resultate")
+    elif crsec_type == "rc_rec"and system == "Simple Beam":
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
+        if members_1d:
+            floor_name = members_1d[0].floorstruc.name
+            floor_name_clean = str(floor_name)
+        else:
+            floor_name_clean = "default"
 
-    elif crsec_type == "rc_rib":
-        class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
+        dynamic_filename = f"Members_rc_rec_{floor_name_clean}_2.xlsx"
+
+        class_to_excel_2.members_to_excel2(members_1d, dynamic_filename, folder="Results")
+        #class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
+
+    elif crsec_type == "rc_rib" and system == "Simple Beam":
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_2.xlsx", folder="Results")
+    elif crsec_type == "rc_rec"and system == "Continuous 1D":
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec_cont.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_cont_2.xlsx", folder="Results")
+    elif crsec_type == "rc_rib" and system == "Continuous 1D":
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rib_cont.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_cont_2.xlsx", folder="Results")
+
+    elif crsec_type == "rc_rec"and system == "Two span 1D 1D":
+        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec_2span.xlsx", folder="Resultate")
+        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2span_2.xlsx", folder="Results")
+
+
     elif crsec_type == "wd_rib":
         class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
     else:
-        print("cross-section type is not defined inside function plot_dataset()")
+        print("cross-section type is not defined inside function plot_dataset()")'''
 
+    # 1. Dynamisch den Bodenaufbau (floor_name) auslesen, falls vorhanden
+    if members_1d and hasattr(members_1d[0], 'floorstruc') and members_1d[0].floorstruc:
+        floor_name = members_1d[0].floorstruc.name
+        floor_name_clean = f"_{str(floor_name).replace(' ', '_').replace('/', '-')}"
+    else:
+        floor_name_clean = ""
 
-    return data_max, vrfctn_members
+    # 2. System-Suffix übersetzen (Kurzformen für den Dateinamen)
+    system_mapping = {
+        "Simple Beam": "_simple",
+        "Continuous 1D": "_cont",
+        "Two span 1D 1D": "_2span"
+    }
+    # Nimmt das Suffix aus dem Mapping, andernfalls wird der Systemname direkt (bereinigt) angehängt
+    system_suffix = system_mapping.get(system, f"_{str(system).replace(' ', '_')}")
+
+    # 3. Weiche für Export-Klasse und Ordner anhand des Präfixes ('wd' vs. alle anderen)
+    # Use members_to_excel2 and folder 'Results' for all cross-section types (including wood 'wd')
+    filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
+    class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
+
 
 
     return data_max, vrfctn_members
@@ -414,6 +520,8 @@ def plot_section(section):
               f'di_r = {section.bw_r[0]:.3f} \n'
               f'di_xu / s_xu = {section.bw[0][0]:.3f} / {section.bw[0][1]} \n'
               #f'di_stir / s_stir / n = {section.bw_bg[0]} / {section.bw_bg[1]} / {section.bw_bg[2]}\n'
+              f'di_xo / s_xo / n = {section.bw[1][0]:.3f} / {section.bw[1][1]} \n'
+              f'di_x_w / n_x_w / n = {section.bw_r[0]:.3f} / {section.bw_r[1]} \n'
               f'c_nom = {100 * section.c_nom:.1f} cm \n'
               f'x/d = {section.x_p / section.d:.2f} \n'
               f'h, hf, hw, b, bw = {section.h:.2f}, {section.h_f:.2f}, {section.h_w:.2f}, {section.b:.2f}, {section.b_w:.2f} \n'
@@ -671,7 +779,7 @@ def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50
                 # create a Rebar material object
                 rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name)
                 # create initial wooden rectangular cross-section
-                section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.0, 0.14, 0.3, 0.18, 0.01, 0.15, 0.01, 0.15, 0.02, 2, 0.01, 0.15, 2)
+                section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.5, 0.14, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.02, 5, 0.008, 0.15, 2)
                 color = 'mediumseagreen'
 ## XXXXXXXXXXX neuen Querschnittstyp initialisieren
             else:
