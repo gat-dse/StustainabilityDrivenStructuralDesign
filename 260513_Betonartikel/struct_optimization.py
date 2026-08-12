@@ -837,9 +837,9 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
     #                  +0.03 )
     # bb_w = (max(0.15, b_w_min_c), 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
 
-    # bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
-    bb = (1.0,
-          1.0)  # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
+    bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
+    #bb = (1.0,
+    #     1.0)  # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
 
     bounds = [bh_w, bh_f, bdi_x_w, bb_w, bb, bdi_pb_bw]
 
@@ -1060,6 +1060,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
 
 
+    #TODO Penalty ür bw hier integrieren
 
     # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
     # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
@@ -1068,7 +1069,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
                          2 * di_pb_bw +  # 2 * AKTUELLER Bügeldurchmesser
                          di_x_w * n_x_w  # n * AKTUELLER Längsstabdurchmesser
                         +0.01) #Reserve 10 mm
-
+    #TODO Flanschbreiten check mit 2 Lagen hier einfügen
     b_w_erforderlich = max(0.15, b_w_min_c_aktuell)
 
 
