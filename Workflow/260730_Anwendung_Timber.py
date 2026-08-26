@@ -73,7 +73,7 @@ start = time.time()
 
 # RECTANGUALR WOODEN CROSS-SECTION ("BRETTSTAPELDECKE") mit VOLLHOLZ
 # define materials for which date is searched in the database (table products, attribute material)
-mat_names_rc_wd = ["'Solid_structural_timber'"]
+mat_names_rc_wd = ["'Solid_structural_timber'", "'Glue_laminated_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_solid, req, "wd_rec", mat_names_rc_wd,

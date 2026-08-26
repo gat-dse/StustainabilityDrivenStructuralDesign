@@ -454,7 +454,7 @@ class RectangularConcrete(SupStrucRectangular):
 
     @staticmethod
     def f_w_ger(roh, rohs, phi, h, d):
-        f = (1 - 20 * rohs) / (10 * roh ** 0.7) * (0.75 + 0.1 * phi) * (h / d) ** 3
+        f = ((1 - 20 * rohs) / (10 * roh ** 0.7)) * (0.75 + 0.1 * phi) * (h / d) ** 3
         return f
 
     @staticmethod
