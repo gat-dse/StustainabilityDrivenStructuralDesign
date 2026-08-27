@@ -1466,58 +1466,81 @@ class Member1D:
         if self.requirements.install == "ductile": #Lastfall häufig und w < L/350
             self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
-                # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                           self.section.h, self.section.d)
+                self.f_w_ger_0 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
+                                                             self.section.h, self.section.d)
+
+                ''''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
                 self.w_install_ger = self.unit_def * self.q_freq * min(10.0, max(3.4, self.section.Faktor_ger))  #SIA262:2025, Formel (104), wobei fger immer grösser 3.4 sein muss.
-                #Alte Berechnung gerissene Durchbiegung Langzeit
-                #self.w_install_ger = unit_def * (
-                #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                #                                                 self.section.h, self.section.d)
-                #        + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                #                                                                   0, self.section.h, self.section.d)
-                #        - self.q_per
-                #)
+                '''
+                #Detaillierte Berechnung gerissene Durchbiegung Langzeit
+                self.w_install_ger = self.unit_def * (
+                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                                 self.section.h, self.section.d)
+                        + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
+                                                                                   0, self.section.h, self.section.d)
+                        - self.q_per
+                )
 
         elif self.requirements.install == "brittle": #Lastfall selten und w < L/500
             self.w_install = self.unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
+                self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                             self.section.h, self.section.d)
+                self.f_w_ger_0 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
+                                                             self.section.h, self.section.d)
+                '''
                 # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
                 self.w_install_ger = self.unit_def * self.q_rare * min(10.0, max(3.4, self.section.Faktor_ger)) # SIA262:2025, Formel (104)
-                # Alte Berechnung gerissene Durchbiegung Langzeit
-                #self.w_install_ger = unit_def * (
-                #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                #                                                 self.section.h, self.section.d)
-                #        + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                #                                                                   0, self.section.h, self.section.d)
-                #        - self.q_per
-                #)
+                '''
+
+                # Detaillierte Berechnung gerissene Durchbiegung Langzeit
+                self.w_install_ger = self.unit_def * (
+                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                                 self.section.h, self.section.d)
+                        + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
+                                                                                   0, self.section.h, self.section.d)
+                        - self.q_per
+                )
 
         self.w_use = self.unit_def * (self.q_freq - self.gk) #Lastfall häufig, aber Durchbiegung infolge veränderlicher Einwirkung und w < L/350
         if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
-            # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+            self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                         self.section.h, self.section.d)
+            self.f_w_ger_0 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
+                                                         self.section.h, self.section.d)
+
+            '''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
             self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                        self.section.h, self.section.d)
             self.w_use_ger = self.unit_def * self.q_freq * min(10.0, max(3.4, self.section.Faktor_ger)) # SIA262:2025, Formel (104)
-            #Alte Berechnung gerissene Durchbiegung
-            #self.w_use_ger = unit_def * (
-            #        (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
-            #                                                                 self.section.h, self.section.d)
-            #)
+            '''
+            #Detaillierte Berechnung gerissene Durchbiegung
+            self.w_use_ger = self.unit_def * (
+                    (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
+                                                                             self.section.h, self.section.d)
+            )
 
         self.w_app = self.unit_def * self.q_per * (1 + self.section.phi)
         if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
-            # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+            self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                         self.section.h, self.section.d)
+            '''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
             self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                        self.section.h, self.section.d)
             self.w_app_ger = self.unit_def * self.q_per * min(10.0, max(3.4, self.section.Faktor_ger))  # SIA262:2025, Formel (104)
-            # Alte Berechnung gerissene Durchbiegung
-            #self.w_app_ger = unit_def * (
-            #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-            #                                                 self.section.h, self.section.d)
-            #)
+            '''
+
+            # Detaillierte Berechnung gerissene Durchbiegung
+            self.w_app_ger = self.unit_def * (
+                    self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                             self.section.h, self.section.d)
+            )
 
         self.co2 = system.l_tot * (self.floorstruc.co2_Floor + self.section.co2)
         self.co2_a = system.l_tot * (self.floorstruc.co2_a_Floor  + self.section.co2/60)
@@ -1714,64 +1737,64 @@ class Member2D:
             self.fire[3] = 1
         self.fire_resistance = []
 
-        # calculation of deflections uncracked (plus cracked for concrete sections self.section.section_type[0:2] = rc))
+        # calculation of deflections cracked for concrete sections self.section.section_type[0:2] = rc))
         section_material = self.section.section_type[0:2]
-        unit_def = self.system.alpha_w * self.system.l_tot ** 4 / self.section.ei1  # deflection for q = 1, phi = 0
+        self.unit_def = self.system.alpha_w * self.system.l_tot ** 4 / self.section.ei1  # deflection for q = 1, phi = 0
 
+        #Faktor für Durchbiegung gerissen für phi = 0 (exkl. Kriechen) und phi = 2 (inkl. Kriechen). gemäss SIA262, (104)
+        self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
+                                                     self.section.h, self.section.d)
+        self.f_w_ger_0 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
+                                                     self.section.h, self.section.d)
 
         if self.requirements.install == "ductile":
-            self.w_install = unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
-            # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
-            self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                       self.section.h, self.section.d)
-            self.w_install_ger = unit_def * self.q_freq * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
-            # Alte Berechnung Durchbiegung
-            #if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-            #    self.w_install_ger = unit_def * (
-            #            self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
-            #            + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h,self.section.d)
-            #            - self.q_per
-            #            )
-        elif self.requirements.install == "brittle":
-            self.w_install = unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
+
+            self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
+
+            '''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+            self.w_install_ger = self.unit_def * self.q_freq * max(3.4,self.f_w_ger_2)  # SIA262:2025, Formel (104)'''
+            # Detaillierte Berechnung Durchbiegung
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                    # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
-                    self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                               self.section.h, self.section.d)
-                    self.w_install_ger = unit_def * self.q_rare * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
+                self.w_install_ger = self.unit_def * (
+                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
+                        + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h,self.section.d)
+                        - self.q_per
+                        )
 
-                    # Alte Berechnung Durchbiegung
-                    #self.w_install_ger = unit_def * (
-                    #    self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
-                    #    + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h, self.section.d)
-                    #    - self.q_per
-                    #    )
+        elif self.requirements.install == "brittle":
+            self.w_install = self.unit_def * (self.q_rare + self.q_per * (self.section.phi - 1))
+            if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
+                    ''''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                     self.w_install_ger = unit_def * self.q_rare * max(3.4,self.f_w_ger_2)  # SIA262:2025, Formel (104)'''
 
-        self.w_use = unit_def * (self.q_freq - self.gk)
+                    # Detaillierte Berechnung Durchbiegung
+                    self.w_install_ger = unit_def * (
+                        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi, self.section.h, self.section.d)
+                        + (self.q_rare - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,0, self.section.h, self.section.d)
+                        - self.q_per
+                        )
+
+        self.w_use = self.unit_def * (self.q_freq - self.gk)
         if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
-                self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                           self.section.h, self.section.d)
-                self.w_use_ger = unit_def * self.q_freq * max(3.4,self.f_w_ger) # SIA262:2025, Formel (104)
-                #Alte Berechnung Durchbiegung
-                #self.w_use_ger = unit_def * (
-                #            (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh,
-                #                                                                     self.section.rohs, 0,
-                #                                                                     self.section.h, self.section.d)
-                #    )
+                '''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                self.w_use_ger = self.unit_def * self.q_freq * max(3.4,self.f_w_ger_2) # SIA262:2025, Formel (104)'''
+                #Detaillierte Berechnung Durchbiegung
+                self.w_use_ger = self.unit_def * (
+                            (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh,
+                                                                                     self.section.rohs, 0,
+                                                                                     self.section.h, self.section.d)
+                    )
 
-        self.w_app = unit_def * (self.q_per * (1 + self.section.phi))
+        self.w_app = self.unit_def * (self.q_per * (1 + self.section.phi))
         if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(102)
-                    # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
-                    self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
-                                                               self.section.h, self.section.d)
-                    self.w_app_ger = unit_def * self.q_per * max(3.4,self.f_w_ger)  # SIA262:2025, Formel (104)
-                    #Alte Berechnung Durchbiegung
-                    #self.w_app_ger = unit_def * (
-                    #        self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                    #                                                 self.section.phi,
-                    #                                                 self.section.h, self.section.d)
-                    #)
+                    '''# Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
+                    self.w_app_ger = self.unit_def * self.q_per * max(3.4,self.f_w_ger_2)  # SIA262:2025, Formel (104)'''
+                    #Detaillierte Berechnung Durchbiegung
+                    self.w_app_ger = self.unit_def * (
+                            self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
+                                                                     self.section.phi,
+                                                                     self.section.h, self.section.d)
+                    )
 
         self.co2 = system.l_tot * (self.floorstruc.co2_Floor + self.section.co2)
         self.co2_a = system.l_tot * (self.floorstruc.co2_a_Floor + self.section.co2 / 60)
