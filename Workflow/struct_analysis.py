@@ -222,6 +222,7 @@ class RectangularWood(SupStrucRectangular, Section):
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
         self.wood_type = wood_type
+        self.phi = wood_type.creep_coef
         mu_el, vu_el = self.calc_strength_elast(wood_type.fmd, wood_type.fvd)
         self.mu_max, self.mu_min = [mu_el, -mu_el]  #Readme: Why is this needed for wood? -> is not needed for wood.
         # However, as the same resistance values should be provided for all cross-sections, I defined them for both
