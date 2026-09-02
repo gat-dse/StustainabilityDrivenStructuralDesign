@@ -218,7 +218,6 @@ class SupStrucRectangular(Section):
 class RectangularWood(SupStrucRectangular, Section):
     # defines properties of rectangular, wooden cross-section (Brettstapeldecke)
     def __init__(self, wood_type, b, h, phi=0.6, xi=0.02, ei_b=0.0):  # create a rectangular timber object
-        #TODO: phi in Datenbank "material_prop" aufnehmen (für FK1), da sich der Wert unterscheidet je nach HWS (in Excel ergaenzt -> Im Code noch anpassen)
         section_type = "wd_rec"
         super().__init__(section_type, b, h, phi)
         self.wood_type = wood_type
@@ -319,7 +318,7 @@ class RectangularConcrete(SupStrucRectangular):
         self.mr_p, self.mr_n = mr, -mr  # mr_p: positives Rissmoment, mr_n: negatives Rissmoment
 
         #Berechnung Traglasten und Eigengewicht
-        [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos')
+        [self.mu_max, self.x_p, self.as_p, self.qs_class_p] = self.calc_mu('pos') #
         [self.mu_min, self.x_n, self.as_n, self.qs_class_n] = self.calc_mu('neg')
         self.roh, self.rohs = self.as_p / self.d, self.as_n / self.ds #Bewehrungsgehalt für Hauptbewehrungsrichtung x (oben und unten)
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance()
@@ -1466,6 +1465,7 @@ class Member1D:
 
         if self.requirements.install == "ductile": #Lastfall häufig und w < L/350
             self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
+
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
                 self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
