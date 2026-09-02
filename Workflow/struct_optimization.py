@@ -955,6 +955,52 @@ def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28):
             return None
 
     section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
+    return section'''
+
+#TPE-OPTIMIERUNG
+
+##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
+# outer function for finding optimal wooden rectangular cross-section
+
+available_h = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28]
+
+
+def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter= 20, alg="TPE"):
+    h_0 = member.section.h
+    #Nur Höhen bis h_max zulassen
+    h_kandidaten = [h for h in available_h if h <= h_max] #h_max enstpricht der maximal verfügbaren Stärke für Massivholzdecken
+    if not h_kandidaten:
+        return None
+
+    add_arg = [member, criterion]
+    def objective(trial):
+        h = trial.suggest_categorical("h", h_kandidaten)
+        try:
+            return wd_rqs_h(h, add_arg)
+        except Exception:
+            return 1e20
+    study = optuna.create_study(
+        direction = "minimize",
+        sampler=optuna.samplers.TPESampler(seed=42)
+    )
+    #Startpunkt: nächstgelegene verfügbare Höhe zum ursprünglichen Querschnitt
+    study.enqueue_trial({
+        "h":min(h_kandidaten, key=lambda h: abs(h - h_0))
+    })
+
+    study.optimize(objective, n_trials=max_iter)
+
+    h_opt = study.best_params['h']
+
+    #Check feasibilty: if optimizer hit upper bound, solution may be infeasible:
+    if h_opt >= h_max: #for wd_rec (Massivholzdecken) max available cross section height is 28 cm
+        # Only if it's truly at the max and still fails
+        feasibility = wd_rqs_h(h_opt, [member, criterion])
+        # For ULS: tolerance in kN/m; 0.5 kN/m is reasonable (5% of typical loads)
+        if feasibility > 0.5:  # Much higher tolerance
+            return None
+
+    section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
     return section
 
 # inner function used for optimizing wooden section in terms of height (equals co2)
