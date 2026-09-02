@@ -10,7 +10,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,5,6,7,8,9,10]
+lengths = [3,4,5,6,7,8,9,10,11,12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -32,6 +32,7 @@ bodenaufbau_vollholzdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False
                                  ["'Kies gebrochen'", 0.12, False]]
 bodenaufbau_wd_solid = struct_analysis.FloorStruc(bodenaufbau_vollholzdecke, database_name)
 
+
 # create floor structure for ribbed wooden cross-section
 # For reaching REI60, Lignum 4.1, Table 433-2, Column G is applied. Thus, Gipsfaserplatte (2x15 mm) and Steinwolle
 # (180 mm) are required as non load bearing layers.
@@ -42,6 +43,7 @@ bodenaufbau_hohlkastendecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", Fal
 bodenaufbau_wd_rib = struct_analysis.FloorStruc(bodenaufbau_hohlkastendecke, database_name)
 # correct the total height of the floor structure by the height of the insulation within the element
 bodenaufbau_wd_rib.h_Floor = bodenaufbau_wd_rib.h_Floor - h_ins
+
 
 
 
