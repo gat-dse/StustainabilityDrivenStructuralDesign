@@ -1057,6 +1057,12 @@ def wd_rqs_h(h, args):
         print("criterion has to be 'ULS', 'SLS1', 'SLS2' or ENV")
     return to_minimize
 
+##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
+# outer function for finding optimal wooden rib cross-section
+
+#ALTE VERSION
+
+'''
 def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     # definition of initial values for variables, which are going to be optimized
     h0 = m.section.h
@@ -1096,6 +1102,109 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
                                                                             "method": "Powell"}, take_step=bounded_step)
 
     b, h, t2, t3, a = opt.x
+    optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, b, h, a, t2, t3)
+    #print(l0, b, h, t2)
+    return optimized_section'''
+
+
+#NEU: Optimierung mit TPE
+
+# Handelsübliche Abmessungen (kategorial) für opt_wd_rib
+T_KANDIDATEN_WDRIB = [0.027, 0.03, 0.04, 0.05, 0.06]  # Beplankungsstärken t2 / t3
+B_KANDIDATEN_WDRIB = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24]  # Rippenbreite b
+A_KANDIDATEN_WDRIB = [0.625, 0.65, 0.675, 0.7]  # Rippenabstand a (Lignum 4.1, Table 433-2)
+
+# Rippenhöhe h: Handelsstärken hängen vom Werkstoff der Rippe ab (Vollholz/BSH "C.." vs. Brettschichtholz "GL..")
+H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3]
+H_KANDIDATEN_GL = [0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.76, 0.8]  # 4 cm Schritte
+
+
+def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
+    # definition of initial values for variables, which are going to be optimized
+    h0 = m.section.h
+    b0 = m.section.b
+    t20 = m.section.t2
+    t30 = m.section.t3
+    a0 = m.section.a
+
+    # define bounds of variables
+    # Randbedingungen Abmessungen für R60 und Aufbau gemäss Lignum 4.1, Tabelle 433-2, Spalte G: Unten keine Beplankung, aber Hohlraumdämmung und Mindestabmessungen Rippen
+    bh = (0.22, 2.0)  # height of rib between 22 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
+    # Column G) and 200 cm
+    bb = (0.1, 0.52)  # width of rib between 10 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
+    # Column G) and 52 cm
+    bt2 = (0.025, 0.16)  # hight of lower sheating between 2.5 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2,
+    # Column G) and 16 cm
+    bt3 = (0.027, 0.16)  # hight of lower sheating between 2.7 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2,
+    #Rippenabstand zwischen 0.625 und 0.7 m (Lignum4.1, Table 433-2)
+    ba = (0.625, 0.7)
+
+    # definition of fixed values of cross-section
+    l0 = m.li_max
+
+    ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
+
+    # Handelsübliche Kandidaten auf die Randbedingungen (R60, Lignum 4.1) einschränken
+    b_kandidaten = [x for x in B_KANDIDATEN_WDRIB if bb[0] <= x <= bb[1]]
+    t2_kandidaten = [x for x in T_KANDIDATEN_WDRIB if bt2[0] <= x <= bt2[1]]
+    t3_kandidaten = [x for x in T_KANDIDATEN_WDRIB if bt3[0] <= x <= bt3[1]]
+    a_kandidaten = [x for x in A_KANDIDATEN_WDRIB if ba[0] <= x <= ba[1]]
+
+    # Höhenkandidaten und h_max in Abhängigkeit vom Werkstoff der Rippe (wood_type_1) bestimmen:
+    # mech_prop ist z.B. "'C24'" oder "'GL24h'" (inkl. Anführungszeichen aus der DB-Abfrage)
+    mech_prop_1 = ti1.mech_prop.strip("'\"")
+    if mech_prop_1.startswith("GL"):
+        h_kandidaten_full = H_KANDIDATEN_GL
+    else:
+        h_kandidaten_full = H_KANDIDATEN_C
+    h_kandidaten = [x for x in h_kandidaten_full if bh[0] <= x <= bh[1]]
+    h_max = max(h_kandidaten) if h_kandidaten else bh[1]
+
+    if not (b_kandidaten and t2_kandidaten and t3_kandidaten and a_kandidaten and h_kandidaten):
+        # keine handelsübliche Kombination innerhalb der Randbedingungen (R60) verfügbar
+        return None
+
+    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+
+    # TPE-Algorithmus mit Optuna
+    def objective(trial):
+
+        b = trial.suggest_categorical("b", b_kandidaten)
+        h = trial.suggest_categorical("h", h_kandidaten)
+        t2 = trial.suggest_categorical("t2", t2_kandidaten)
+        t3 = trial.suggest_categorical("t3", t3_kandidaten)
+        a = trial.suggest_categorical("a", a_kandidaten)
+
+        try:
+            return wd_rib_rqs([b, h, t2, t3, a], add_arg)
+        except Exception:
+            return 1e20
+
+    study = optuna.create_study(
+        direction="minimize",
+        sampler=optuna.samplers.TPESampler(seed=42)
+    )
+
+    # Startpunkt: nächstgelegene verfügbare Werte zum ursprünglichen Querschnitt
+    study.enqueue_trial({
+        "b": min(b_kandidaten, key=lambda x: abs(x - b0)),
+        "h": min(h_kandidaten, key=lambda x: abs(x - h0)),
+        "t2": min(t2_kandidaten, key=lambda x: abs(x - t20)),
+        "t3": min(t3_kandidaten, key=lambda x: abs(x - t30)),
+        "a": min(a_kandidaten, key=lambda x: abs(x - a0)),
+    })
+
+    study.optimize(
+        objective,
+        n_trials=max_iter
+    )
+
+    b = study.best_params["b"]
+    h = study.best_params["h"]
+    t2 = study.best_params["t2"]
+    t3 = study.best_params["t3"]
+    a = study.best_params["a"]
+
     optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, b, h, a, t2, t3)
     #print(l0, b, h, t2)
     return optimized_section
@@ -1333,8 +1442,8 @@ def rc_rib_crsc(var, add_arg):
     reinfsteel = add_arg[1]
     l0 = add_arg[2]
     h_f = add_arg[3]
-    di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw = add_arg[4:11]
-    phi, c_nom, xi, jnt_srch = add_arg[12:15]
+    di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw = add_arg[4:12]
+    phi, c_nom, xi, jnt_srch = add_arg[12:16]
     gwp_budget = add_arg[16]
     section_updated = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, phi, c_nom, xi, jnt_srch)
     penalty = 1e6*max(section_updated.co2-gwp_budget, 0)
