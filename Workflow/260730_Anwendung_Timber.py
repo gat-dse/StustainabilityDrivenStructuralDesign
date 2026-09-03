@@ -10,13 +10,13 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [3,4,5,6,7,8,9,10,11,12]
+lengths = [4,6,8,10,12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 5
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
@@ -34,11 +34,11 @@ bodenaufbau_wd_solid = struct_analysis.FloorStruc(bodenaufbau_vollholzdecke, dat
 
 
 # create floor structure for ribbed wooden cross-section
-# For reaching REI60, Lignum 4.1, Table 433-2, Column G is applied. Thus, Gipsfaserplatte (2x15 mm) and Steinwolle
-# (180 mm) are required as non load bearing layers.
+# For reaching REI60, Lignum 4.1, Table 433-2, Column G is applied. Thus Steinwolle
+# (180 mm) and Estrich (mind. 30mm) required as non load bearing layers.
 h_ins = 0.18
 bodenaufbau_hohlkastendecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                                 ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Gipsfaserplatte'", 0.03, False], ["'Glaswolle'", 0.03, False],
+                                 ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False],
                                  ["'Kies gebrochen'", 0.12, False], ["'Steinwolle'", h_ins, False],]
 bodenaufbau_wd_rib = struct_analysis.FloorStruc(bodenaufbau_hohlkastendecke, database_name)
 # correct the total height of the floor structure by the height of the insulation within the element
@@ -72,7 +72,7 @@ start = time.time()
 #TODO: Achtung 'Glue_laminated_timber_board' heisst jetzt 3- and .....
 #TODO: Glue Laminated Timberboard: 3-Schichtplatten / CLT Platten: Prüfen, sind die mech. Eigenschaften und das Trägheitsmoment richtig berücksichtigt? Also z.B: mit Faktor 2/3?
 
-
+'''
 # RECTANGUALR WOODEN CROSS-SECTION ("BRETTSTAPELDECKE") mit VOLLHOLZ
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names_rc_wd = ["'Solid_structural_timber'", "'Glue_laminated_timber'"]
@@ -82,8 +82,9 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
 '''
+
+
 # RIB WOODEN CROSS-SECTION (Hohlkastendecke) mit Steg aus BSH oder Vollholz und Flanch oben und unten aus 3-Schichtplatte
 # define materials for which date is searched in the database (table products, attribute material)
 
@@ -94,7 +95,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-'''
+
 
 
 # DEFINE LABELS OF PLOTS

@@ -426,8 +426,8 @@ class RectangularConcrete(SupStrucRectangular):
     def calc_as_bw(di, n, s, d):
         #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
         #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
-        as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d #ToDo: muss die Bügelquerschnittsfläche nicht noch mit der Plattenstärke multipliziert werden?
-        return as_bw #TODo: Berechnung as_bw falsch? (Einheiten?)
+        as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d
+        return as_bw
 
     @staticmethod
     def vu_unsigned(bw, di, n, s, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
@@ -636,8 +636,8 @@ class FlatSlab2D(SupStrucRectangular):
     def calc_as_bw(di, n, s, d):
         #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
         #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
-        as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d #ToDo: muss die Bügelquerschnittsfläche nicht noch mit der Plattenstärke multipliziert werden?
-        return as_bw #TODo: Berechnung as_bw falsch? (Einheiten?)
+        as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d
+        return as_bw
 
     @staticmethod
     def vu_unsigned(bw, di, n, s, as_bw, d, dv, x, fck, fcd, tcd, fsk, fsd, es, dmax=32, alpha=np.pi / 4, kc=0.55):
@@ -1078,16 +1078,17 @@ class SupStrucRibWood(Section):
     def calc_area(self):
         # in: width b and bw [m], height h and h_f[m]
         # out: area [m2]
-        a_brutt = self.b * self.h / self.a + 1 * self.t2 + 1 * self.t3
+        a_brutt = self.b * self.h / self.a + 1 * self.t2 + 1 * self.t3 # Total area, not effective area (not for static calculation but for GWP, Cost)
         return a_brutt
 
     def calc_bef(self, sign='comp' ):
-        # in: width b and bw [m], Abstand Momentennullpunkte l_0 [m] #TODO: prüfen ob Berechnung b_eff auf für Holz korrekt ist
+        # in: width b and bw [m], Abstand Momentennullpunkte l_0 [m]
         # out: effective width b_eff
         l_0 = self.l0
         if sign == 'comp':
-            b_ef_schub = 0.1 * l_0
-            b_ef_beulen = 20 * self.t3  # falls Fasern rechtwinklig zu Stegen wären, ist Faktor falsch!
+            b_ef_schub = 0.1 * l_0 #SIA265, Tab. 17 für BSP (für OSB Wäre es 0.15 * l)
+            b_ef_beulen = 20 * self.t3  #SIA265, Tab. 17 für BSP (Faser parallel  falls Fasern rechtwinklig zu Stegen wären, gilt: 25*ti
+            #Die Berechnung für alle Beplankungen mit 0.1*l und 20*ti ist konservativ. Es wird nicht unterschieden je nach Spannrichtung.
             b_ef = min(b_ef_schub, b_ef_beulen, self.a - self.b)
             return b_ef
         else:
@@ -1099,8 +1100,8 @@ class SupStrucRibWood(Section):
         # in: Geometry effective width b, h, a, t2, b_ef_t, t3, b_ef_c
         # out: center of gravity z_s [m]
         z_s1 = self.t3 + self.h/2
-        z_s2 = self.t3+self.h + self.t2/2
-        z_s3 = self. t3/2
+        z_s2 = self.t3 + self.h + self.t2/2
+        z_s3 = self.t3/2
         z_s = ((self.b * self.h *z_s1 + self.bt_ef * self.t2 * z_s2 + self.bc_ef * self.t3 * z_s3) /
                (self.b * self.h + self.bt_ef * self.t2 + self.bc_ef * self.t3))
         return z_s
@@ -1111,8 +1112,8 @@ class SupStrucRibWood(Section):
 
         #z=0: Oberkante obere Beplankung
         z_s1 = self.t3 + self.h/2
-        z_s2 = self.t3+self.h + self.t2/2
-        z_s3 = self. t3/2
+        z_s2 = self.t3 + self.h + self.t2/2
+        z_s3 = self.t3/2
 
         i_1 = self.n[0] * self.b * self.h ** 3 / 12
         as_1 = self.n[0] * self.b * self.h * abs(self.z_s - z_s1) ** 2
@@ -1179,20 +1180,23 @@ class RibWood(SupStrucRibWood):
     def calc_n(self):
         ft0d = 8.5 #C24
         fc0d = 12.4 #C24
-        E0mean = 11000 #C24
+        E0mean = 11000 #C24 #fpr mehrlagige Massivholzplatte wir auf mech_prop von "C24" verwiesen
 
-        factor = 2/3 #Dreischichtplatte 9/9/9 oder 10/10/10
+        #Die Beplankung wird durch Biegedruck bzw. Biegezug parallel zur Faserrichtung der Decklagen beanpsrucht.
+        #Deshalb wird der mittlere E-Modul für Zug- und Druckbeanspruchung der mehrlagigen Massivholzplatte SWP/2 nach Herstellerangaben eingesetzt.
+        #Vorgehen gemäss Lignum (2022), HBT - Bemessungsbeispiele zur Norm SIA265 (Besp. 4.1, Bemessung Hohlkastenträger)
+        factor = 2/3 #Dreischichtplatte 9/9/9 oder 10/10/10, ACHTUNG: Faserrichtung Decklage parallel zu Stegrichtung!
 
         n1 = self.wood_type_1.Emmean / self.wood_type_1.Emmean          # Wertigkeit Rippe
-        n2 = self.wood_type_2.Emmean*factor / self.wood_type_1.Emmean  # Wertigkeit Beplankung unten           #Todo: EMMEAN reduzieren! Stimmt das?
-        n3 = self.wood_type_3.Emmean*factor / self.wood_type_1.Emmean  # Wertigkeit Beplankung oben            #Todo: EMMEAN reduzieren!
+        n2 = self.wood_type_2.Emmean*factor / self.wood_type_1.Emmean  # Wertigkeit Beplankung unten
+        n3 = self.wood_type_3.Emmean*factor / self.wood_type_1.Emmean  # Wertigkeit Beplankung oben
         n = [n1, n2, n3]
         n1_inf = (self.wood_type_1.Emmean / (1 + self.phi_1)) / (
                 self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Rippe t=inf
         n2_inf = (self.wood_type_2.Emmean*factor / (1 + self.phi_2)) / (
-                self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Beplankung unten t=inf    #Todo: EMMEAN reduzieren!
+                self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Beplankung unten t=inf
         n3_inf = (self.wood_type_3.Emmean*factor / (1 + self.phi_3)) / (
-                self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Beplankung oben t=inf     #Todo: EMMEAN reduzieren!
+                self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Beplankung oben t=inf
         n_inf = [n1_inf, n2_inf, n3_inf]
         return n, n_inf
 
@@ -1204,17 +1208,19 @@ class RibWood(SupStrucRibWood):
         fy2 = 8600000  #self.wood_type_2.fcd      #Festigkeiten für 3S Platten reduzieren
         fy3 = 5900000  #self.wood_type_3.ftd      #Festigkeiten für 3S Platten reduzieren
 
+        #Biegerandspannung am Steg (Rand oben und unten)
         mu1_rand_o = min(self.mu_unsigned(fy1, self.iy, (self.z_s - self.t3), self.n[0]),  # z = zs -t3
                        self.mu_unsigned(fy1, self.iy_inf, (self.z_s - self.t3), self.n_inf[0]))
         mu1_rand_u = min(self.mu_unsigned(fy1, self.iy, (self.h + self.t3 - self.z_s), self.n[0]),  # z = h + t3 -zs
                        self.mu_unsigned(fy1, self.iy_inf,(self.h + self.t3 - self.z_s), self.n_inf[0]))
 
-
+        # Biegerandspannung am Flanch unten (Rand oben und unten)
         mu2_rand_o = min(self.mu_unsigned(fy2, self.iy, (self.t3 + self.h - self.z_s ), self.n[1]),  # z = t3 + h - zs
                          self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h - self.z_s ), self.n_inf[1]))
         mu2_rand_u = min(self.mu_unsigned(fy2, self.iy, (self.t3 + self.h + self.t2- self.z_s ), self.n[1]),  # z = t3 + h + t2 - zs
                          self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h + self.t2- self.z_s ), self.n_inf[1]))
 
+        # Biegerandspannung am Flanch oben (Rand oben und unten)
         mu3_rand_o = min(self.mu_unsigned(fy3, self.iy, self.z_s, self.n[2]),  # z = zs
                          self.mu_unsigned(fy3, self.iy_inf, self.z_s, self.n_inf[2]))
         mu3_rand_u = min(self.mu_unsigned(fy3, self.iy, (self.z_s - self.t3), self.n[2]),  # z = zs -t3
@@ -1226,10 +1232,17 @@ class RibWood(SupStrucRibWood):
         mu = fy * iy / z / n
         return mu
 
-    def calc_vu(self):
+    def calc_vu(self): #Querkraftwiderstand
         ty1 = self.wood_type_1.fvd
-        vu_1 = ty1 * self.b * self.h / 1.5  #nur Rippe angesetzt
-        return vu_1
+        vu_1 = ty1 * self.b * self.h / 1.5  #Widerstand Steg (nur Rippe angesetzt)
+
+        #ty2 = self.wood_type_2.fvd #Schubwiderstand in Beplankung in Fuge unten
+        #vu_2 = ty2 * self.bt_ef * self.t2 / 1.5
+
+        # ty3 = self.wood_type_3.fvd #Schubwiderstand in Beplankung in Fuge oben
+        # vu_3 = ty3 * self.bc_ef * self.t3 / 1.5
+
+        return vu_1 #, vu2, vu3
 
     # FEHLT: Rollschubnachweis!!
 

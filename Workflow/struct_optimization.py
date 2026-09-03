@@ -937,8 +937,11 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
         print("criterion has to be 'ULS', 'SLS1', 'SLS2', 'FIRE' or 'ENV'")
     return to_minimize
 
-'''
+
 ##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
+'''
+#OPTIMIERUNG mit Powell (alt)
+
 # outer function for finding optimal wooden rectangular cross-section
 def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28):
     h_0 = member.section.h
@@ -1060,11 +1063,11 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     b0 = m.section.b
     t20 = m.section.t2
     t30 = m.section.t3
-    var0 = [b0, h0, t20, t30]
+    a0 = m.section.a
+    var0 = [b0, h0, t20, t30, a0]
 
     # define bounds of variables
-    # TODO: Stimmen die Randbedingungen der Schichtdicken so gemäss Lignum? Ist zu verifizieren!
-    # TODO: Ev. Fallunterscheidung -> Falls unten GFP vorhanden, gem. aktuellem Stand, falls nicht, dann 2. Fall definieren.
+    # Randbedingungen Abmessungen für R60 und Aufbau gemäss Lignum 4.1, Tabelle 433-2, Spalte G: Unten keine Beplankung, aber Hohlraumdämmung und Mindestabmessungen Rippen
     bh = (0.22, 2.0)  # height of rib between 22 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
     # Column G) and 200 cm
     bb = (0.1, 0.52)  # width of rib between 10 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
@@ -1072,47 +1075,48 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
     bt2 = (0.025, 0.16)  # hight of lower sheating between 2.5 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2,
     # Column G) and 16 cm
     bt3 = (0.027, 0.16)  # hight of lower sheating between 2.7 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2,
-    # Column G) and 16 cm
-    bounds = [bb, bh, bt2, bt3]
+    #Rippenabstand zwischen 0.625 und 0.7 m (Lignum4.1, Table 433-2)
+    ba = (0.625, 0.7)
+    bounds = [bb, bh, bt2, bt3, ba]
 
     # definition of fixed values of cross-section
     #TODO: Rippenabstand sollte als Variabel einfliessen. Achtung: gem. Tab. 433-2 darf der Abstand jedoch max. 700 mm sein! Grenzen entsprechend wählen.
     l0 = m.li_max
-    a = m.section.a
+    # a = m.section.a
     # t2 = m.section.t2
     # t3 = m.section.t3
 
     ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
 
-    add_arg = [m.system, ti1, ti2, ti3, l0, a, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
 
 # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
     opt = basinhopping(wd_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
                                                                             "method": "Powell"}, take_step=bounded_step)
 
-    b, h, t2, t3 = opt.x
+    b, h, t2, t3, a = opt.x
     optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, b, h, a, t2, t3)
     #print(l0, b, h, t2)
     return optimized_section
 
 #inner function for optimizing wood sections for criteria ULS or SLS in terms of GWP or height
 def wd_rib_rqs(var, add_arg):
-    b, h, t2, t3 = var
+    b, h, t2, t3, a = var
     system = add_arg[0]
     timber1 = add_arg[1]
     timber2 = add_arg[2]
     timber3 = add_arg[3]
     l0 = add_arg[4]
-    a = add_arg[5]
+    #a = add_arg[5]
     #t2 = add_arg[6]
     #t3 = add_arg[6]
-    floorstruc = add_arg[6]
-    criteria = add_arg[7]
-    to_opt = add_arg[8]
-    criterion = add_arg[9]
-    g2k = add_arg[10]
-    qk = add_arg[11]
+    floorstruc = add_arg[5]
+    criteria = add_arg[6]
+    to_opt = add_arg[7]
+    criterion = add_arg[8]
+    g2k = add_arg[9]
+    qk = add_arg[10]
 
     # create section
     section = struct_analysis.RibWood(timber1, timber2, timber3, l0, b, h, a, t2, t3)
