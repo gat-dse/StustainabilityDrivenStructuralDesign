@@ -8,20 +8,20 @@ import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,8]
+lengths = [4, 6, 8, 10, 12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 100
+max_iter = 150
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260805.db"
+database_name = "database_260811.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
