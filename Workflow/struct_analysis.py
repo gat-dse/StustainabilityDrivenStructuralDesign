@@ -837,7 +837,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.rohw_min = 0.001 * (self.concrete_type.fck * 1e-6 / 30) ** 0.5 * 500 / (self.rebar_type.fsk * 1e-6)  # Formel (116) mit fck und fyk in MPa
 
         self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
-        self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
+        self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Rippenabstand  b -> Eigenlast QS pro m2 [N/m2]
 
         # Gesamte Bewehrungsfläche as_tot inkl. Mindestbewehrung für Bewehrung in y-Richtung in Platte
         self.as_Platte = (self.as_p + self.as_n)* self.b * 1 * 2 # [m3]
@@ -854,7 +854,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.Bew_Gehalt = a_s_tot * self.rebar_type.density / (self.h_w * self.b_w + self.h_f * self.b) # [kg CO2 eq / m3]
 
         self.co2_rebar = a_s_tot * self.rebar_type.GWP * self.rebar_type.density/self.b  # [kg_CO2_eq/m2]
-        self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m]
+        self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m2]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete) #[kgCO2_eq/m2]
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
@@ -1059,55 +1059,55 @@ class RibbedConcrete(SupStrucRibbedConcrete):
 
 # .....................................................................................
 class SupStrucRibWood(Section):
-    def __init__(self, section_type, b, h, a, t2, t3, n, n_inf):
+    def __init__(self, section_type, bw, h, b, t2, t3, n, n_inf):
         super().__init__(section_type)
-        self.b = b  # rib width [m]
+        self.bw = bw  # rib width [m]
         self.h = h  # rib height [m]
-        self.a = a  # spacing between ribs [m]
+        self.b = b  # spacing between ribs [m]
         self.t2 = t2  # slab height bottom flange [m]
         self.t3 = t3  # slab height top flange [m]
-        self.bc_ef = self.calc_bef('comp') + b  # Effective width top flange compression [m]
-        self.bt_ef = self.calc_bef('tens') + b  # Effective width bottom flange tension [m]
-        self.a_brutt = self.calc_area()
+        self.bc_ef = self.calc_bef('comp') + bw  # Effective width top flange compression [m]
+        self.bt_ef = self.calc_bef('tens') + bw  # Effective width bottom flange tension [m]
+        self.a_brutt = self.calc_area() #Bruttoquerschnittsfläche [m2] (QS zwischen zwei Rippen, Abstand a)
         self.n = n
         self.n_inf = n_inf
         self.z_s = self.calc_center_of_gravity()
         self.iy, self.iy_inf = self.calc_moment_of_inertia()
-        self.w = self.calc_weight #Eigenlast QS pro Laufmeter [N/m]
+        self.w = self.calc_weight #Eigenlast QS pro Laufmeter [N/m']
 
     def calc_area(self):
-        # in: width b and bw [m], height h and h_f[m]
+        # in: width bw (Stegbreite) and b (Stegabstand) [m], height h and h_f[m]
         # out: area [m2]
-        a_brutt = self.b * self.h / self.a + 1 * self.t2 + 1 * self.t3 # Total area, not effective area (not for static calculation but for GWP, Cost)
+        a_brutt = self.bw * self.h + self.b * (self.t2 + self.t3)  #Bruttoquerschnittsfläche [m2]
         return a_brutt
 
     def calc_bef(self, sign='comp' ):
-        # in: width b and bw [m], Abstand Momentennullpunkte l_0 [m]
+        # in: width bw and b [m], Abstand Momentennullpunkte l_0 [m]
         # out: effective width b_eff
         l_0 = self.l0
         if sign == 'comp':
             b_ef_schub = 0.1 * l_0 #SIA265, Tab. 17 für BSP (für OSB Wäre es 0.15 * l)
             b_ef_beulen = 20 * self.t3  #SIA265, Tab. 17 für BSP (Faser parallel  falls Fasern rechtwinklig zu Stegen wären, gilt: 25*ti
             #Die Berechnung für alle Beplankungen mit 0.1*l und 20*ti ist konservativ. Es wird nicht unterschieden je nach Spannrichtung.
-            b_ef = min(b_ef_schub, b_ef_beulen, self.a - self.b)
+            b_ef = min(b_ef_schub, b_ef_beulen, self.b - self.bw)
             return b_ef
         else:
             b_ef_schub = 0.1 * l_0
-            b_ef = min(b_ef_schub, self.a - self.b)
+            b_ef = min(b_ef_schub, self.b - self.bw)
             return b_ef
 
     def calc_center_of_gravity(self):
-        # in: Geometry effective width b, h, a, t2, b_ef_t, t3, b_ef_c
+        # in: Geometry effective width bw, h, t2, b_ef_t, t3, b_ef_c
         # out: center of gravity z_s [m]
         z_s1 = self.t3 + self.h/2
         z_s2 = self.t3 + self.h + self.t2/2
         z_s3 = self.t3/2
-        z_s = ((self.b * self.h *z_s1 + self.bt_ef * self.t2 * z_s2 + self.bc_ef * self.t3 * z_s3) /
-               (self.b * self.h + self.bt_ef * self.t2 + self.bc_ef * self.t3))
+        z_s = ((self.bw * self.h *z_s1 + self.bt_ef * self.t2 * z_s2 + self.bc_ef * self.t3 * z_s3) /
+               (self.bw * self.h + self.bt_ef * self.t2 + self.bc_ef * self.t3))
         return z_s
 
     def calc_moment_of_inertia(self):
-        # in: Geometry b, h, t2, bt_ef, t3, bc_ef, zs
+        # in: Geometry bw, h, t2, bt_ef, t3, bc_ef, zs
         # out: moment of inertia I_y [m^4]
 
         #z=0: Oberkante obere Beplankung
@@ -1115,15 +1115,15 @@ class SupStrucRibWood(Section):
         z_s2 = self.t3 + self.h + self.t2/2
         z_s3 = self.t3/2
 
-        i_1 = self.n[0] * self.b * self.h ** 3 / 12
-        as_1 = self.n[0] * self.b * self.h * abs(self.z_s - z_s1) ** 2
+        i_1 = self.n[0] * self.bw * self.h ** 3 / 12
+        as_1 = self.n[0] * self.bw * self.h * abs(self.z_s - z_s1) ** 2
         i_2 = self.n[1] * self.bt_ef * self.t2 ** 3 / 12
         as_2 = self.n[1] * self.bt_ef * self.t2 * abs(self.z_s - z_s2) ** 2
         i_3 = self.n[2] * self.bc_ef * self.t3 ** 3 / 12
         as_3 = self.n[2] * self.bc_ef * self.t3 * abs(self.z_s - z_s3) ** 2
         iy = i_1 + as_1 + i_2 + as_2 + i_3 + as_3
-        i_1_inf = self.n_inf[0] * self.b * self.h ** 3 / 12
-        as_1_inf = self.n_inf[0] * self.b * self.h * abs(self.z_s - z_s1) ** 2
+        i_1_inf = self.n_inf[0] * self.bw * self.h ** 3 / 12
+        as_1_inf = self.n_inf[0] * self.bw * self.h * abs(self.z_s - z_s1) ** 2
         i_2_inf = self.n_inf[1] * self.bt_ef * self.t2 ** 3 / 12
         as_2_inf = self.n_inf[1] * self.bt_ef * self.t2 * abs(self.z_s - z_s2) ** 2
         i_3_inf = self.n_inf[2] * self.bc_ef * self.t3 ** 3 / 12
@@ -1143,7 +1143,7 @@ class SupStrucRibWood(Section):
 #................................................................
 class RibWood(SupStrucRibWood):
     # defines properties of ribbed timber slab = "Hohlkastendecke" → box beam floor or "Ripendecke" = → joist floor
-    def __init__(self, wood_type_1, wood_type_2, wood_type_3, l0, b, h, a, t2, t3, phi_1=0.6, phi_2=0.6, phi_3=0.6,
+    def __init__(self, wood_type_1, wood_type_2, wood_type_3, l0, bw, h, b, t2, t3, phi_1=0.6, phi_2=0.6, phi_3=0.6,
                  xi=0.03, ei_b=0.0):  # create a rectangular timber object
         section_type = "wd_rib"
         self.wood_type_1 = wood_type_1
@@ -1158,22 +1158,22 @@ class RibWood(SupStrucRibWood):
         self.l0 = l0
 
         n, n_inf = self.calc_n()
-        super().__init__(section_type, b, h, a, t2, t3, n, n_inf)
+        super().__init__(section_type, bw, h, b, t2, t3, n, n_inf)
 
         mu1_rand_u, mu1_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = self.calc_mu()
-        #print("mu1_rand_u, muq_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o =", mu1_rand_u, mu1_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o)
+        print(f"mu1_rand_u, muq_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = {mu1_rand_u/1000:.2f}, {mu1_rand_o/1000:.2f}, {mu2_rand_u/1000:.2f}, {mu2_rand_o/1000:.2f}, {mu3_rand_u/1000:.2f}, {mu3_rand_o/1000:.2f}")
         mu_el = max(mu1_rand_u, mu1_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o)
         self.mu_max, self.mu_min = [mu_el, -mu_el]
         vu_el = self.calc_vu()
         self.vu_p, self.vu_n = vu_el, vu_el
 
         self.qs_class_n, self.qs_class_p = [3, 3]  # Required cross-section class: 1:=PP, 2:EP, 3:EE
-        self.g0k = self.calc_weight(wood_type_1.weight)
-        self.g0k_b = self.g0k / self.b  # Eigenlast QS geteilt durch Breite -> Eigenlast QS pro m2 [N/m2]
+        self.g0k = self.calc_weight(wood_type_1.weight) # Eigenlast QS pro Laufmeter [N/m]
+        self.g0k_b = self.g0k / self.b  #Eigenlast QS geteilt durch Rippenabstand b -> Eigenlast QS pro m2 [N/m2]
         self.ei1 = self.wood_type_1.Emmean * self.iy  # elastic stiffness [Nm^2], Zeitpunkt t = 0
 
-        self.co2 = (self.b*self.h * self.wood_type_1.GWP * self.wood_type_1.density)/self.a +self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m]
-        self.cost = self.b * self.h / self.a * self.wood_type_1.cost + (self.t2 + self.t3)  * self.wood_type_2.cost
+        self.co2 = (self.bw * self.h * self.wood_type_1.GWP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m2]
+        self.cost = self.bw * self.h / self.b * self.wood_type_1.cost + 1 * self.t2 * self.wood_type_2.cost + 1 * self.t3  * self.wood_type_3.cost #[CHF/m2]
         self.ei_b = ei_b  # stiffness perpendicular to direction of span
         self.xi = xi  # damping factor, preset value for builddup with "Schwimmendem Estrich" see: HBT, Page 47
 
@@ -1201,26 +1201,26 @@ class RibWood(SupStrucRibWood):
         return n, n_inf
 
     def calc_mu(self):
-        #Nachweise nach SIA 5.3.5 Tafelelemente (Biegeelemente)-----PRÜFEN
+        #Nachweise nach SIA 5.3.5 Tafelelemente (Biegeelemente)-----#TODO PRÜFEN
 
         fy1 = self.wood_type_1.fmd
         #print("fy1= ", fy1)
         fy2 = 8600000  #self.wood_type_2.fcd      #Festigkeiten für 3S Platten reduzieren
         fy3 = 5900000  #self.wood_type_3.ftd      #Festigkeiten für 3S Platten reduzieren
 
-        #Biegerandspannung am Steg (Rand oben und unten)
+        #Biegewiderstand Steg (Rand oben und unten)
         mu1_rand_o = min(self.mu_unsigned(fy1, self.iy, (self.z_s - self.t3), self.n[0]),  # z = zs -t3
                        self.mu_unsigned(fy1, self.iy_inf, (self.z_s - self.t3), self.n_inf[0]))
         mu1_rand_u = min(self.mu_unsigned(fy1, self.iy, (self.h + self.t3 - self.z_s), self.n[0]),  # z = h + t3 -zs
                        self.mu_unsigned(fy1, self.iy_inf,(self.h + self.t3 - self.z_s), self.n_inf[0]))
 
-        # Biegerandspannung am Flanch unten (Rand oben und unten)
+        # Biegewidersatnd Flanch unten (Rand oben und unten)
         mu2_rand_o = min(self.mu_unsigned(fy2, self.iy, (self.t3 + self.h - self.z_s ), self.n[1]),  # z = t3 + h - zs
                          self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h - self.z_s ), self.n_inf[1]))
         mu2_rand_u = min(self.mu_unsigned(fy2, self.iy, (self.t3 + self.h + self.t2- self.z_s ), self.n[1]),  # z = t3 + h + t2 - zs
                          self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h + self.t2- self.z_s ), self.n_inf[1]))
 
-        # Biegerandspannung am Flanch oben (Rand oben und unten)
+        # Biegewiderstand Flanch oben (Rand oben und unten)
         mu3_rand_o = min(self.mu_unsigned(fy3, self.iy, self.z_s, self.n[2]),  # z = zs
                          self.mu_unsigned(fy3, self.iy_inf, self.z_s, self.n_inf[2]))
         mu3_rand_u = min(self.mu_unsigned(fy3, self.iy, (self.z_s - self.t3), self.n[2]),  # z = zs -t3
@@ -1233,16 +1233,10 @@ class RibWood(SupStrucRibWood):
         return mu
 
     def calc_vu(self): #Querkraftwiderstand
+        #Steg
         ty1 = self.wood_type_1.fvd
-        vu_1 = ty1 * self.b * self.h / 1.5  #Widerstand Steg (nur Rippe angesetzt)
-
-        #ty2 = self.wood_type_2.fvd #Schubwiderstand in Beplankung in Fuge unten
-        #vu_2 = ty2 * self.bt_ef * self.t2 / 1.5
-
-        # ty3 = self.wood_type_3.fvd #Schubwiderstand in Beplankung in Fuge oben
-        # vu_3 = ty3 * self.bc_ef * self.t3 / 1.5
-
-        return vu_1 #, vu2, vu3
+        vu_1 = ty1 * self.bw * self.h / 1.5  #Widerstand Steg (nur Rippe angesetzt)
+        return vu_1
 
     # FEHLT: Rollschubnachweis!!
 
@@ -1257,7 +1251,7 @@ class RibWood(SupStrucRibWood):
          #t_max = max_t.x[0]
         t2 = section.t2
         t3 = section.t3
-        b = section.b
+        bw = section.bw
         h = section.h
         if t2 >= 50: #and b > ? and h > ? and t3 >= ?
             resistance = 90
@@ -1443,7 +1437,7 @@ class Member1D:
         self.g0k_b  = self.section.g0k_b #[kN/m2]
         self.g1k = self.floorstruc.gk_area #[kN/m2]
         self.g2k = g2k #[kN/m2]
-        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m']
+        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m'] #TODO für Wood_rib prüfen, obn self.section.b nicht falsch (weil Stegbreite anstatt rippenabstand)
         self.qk = qk * self.section.b #[kN/m']
         self.psi = [psi0, psi1, psi2]
         self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m']

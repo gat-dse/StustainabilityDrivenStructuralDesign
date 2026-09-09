@@ -528,10 +528,10 @@ def plot_section(section):
               f'GWP = {section.co2:.0f} kg/m^2')
 
     elif section.section_type == "wd_rib": #Betonrippenquerschnitte
-        fig, ax, offset = plot_wd_rib_with_dimensions(section.b, section.h, section.a, section.t2, section.t3, 'brown', 'x')
+        fig, ax, offset = plot_wd_rib_with_dimensions(section.bw, section.h, section.b, section.t2, section.t3, 'brown', 'x')
         legend = (f'{section.wood_type_1.mech_prop}, prod_ID:{section.wood_type_1.prod_id} \n'
               f'length = {section.l0} \n'
-              f'h, b, a, t2, t3 = {section.h:.2f}, {section.b:.2f}, {section.a:.2f}, {section.t2:.2f}, {section.t3:.2f} \n'
+              f'h, bw, b, t2, t3 = {section.h:.2f}, {section.bw:.2f}, {section.b:.2f}, {section.t2:.2f}, {section.t3:.2f} \n'
               f'GWP = {section.co2:.0f} kg/m^2')
 
     else:
@@ -614,18 +614,18 @@ def plot_rib_with_dimensions(b, bw, h, hf, color='black', hatch='*', offset=0.1)
 
     return fig, ax, offset
 
-def plot_wd_rib_with_dimensions(b, h, a, t2, t3, color='black', hatch='--', offset=0.1):
+def plot_wd_rib_with_dimensions(bw, h, b, t2, t3, color='black', hatch='--', offset=0.1):
     # Create a figure and axis
     fig, ax = plt.subplots()
 
     # Define the rectangle with hatching (lower-left corner at (x, y), width, and height)
-    rect_flange2 = patches.Rectangle((offset, offset), 2*a, t2, linewidth=1, edgecolor=color, facecolor='none',
+    rect_flange2 = patches.Rectangle((offset, offset), 2*b, t2, linewidth=1, edgecolor=color, facecolor='none',
                              hatch='--', fill=False)
-    rect_flange3 = patches.Rectangle((offset, offset + t2+h), 2*a, t3, linewidth=1, edgecolor=color, facecolor='none',
+    rect_flange3 = patches.Rectangle((offset, offset + t2+h), 2*b, t3, linewidth=1, edgecolor=color, facecolor='none',
                                      hatch='--', fill=False)
-    rect_rib1 = patches.Rectangle((offset+a/2, offset+t2), b, h, linewidth=1, edgecolor=color, facecolor='none',
+    rect_rib1 = patches.Rectangle((offset+a/2, offset+t2), bw, h, linewidth=1, edgecolor=color, facecolor='none',
                              hatch='-', fill=False)
-    rect_rib2 = patches.Rectangle((offset+3*a/2, offset+t2), b, h, linewidth=1, edgecolor=color, facecolor='none',
+    rect_rib2 = patches.Rectangle((offset+3*a/2, offset+t2), bw, h, linewidth=1, edgecolor=color, facecolor='none',
                              hatch='-', fill=False)
 
 
@@ -636,8 +636,8 @@ def plot_wd_rib_with_dimensions(b, h, a, t2, t3, color='black', hatch='--', offs
     ax.add_patch(rect_rib2)
 
     # Add dimension annotations
-    ax.annotate(f'b_Rippe = {b:.2f} m', xy=(offset + b, 0.05), xytext=(offset + b / 2, 0.06), ha='center')
-    ax.annotate(f'b = {b:.2f} m', xy=(offset + b/2, 0.05), xytext=(offset + 3*b / 2, -0.16), ha='center')
+    ax.annotate(f'bw_Rippe = {bw:.2f} m', xy=(offset + bw, 0.05), xytext=(offset + bw / 2, 0.06), ha='center')
+    ax.annotate(f'bw = {bw:.2f} m', xy=(offset + bw/2, 0.05), xytext=(offset + 3*bw / 2, -0.16), ha='center')
     ax.annotate(f'h = {h:.2f} m', xy=(0.02, offset + h / 2), xytext=(0.01, offset + h / 2),
                 va='center', rotation='vertical')
 
@@ -652,7 +652,7 @@ def plot_wd_rib_with_dimensions(b, h, a, t2, t3, color='black', hatch='--', offs
     ax.set_aspect('equal')
 
     # Set the limits of the plot
-    ax.set_xlim(0, 2*a + 2 * offset)
+    ax.set_xlim(0, 2*b + 2 * offset)
     ax.set_ylim(0, h+t2+t3 + 4 * offset)
 
     return fig, ax, offset
