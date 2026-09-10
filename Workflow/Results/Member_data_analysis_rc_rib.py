@@ -47,7 +47,7 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 # Zu analysierende Excel-Datei (liegt im selben Ordner wie dieses Skript) - hier anpassen:
-EXCEL_DATEI = "Members_rc_rib_simple_massiv_bvar.xlsx"
+EXCEL_DATEI = "Members_rc_rib_simple_V3.xlsx"
 
 DEFAULT_SHEET_NAME = "Members_Comparison"
 

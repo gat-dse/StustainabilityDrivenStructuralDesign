@@ -853,7 +853,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     penalty_bw = max(b_w_erforderlich - b_w, 0)
 
     # Skalierungsfaktor für die Strafe (muss hoch sein, da Abweichungen im Millimeterbereich liegen)
-    penalty_bw_scaled = penalty_bw * 1e5
+    penalty_bw_scaled = penalty_bw * 1e8
 
     #create section
     section = struct_analysis.RibbedConcrete(concrete, reinfsteel, l0, b, b_w, h_f+h_w, h_f, di_xu, s_xu, di_xo, s_xo, di_x_w, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, n_lagen, phi, c_nom, xi, jnt_srch)
@@ -863,7 +863,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     member.calc_qk_zul_gzt()  # calculate admissible live load
 
     # define penalty1, if ULS is not fulfilled
-    penalty1 = max(member.qk - member.qk_zul_gzt, 0)
+    penalty1 = 1e8 *max(member.qk - member.qk_zul_gzt, 0)
 
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
@@ -880,7 +880,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
                       member.w_app_ger - member.w_app_adm]
 
-    penalty2 = 1e5 * max(d1, d2, d3, 0)
+    penalty2 = 1e8 * max(d1, d2, d3, 0)
 
     # define penalty3, if SLS2 (vibrations) are not fulfilled
     #pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
@@ -895,42 +895,42 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
     # define penalty4, if fire resistance is not fulfilled
     member.get_fire_resistance()
-    penalty4 = max(member.requirements.t_fire-member.fire_resistance, 0)
+    penalty4 = 1e5 *max(member.requirements.t_fire-member.fire_resistance, 0)
 
     # optimize ULS only
     if criterion == "ULS":  # optimize ultimate limit state
         if to_opt == "GWP":
-            return member.section.co2*(1+penalty1) + penalty_bw_scaled
+            return member.section.co2*(1+penalty1+ penalty_bw_scaled)
         elif to_opt == "h":
-            return member.section.h*(1+penalty1) + penalty_bw_scaled
+            return member.section.h*(1+penalty1+ penalty_bw_scaled)
 
     # optimize SLS1 (deflections). Make sure, that also ULS is fulfilled
     elif criterion == "SLS1":  # optimize service limit state (deflections)
         if to_opt == "GWP":
-            return member.section.co2*(1+penalty2) + penalty_bw_scaled
+            return member.section.co2*(1+penalty2+ penalty_bw_scaled)
         elif to_opt == "h":
-            return member.section.h*(1+penalty2) + penalty_bw_scaled
+            return member.section.h*(1+penalty2+ penalty_bw_scaled)
 
     # optimize SLS2 (vibrations). Make sure, that also ULS is fulfilled
     elif criterion == "SLS2":
         if to_opt == "GWP":
-            to_minimize = member.section.co2*(1+penalty3) + penalty_bw_scaled
+            to_minimize = member.section.co2*(1+penalty3+ penalty_bw_scaled)
         elif to_opt == "h":
-            to_minimize = member.section.h*(1+penalty3) + penalty_bw_scaled
+            to_minimize = member.section.h*(1+penalty3+ penalty_bw_scaled)
 
     # optimize fire resistance only
     elif criterion == "FIRE":
         if to_opt == "GWP":
-            return member.section.co2*(1+penalty4) + penalty_bw_scaled
+            return member.section.co2*(1+penalty4+ penalty_bw_scaled)
         elif to_opt == "h":
-            return member.section.h * (1+penalty4) + penalty_bw_scaled
+            return member.section.h * (1+penalty4+ penalty_bw_scaled)
 
     # optimize solution, which fulfills all requirements (ULS, SLS1 and SLS2, FIRE)
     elif criterion == "ENV":
         if to_opt == "GWP":
-            to_minimize = member.section.co2*(1+penalty1+penalty2+penalty3+penalty4) + penalty_bw_scaled
+            to_minimize = member.section.co2*(1+penalty1+penalty2+penalty3+penalty4+ penalty_bw_scaled)
         elif to_opt == "h":
-            to_minimize = member.section.h*(1+penalty1+penalty2+penalty3+penalty4) + penalty_bw_scaled
+            to_minimize = member.section.h*(1+penalty1+penalty2+penalty3+penalty4+ penalty_bw_scaled)
     else:
         to_minimize = 99
         print("criterion " + criterion + " is not defined")

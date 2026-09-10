@@ -859,7 +859,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.co2 = (self.co2_rebar + self.co2_concrete) #[kgCO2_eq/m2]
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
-        self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB
+        self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB  --- stimmt doch so als ungerissene Steifigkeit?
         self.xi = xi
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d_PB)  #!!!!!ANPASSEN AUF PB
 
@@ -1021,7 +1021,7 @@ class RibbedConcrete(SupStrucRibbedConcrete):
             return vrd
         else:  # cross-section with vertical stirrups
             z = d - 0.85 * x / 2
-            vrds = as_bw * z * fsd  # SIA 262, 4.3.3.4.3, (43)
+            vrds = as_bw * z * fsd / np.tan(alpha)  # SIA 262, 4.3.3.4.3, (43)
             vrdc = bw * z * kc * fcd * np.sin(alpha) * np.cos(alpha)  # unit of alpha: [rad]    # SIA 262, 4.3.3.4.6, (45)
             rohw = as_bw / bw /(0.9*d)
             rohw_min = 0.001 * (fck * 1e-6 / 30) ** 0.5 * 500 / (fsk * 1e-6) #Formel mit fck und fyk in MPa
