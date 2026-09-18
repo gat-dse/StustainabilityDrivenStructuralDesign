@@ -10,13 +10,13 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [6,8]
+lengths = [4,6,8, 10]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 10
+max_iter = 50
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)

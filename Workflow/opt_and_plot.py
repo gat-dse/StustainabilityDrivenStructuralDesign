@@ -265,19 +265,19 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                             members.append(None)
                             continue
 
-                    opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
+                        opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
 
-                    members.append(opt_member)
-                member_list.append(members)
-                if i[0].section_type[0:2] == "rc":
-                    material_lg = i[0].concrete_type.mech_prop + " + " + i[0].rebar_type.mech_prop
-                elif i[0].section_type == "wd":
-                    material_lg = i[0].wood_type.mech_prop
-                elif i[0].section_type == "wd_rib":
-                    material_lg = i[0].wood_type_1.mech_prop
-                else:
-                    material_lg = "error: section material is not defined"
-                legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name])
+                        members.append(opt_member)
+                    member_list.append(members)
+                    if i[0].section_type[0:2] == "rc":
+                        material_lg = i[0].concrete_type.mech_prop + " + " + i[0].rebar_type.mech_prop
+                    elif i[0].section_type == "wd":
+                        material_lg = i[0].wood_type.mech_prop
+                    elif i[0].section_type == "wd_rib":
+                        material_lg = i[0].wood_type_1.mech_prop
+                    else:
+                        material_lg = "error: section material is not defined"
+                    legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name, fixed_params.get("t3")])
 
     #Filter out None values (infesible solutions):
     member_list = [[mem for mem in sublist if mem is not None] for sublist in member_list]
@@ -352,7 +352,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             if j == idx_vrfctn:
                 vrfctn_members[0].append(mem)
                 vrfctn_members[1].append(i)
-        sec_typ, mat, cri, opt, floor_name = legend[i]
+        sec_typ, mat, cri, opt, floor_name, t3_val = legend[i]
         # set line color
         if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
             color = 'darkgreen'
@@ -403,6 +403,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         else:
             linewidth = 0.1
         label = sec_typ + ", " + mat + ", " + cri + ", optimized for " + opt
+        if t3_val is not None:
+            label += f", t3={t3_val}"
         # plot data
         for idx, data in enumerate(plotdata):
             plt.subplot(2, 2, idx + 1)

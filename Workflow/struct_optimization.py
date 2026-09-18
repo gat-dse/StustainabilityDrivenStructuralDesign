@@ -1110,7 +1110,8 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 #NEU: Optimierung mit TPE
 
 # Handelsübliche Abmessungen (kategorial) für opt_wd_rib
-T_KANDIDATEN_WDRIB = [0.027, 0.04]  # Beplankungsstärken t2 / t3
+T_KANDIDATEN_WDRIB = [0.027, 0.04]  # Beplankungsstärken t2 (unten) / t3 (oben)
+T2_FIX_WDRIB = 0.027 #Stärke Beplankung unten t2 fix (keine Optimierungsvariable)
 BW_KANDIDATEN_WDRIB = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24]  # Rippenbreite bw
 B_KANDIDATEN_WDRIB = [0.625, 0.7]  # Rippenabstand b (Lignum 4.1, Table 433-2)
 
@@ -1119,12 +1120,11 @@ H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3]
 H_KANDIDATEN_GL = [0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.76, 0.8]  # 4 cm Schritte
 
 
-def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
+def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_FIX_WDRIB, t3=T_KANDIDATEN_WDRIB[0]):
+    #t2 und t3 sind fix vorgegeben und werden nicht optimiert. Pro Spannwetie wird diese Funktion zweimal aufgerufen: einmal je Wert aus T_KANDIDATEN_WDRIB für t3 (Beplankung oben)
     # definition of initial values for variables, which are going to be optimized
     h0 = m.section.h
     bw0 = m.section.bw
-    t20 = m.section.t2
-    t30 = m.section.t3
     b0 = m.section.b
 
     # define bounds of variables
@@ -1135,6 +1135,10 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
     bt3 = (0.027, 0.16)  # hight of lower sheating between 2.7 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2, Column G)
     bb = (0.625, 0.7) #Rippenabstand b zwischen 0.625 und 0.7 m (Lignum4.1, Table 433-2)
 
+    #t2, t3 sind fix vorgegeben -> nur noch prüfen, ob sie innerhlab der Randbedingung liegen
+    if not (bt2[0] <= t2 <= bt2[1] and bt3[0] <= t3 <= bt3[1]):
+        return None
+
     # definition of fixed values of cross-section
     l0 = m.li_max
 
@@ -1142,8 +1146,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
 
     # Handelsübliche Kandidaten auf die Randbedingungen (R60, Lignum 4.1) einschränken
     bw_kandidaten = [x for x in BW_KANDIDATEN_WDRIB if bbw[0] <= x <= bbw[1]]
-    t2_kandidaten = [x for x in T_KANDIDATEN_WDRIB if bt2[0] <= x <= bt2[1]]
-    t3_kandidaten = [x for x in T_KANDIDATEN_WDRIB if bt3[0] <= x <= bt3[1]]
     b_kandidaten = [x for x in B_KANDIDATEN_WDRIB if bb[0] <= x <= bb[1]]
 
     # Höhenkandidaten und h_max in Abhängigkeit vom Werkstoff der Rippe (wood_type_1) bestimmen:
@@ -1156,7 +1158,7 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
     h_kandidaten = [x for x in h_kandidaten_full if bh[0] <= x <= bh[1]]
     h_max = max(h_kandidaten) if h_kandidaten else bh[1]
 
-    if not (bw_kandidaten and t2_kandidaten and t3_kandidaten and b_kandidaten and h_kandidaten):
+    if not (bw_kandidaten and b_kandidaten and h_kandidaten):
         # keine handelsübliche Kombination innerhalb der Randbedingungen (R60) verfügbar
         return None
 
@@ -1167,8 +1169,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
 
         bw = trial.suggest_categorical("bw", bw_kandidaten)
         h = trial.suggest_categorical("h", h_kandidaten)
-        t2 = trial.suggest_categorical("t2", t2_kandidaten)
-        t3 = trial.suggest_categorical("t3", t3_kandidaten)
         b = trial.suggest_categorical("b", b_kandidaten)
 
         try:
@@ -1185,8 +1185,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
     study.enqueue_trial({
         "bw": min(bw_kandidaten, key=lambda x: abs(x - bw0)),
         "h": min(h_kandidaten, key=lambda x: abs(x - h0)),
-        "t2": min(t2_kandidaten, key=lambda x: abs(x - t20)),
-        "t3": min(t3_kandidaten, key=lambda x: abs(x - t30)),
         "b": min(b_kandidaten, key=lambda x: abs(x - b0)),
     })
 
@@ -1197,8 +1195,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE"):
 
     bw = study.best_params["bw"]
     h = study.best_params["h"]
-    t2 = study.best_params["t2"]
-    t3 = study.best_params["t3"]
     b = study.best_params["b"]
 
     optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, bw, h, b, t2, t3)
@@ -1289,22 +1285,26 @@ def wd_rib_rqs(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter, alg):
+def get_optimized_section(member, criterion, to_opt, max_iter, alg, fixed_params=None):
+    # fixed_params: optional dict of section-specific parameters that are held fixed (not optimized),
+    # e.g. {"t3": 0.04} for wd_rib. Forwarded as **kwargs to the matching opt_* function, which must
+    # accept a keyword of that name; unused for section types whose opt_* function doesn't declare it.
+    fixed_params = fixed_params or {}
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rec(member, to_opt, criterion, max_iter, 0.2, alg)
+        return opt_rc_rec(member, to_opt, criterion, max_iter, 0.2, alg, **fixed_params)
     elif member.section.section_type == "wd_rec":
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_gzt_wd_rqs(member, criterion=criterion)
+        return opt_gzt_wd_rqs(member, criterion=criterion, **fixed_params)
     elif member.section.section_type == "rc_rib":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rib(member, to_opt, criterion, max_iter, alg)
+        return opt_rc_rib(member, to_opt, criterion, max_iter, alg, **fixed_params)
     elif member.section.section_type == "wd_rib":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_wd_rib(member, to_opt, criterion, max_iter)
+        return opt_wd_rib(member, to_opt, criterion, max_iter, **fixed_params)
     else:
         print("There is no optimization for the section type " + member.section.section_type + " available!")
         return member.section
