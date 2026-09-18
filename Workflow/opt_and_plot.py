@@ -232,30 +232,38 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     for i in to_plot:
         for criterion in criteria:
             for optimum in optima:
-                members = []
-                for length in lengths:
-                    if system == "Simple Beam":
-                        sys = struct_analysis.BeamSimpleSup(length)
-                    elif system == "Two span 1D 1D":
-                        sys = struct_analysis.BeamTwoSpan(length)
-                    elif system == "Continuous 1D":
-                        sys =struct_analysis.BeamContinuousSupEl(length)
-                    else:
-                        print("System unknown; Simple Beam used")
-                        sys = struct_analysis.BeamSimpleSup(length)
-                    section0 = i[0]
-                    floorstruc = i[1]
-                    member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
-                    if system == "Continuous 1D" and crsec_type == "rc_rib":
-                        opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
-                                                                                           max_iter,alg)
-                    else:
-                        opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg)
-                    #Handle infeasible solutions (e.g. span too large for wd_rec crosssection)
-                    if opt_section is None:
-                        print(f"Warning:No feasible wood section <= 28 cm for span {length}m")
-                        members.append(None)
-                        continue
+                # wd_rib: t2 is fixed, t3 has two fixed cases (T_KANDIDATEN_WDRIB) -> optimize once per case.
+                # Every other section type runs a single pass with no fixed parameters.
+                if crsec_type == "wd_rib":
+                    fixed_param_cases = [{"t3": t3_case} for t3_case in struct_optimization.T_KANDIDATEN_WDRIB]
+                else:
+                    fixed_param_cases = [{}]
+                for fixed_params in fixed_param_cases:
+                    members = []
+                    for length in lengths:
+                        if system == "Simple Beam":
+                            sys = struct_analysis.BeamSimpleSup(length)
+                        elif system == "Two span 1D 1D":
+                            sys = struct_analysis.BeamTwoSpan(length)
+                        elif system == "Continuous 1D":
+                            sys =struct_analysis.BeamContinuousSupEl(length)
+                        else:
+                            print("System unknown; Simple Beam used")
+                            sys = struct_analysis.BeamSimpleSup(length)
+                        section0 = i[0]
+                        floorstruc = i[1]
+                        member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
+                        if system == "Continuous 1D" and crsec_type == "rc_rib":
+                            opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
+                                                                                               max_iter,alg)
+                        else:
+                            opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg,
+                                                                                     fixed_params=fixed_params)
+                        #Handle infeasible solutions (e.g. span too large for wd_rec crosssection)
+                        if opt_section is None:
+                            print(f"Warning:No feasible wood section <= 28 cm for span {length}m")
+                            members.append(None)
+                            continue
 
                     opt_member = struct_analysis.Member1D(opt_section, sys, floorstruc, requirements, g2k, qk)
 
