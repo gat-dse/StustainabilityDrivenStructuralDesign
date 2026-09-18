@@ -1240,6 +1240,26 @@ class RibWood(SupStrucRibWood):
 
     # FEHLT: Rollschubnachweis!!
 
+    def calc_vu_detail(self): #Querkraftwiderstand im Detail #TODO: check if calc correct and values for fvd in material_prop
+        # Statisches Moment in Stegmitte
+        Sy1 = self.n[0] * (self.z_s - self.t3 - self.h/2) * self.h / 2 * self.bw + self.n[2] * (self.z_s - self.t3 / 2) * self.t3 * self.bc_ef
+        # Statisches Moment für den Schnitt Steg-Beplankung oben
+        Sy3 = self.n[2] * (self.z_s - self.t3 / 2) * self.t3 * self.bc_ef
+        # Statisches Moment für den Schnitt Steg-Beplankung unten
+        Sy2 = self.n[2] * (self.z_s - self.t3 / 2) * self.t3 * self.bc_ef + self.n[0] * (self.t3 + self.h - self.z_s) * self.h * self.bw
+
+        ty1 = self.wood_type_1.fvd
+        vu_1_mitte = ty1 * self.bw * self.iy / Sy1  #Widerstand in Stegmitte
+
+        ty2 = self.wood_type_2.fvd
+        vu_2_fuge = ty2 * self.bw * self.iy / Sy2  # Widerstand in Beplankung unten bei der Fuge Steg-Beplankung
+
+        ty3 = self.wood_type_3.fvd
+        vu_3_fuge = ty3 * self.bw * self.iy / Sy3  #Widerstand in Beplankung oben bei der Fuge Steg-Beplankung
+
+        return vu_1_mitte, vu_2_fuge, vu_3_fuge
+
+
 
 #TODO: Aktueller Stand wird kein Abbrand des Hohlkastenquerschnitts berechnet, die Schichtdicken werden gem. Lignum so gewählt, dass der Abbrand nicht Bemessen werden muss.
 #TODO: Folgende Zeilen müssen angepasst werden, wenn ein anderes Prinzip gewählt wird.
