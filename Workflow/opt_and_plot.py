@@ -21,7 +21,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                  g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin"):
 
     if idx_vrfctn == -1:
-        idx_vrfctn = random.randint(0, len(lengths)-1)
+        idx_vrfctn = random.randint(0, len(lengths)-1) #if idx_verfctn isnt specified, pick a random
 
     # GENERATE INITIAL CROSS-SECTIONS
     # Search database (table products, attribute material) for products
@@ -30,7 +30,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
     for mat_name in mat_names:
-        # Wählt alle EPDs vom Material "mat-name" (z.B. ready mixed concrete), welche ein Minimal oder Maximalwert pro Materialgruppe sind.
+        # Wählt alle EPDs von einem Material -> "mat-name" (z.B. ready mixed concrete)
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL                
@@ -44,6 +44,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         cursor.execute(inquiry)
         result = cursor.fetchall()
         for i, prod_id in enumerate(result):
+            # Wählt innerhalb des Materials die EPDs mit dem min und max GWP aus
             prod_id_str = "'" + str(prod_id[0]) + "'"
             inquiry = ("""
                     SELECT MECH_PROP FROM products
@@ -253,12 +254,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                         section0 = i[0]
                         floorstruc = i[1]
                         member0 = struct_analysis.Member1D(section0, sys, floorstruc, requirements, g2k, qk)
+
                         if system == "Continuous 1D" and crsec_type == "rc_rib":
                             opt_section = struct_optimization_RCrib_cont.get_optimized_section(member0, criterion, optimum,
                                                                                                max_iter,alg)
                         else:
                             opt_section = struct_optimization.get_optimized_section(member0, criterion, optimum, max_iter, alg,
                                                                                      fixed_params=fixed_params)
+
                         #Handle infeasible solutions (e.g. span too large for wd_rec crosssection)
                         if opt_section is None:
                             print(f"Warning:No feasible wood section <= 28 cm for span {length}m")

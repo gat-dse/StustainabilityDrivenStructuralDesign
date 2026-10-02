@@ -150,7 +150,7 @@ class SteelReinforcingBar:
         return fsd
 
 
-#-----------------------------------------------------------------------------------------------------------------------
+#DEFINITIONS OF GEOMETRIC CLASSES (ALSO SPECIFIED FOR DIFFERENT MATERIALS)-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
 class Section:
     # contains fundamental section properties like section type weight, resistance and stiffness
@@ -1356,7 +1356,8 @@ class FloorStruc:  # create a floor structure
             self.h_Floor += current_layer.h_Fi
             self.ei = max(self.ei, current_layer.ei)
 
-#-----------------------------------------------------------------------------------------------------------------------
+
+#DEFINITIONS OF CLASSES FOR DIFFERENT STATIC SYSTEMS-----------------------------------------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
 class BeamSimpleSup:
     """
@@ -1444,7 +1445,7 @@ class Slab:
 
         #self.factors = [self.alpha_m, self.alpha_v, self.qs_cl_erf, self.alpha_w, self.kf2, self.alpha_w_f_cd]
 
-
+# DEFINITIONS OF THE 1D AND THE 2D MEMBER FOR ULS AND SLS (ultimate and service)
 class Member1D:
     def __init__(self, section, system, floorstruc, requirements, g2k=0.0, qk=2e3, psi0=0.7, psi1=0.5, psi2=0.3,
                  fire_b=True, fire_l=False, fire_t=False, fire_r=False):

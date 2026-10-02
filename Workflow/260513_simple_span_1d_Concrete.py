@@ -28,6 +28,7 @@ optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 database_name = "database_260805.db"
 
 
+
 # create floor structure for solid reinforced concrete cross-section
 bodenaufbau_rcdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                        ["'Unterlagsboden Zement, 85 mm'", False, False],

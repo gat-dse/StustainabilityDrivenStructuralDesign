@@ -55,7 +55,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
     # =========================================================================
     # FALL 1: DURCHLAUFTRÄGER (Zweistufige sequentielle Optimierung).
-    # Zuerst wird QS im Feld optimiert (h, di_xu).
+    # Zuerst wird QS im Feld optimiert (h, di_xu). bh und bdi_xi -> bounds
     # Dann wird mit fixem h die Bewehrung über der Stütze optimiert
     # =========================================================================
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
@@ -126,17 +126,17 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
                 bounds_stufe1[0][0],
                 bounds_stufe1[0][1],
                 step=0.01
-            )
+            ) #chooses float
 
             di_xu = trial.suggest_categorical(
                 "di_xu",
                 di_xu_kandidaten
-            )
+            ) #chooses candidates from specified list
 
             s_xu = trial.suggest_categorical(
                 "s_xu",
                 ABSTAENDE
-            )
+            ) #chooses candidates from specified list
 
             try:
                 return rc_rqs([h, di_xu, s_xu], add_arg_stufe1, alg)
@@ -460,7 +460,7 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
                           member.w_app - member.w_app_adm] #Durchbiegung ungerissen
         else:
             d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
-                          member.w_app_ger - member.w_app_adm]
+                          member.w_app_ger - member.w_app_adm] #Durchbiegung gerissen?
 
     # 2. Fall: Reiner Einfeldträger ("unten") -> Prüft nur das Feld
     elif optimise == "unten":
@@ -819,7 +819,7 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     #TODO: nicht alle Inputs für Ribbed Concrete sind hier übertragen
 
 
-    #TODO Penalty ür bw hier integrieren
+    #TODO Penalty für bw hier integrieren
 
     # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
     # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
