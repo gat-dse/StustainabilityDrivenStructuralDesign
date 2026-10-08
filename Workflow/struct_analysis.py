@@ -1205,8 +1205,12 @@ class RibWood(SupStrucRibWood):
 
         fy1 = self.wood_type_1.fmd
         #print("fy1= ", fy1)
-        fy2 = 8600000  #self.wood_type_2.fcd      #Festigkeiten für 3S Platten reduzieren
-        fy3 = 5900000  #self.wood_type_3.ftd      #Festigkeiten für 3S Platten reduzieren
+        fy2 = 9800000  #Wert aus HBT für t >20 bis 30mm, Scheibenbeanspruchung parallel: fc0d = 9.8 N/mm2 (Beplankung unter Druck)
+
+        if t3 == 40:
+            fy3 = 3700000  #Wert aus HBT für t > 30 bis 42mm, Scheibenbeanspruchung parallel: ft0d = 3.7 N/mm2 (Beplankung unter Zug)
+        else:
+            fy3 = 5500000  #Wert aus HBT für t > 20 bis 30mm, Scheibenbeanspruchung parallel: ft0d = 5.5 N/mm2 (Beplankung unter Zug)
 
         #Biegewiderstand Steg (Rand oben und unten)
         mu1_rand_o = min(self.mu_unsigned(fy1, self.iy, (self.z_s - self.t3), self.n[0]),  # z = zs -t3
