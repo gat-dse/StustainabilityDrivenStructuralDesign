@@ -10,11 +10,24 @@ from scipy.interpolate import interp1d
 import class_to_excel_2
 from scipy.spatial import ConvexHull
 
+### KBOB: source filter (same conditions as in opt_and_plot.py)
+# KBOB rows: no EPD_ID ('N/A' in the Excel becomes NULL in the DB) and SOURCE 'KBOB v9.0'; every other row counts as EPD
+KBOB_CONDITION = "(EPD_ID IS NULL AND SOURCE = 'KBOB v9.0')"
+
+
+def source_filter(basetype):
+    # SQL fragment selecting the data basis: product EPDs or generic KBOB values
+    if basetype == "kbob":
+        return f" AND {KBOB_CONDITION} AND Man_Ausschluss = 1 AND CAST(Total_GWP AS REAL) > 0 "
+    elif basetype == "epd":
+        return f" AND NOT {KBOB_CONDITION} AND ValidEPD = 1 AND Man_Ausschluss = 1 "
+    raise ValueError(f"basetype must be 'epd' or 'kbob', got {basetype}")
+
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(length_x,length_y, support, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, basetype="epd"):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(length_x)-1)
@@ -26,16 +39,15 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
     for mat_name in mat_names:
+        ### KBOB: basetype filter
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL
                 AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
                 AND MECH_PROP IS NOT NULL
                 AND MECH_PROP NOT LIKE '%GL30%'
-                AND ValidEPD = 1
                 AND  MIN_MAX = 1
-                AND Man_Ausschluss = 1
-                AND "MATERIAL" LIKE """ + mat_name
+                AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
         #            " material=" + mat_name)
@@ -75,20 +87,19 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highest emissions
                 # exclude not epd sources from the data.
-                inquiry = """
+                ### KBOB: basetype filter
+                inquiry = f"""
                                 SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
                                 WHERE "MATERIAL" = 'Steel_reinforcing_bar'
                                   AND DENSITY IS NOT NULL
                                   AND MECH_PROP = 'B500B'
-                                  AND ValidEPD = 1
-                                  AND Man_Ausschluss = 1
+                                  {source_filter(basetype)}
                                   AND CAST(Total_GWP AS REAL) IN (
                                       SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
                                       WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
                                         AND DENSITY IS NOT NULL 
                                         AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
+                                        {source_filter(basetype)}
 
                                       UNION
 
@@ -96,15 +107,15 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                                       WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
                                         AND DENSITY IS NOT NULL 
                                         AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
+                                        {source_filter(basetype)}
                                   )
                                 """
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
                 prod_id_low = result[0]
                 prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
+                ### KBOB: result[-1] instead of result[1], KBOB has only one B500B rebar (low = high)
+                prod_id_high = result[-1]
                 prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
                 # create a rebar material objects with mech prop B500B and low rsp high emission values
                 rebar_low_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_low_str)
@@ -126,20 +137,19 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highes emissions
-                inquiry = """
+                ### KBOB: basetype filter
+                inquiry = f"""
                                 SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
                                 WHERE "MATERIAL" = 'Steel_reinforcing_bar'
                                   AND DENSITY IS NOT NULL
                                   AND MECH_PROP = 'B500B'
-                                  AND ValidEPD = 1
-                                  AND Man_Ausschluss = 1
+                                  {source_filter(basetype)}
                                   AND CAST(Total_GWP AS REAL) IN (
                                       SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
                                       WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
                                         AND DENSITY IS NOT NULL 
                                         AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
+                                        {source_filter(basetype)}
 
                                       UNION
 
@@ -147,8 +157,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                                       WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
                                         AND DENSITY IS NOT NULL 
                                         AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
+                                        {source_filter(basetype)}
                                   )
                                 """
                 cursor.execute(inquiry)
@@ -156,7 +165,8 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 result = cursor.fetchall()
                 prod_id_low = result[0]
                 prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
+                ### KBOB: result[-1] instead of result[1], KBOB has only one B500B rebar (low = high)
+                prod_id_high = result[-1]
                 prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
 
                 # create a rebar material objects with mech prop B500B and low rsp high emission values
@@ -305,11 +315,11 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
             for member in pair
     ]
     if crsec_type == "rc_rec" and sup == "LL-eingespannt":
-        class_to_excel_2.members_to_excel2(members_2d, "Members_2D_LL_eingespannt.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_eingespannt_{basetype}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "LL-frei":
-        class_to_excel_2.members_to_excel2(members_2d, "Members_2D_LL_frei.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_frei_{basetype}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "PL-eingespannt":
-        class_to_excel_2.members_to_excel2(members_2d, "Members_2D_PL_eingespannt.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_PL_eingespannt_{basetype}.xlsx", folder="Results")
     else:
         print("cross-section type is not defined inside function plot_dataset() for Excel-generation")
 

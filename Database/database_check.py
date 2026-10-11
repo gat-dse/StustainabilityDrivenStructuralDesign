@@ -3,12 +3,14 @@ import sqlite3
 import numpy as np
 
 # 1. Daten aus der SQLite-Datenbank laden
-conn = sqlite3.connect("database_260805.db")
+### KBOB: new DB name
+conn = sqlite3.connect("database_261009.db")
 df_db = pd.read_sql_query("SELECT * FROM products", conn)
 conn.close()
 
 # 2. Daten direkt aus der Excel-Datei laden (echte Header in Zeile 3 -> Index 2)
-excel_file = "260805_Datenbankdefinition.xlsx"
+### KBOB: new DB name
+excel_file = "260811_Datenbankdefinition.xlsx"
 df_excel = pd.read_excel(excel_file, sheet_name="products", engine="openpyxl")
 
 # Spaltennamen trimmen (Leerzeichen am Anfang/Ende entfernen)

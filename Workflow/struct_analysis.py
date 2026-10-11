@@ -24,12 +24,18 @@
 # - Bodenaufbauschicht
 # - Bodenaufbau
 # - Rechteckquerschnitte
-# - Anforderungen
+# - Anforderungen (Durchbiegung usw.)
 
 import sqlite3  # import modul for SQLite
 import numpy as np
 from scipy.optimize import minimize
 import math
+
+def per_kg(v):
+    # transform a per-tonne value from the database to per kg; empty values (e.g. UBP/GE of EPD rows) give NaN
+    if v is None or v == '':
+        return math.nan
+    return float(v) / 1e3
 
 #DEFINITONS OF MATERIAL PROPERTIES--------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
@@ -46,16 +52,20 @@ class Wood:
         result = cursor.fetchall()
         self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate, self.creep_coef = result[0]
         # get GWP properties from database
+        ### KBOB: UBP/GE read
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE MECH_PROP=" + mech_prop
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE MECH_PROP=" + mech_prop
         else:
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE PRO_ID=" + prod_id
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE PRO_ID=" + prod_id
         cursor.execute(inquiry)
         result = cursor.fetchall()
         # self.prod_id, self.density, self.GWP, self.cost, self.cost2 = result[0]
-        self.prod_id, density, GWP, self.cost = result[0]
+        ### KBOB: UBP/GE read
+        self.prod_id, density, GWP, self.cost, ubp, ge = result[0]
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
+        self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
+        self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
         self.density = float(density)
         self.cost = 0
         self.cost2 = 0
@@ -88,23 +98,27 @@ class ReadyMixedConcrete:
             self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         #self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         # get GWP properties from database
+        ### KBOB: UBP/GE read
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
             # inquiry = ("""
             #         SELECT PRO_ID, density, Total_GWP, cost, cost2 FROM products WHERE "material [string]" LIKE """ + mech_prop
             #            )
-            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE MECH_PROP LIKE """
+            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE MECH_PROP LIKE """
                        + mech_prop)
         else:
             # inquiry = ("""SELECT PRO_ID, density, Total_GWP, cost, cost2 FROM products WHERE PRO_ID LIKE """ + prod_id
             #            )
-            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE PRO_ID LIKE """
+            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE PRO_ID LIKE """
                        + prod_id)
         cursor.execute(inquiry)
         result = cursor.fetchall()
         # self.prod_id, self.density, self.GWP, self.cost, self.cost2 = result[0]
-        self.prod_id, density, GWP, self.cost = result[0]
+        ### KBOB: UBP/GE read
+        self.prod_id, density, GWP, self.cost, ubp, ge = result[0]
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
+        self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
+        self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
         self.density = float(density)
         self.cost = 0
         self.cost2 = 0
@@ -131,16 +145,20 @@ class SteelReinforcingBar:
         result = cursor.fetchall()
         self.fsk, self.Es = result[0]
         # get GWP properties from database
+        ### KBOB: UBP/GE read
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE MECH_PROP=" + mech_prop
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE MECH_PROP=" + mech_prop
         else:
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE PRO_ID=" + prod_id
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE PRO_ID=" + prod_id
         cursor.execute(inquiry)
         result = cursor.fetchall()
         #self.prod_id, density, self.GWP, self.cost = result[0]
-        self.prod_id, density, GWP, self.cost = result[0]
+        ### KBOB: UBP/GE read
+        self.prod_id, density, GWP, self.cost, ubp, ge = result[0]
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
+        self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
+        self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
         self.density = float(density)
         self.cost = 0
         self.fsd = self.get_design_values()
@@ -232,6 +250,9 @@ class RectangularWood(SupStrucRectangular, Section):
         self.g0k_b = self.g0k / self.b  # dead weight of cross section [N/m]
         self.ei1 = self.wood_type.Emmean * self.iy  # elastic stiffness [Nm^2]
         self.co2 = self.a_brutt * self.wood_type.GWP * self.wood_type.density  # [kg_CO2_eq/m]
+        ### KBOB: UBP/GE section
+        self.ubp = self.a_brutt * self.wood_type.UBP * self.wood_type.density  # [UBP/m]
+        self.graue_energie = self.a_brutt * self.wood_type.graue_energie * self.wood_type.density  # [kWh oil-eq/m]
         self.cost = self.a_brutt * self.wood_type.cost # [CHF] #TODO: Not implemented yet!
         self.ei_b = ei_b  # stiffness perpendicular to direction of span [Nm^2]
         self.xi = xi  # damping factor, preset value see: HBT, Page 47 (higher value for some buildups possible)
@@ -340,6 +361,13 @@ class RectangularConcrete(SupStrucRectangular):
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete)
+        ### KBOB: UBP/GE section
+        self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density  # [UBP/m]
+        self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density  # [UBP/m]
+        self.ubp = self.ubp_rebar + self.ubp_concrete
+        self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density  # [kWh oil-eq/m]
+        self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density  # [kWh oil-eq/m]
+        self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
@@ -545,6 +573,13 @@ class FlatSlab2D(SupStrucRectangular):
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete)
+        ### KBOB: UBP/GE section
+        self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density  # [UBP/m]
+        self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density  # [UBP/m]
+        self.ubp = self.ubp_rebar + self.ubp_concrete
+        self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density  # [kWh oil-eq/m]
+        self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density  # [kWh oil-eq/m]
+        self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
@@ -857,6 +892,14 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m2]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete) #[kgCO2_eq/m2]
+        ### KBOB: UBP/GE section
+        # same formula as GWP (incl. the known unit error for rib spacing b != 1 m) -> fix all three together later
+        self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density/self.b  # [UBP/m2]
+        self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density /self.b  # [UBP/m2]
+        self.ubp = self.ubp_rebar + self.ubp_concrete
+        self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density/self.b  # [kWh oil-eq/m2]
+        self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density /self.b  # [kWh oil-eq/m2]
+        self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB  --- stimmt doch so als ungerissene Steifigkeit?
@@ -1173,6 +1216,9 @@ class RibWood(SupStrucRibWood):
         self.ei1 = self.wood_type_1.Emmean * self.iy  # elastic stiffness [Nm^2], Zeitpunkt t = 0
 
         self.co2 = (self.bw * self.h * self.wood_type_1.GWP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m2]
+        ### KBOB: UBP/GE section
+        self.ubp = (self.bw * self.h * self.wood_type_1.UBP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.UBP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.UBP * self.wood_type_3.density  # [UBP/m2]
+        self.graue_energie = (self.bw * self.h * self.wood_type_1.graue_energie * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.graue_energie * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.graue_energie * self.wood_type_3.density  # [kWh oil-eq/m2]
         self.cost = self.bw * self.h / self.b * self.wood_type_1.cost + 1 * self.t2 * self.wood_type_2.cost + 1 * self.t3  * self.wood_type_3.cost #[CHF/m2]
         self.ei_b = ei_b  # stiffness perpendicular to direction of span
         self.xi = xi  # damping factor, preset value for builddup with "Schwimmendem Estrich" see: HBT, Page 47

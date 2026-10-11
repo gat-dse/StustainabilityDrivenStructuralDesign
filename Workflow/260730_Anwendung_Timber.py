@@ -10,7 +10,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,6,8, 10]
+lengths = [4,6,8,10,12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -19,11 +19,12 @@ idx_vrc = 4
 max_iter = 50
 
 #  define content of plot
-criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, Fire)
+criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ENV, ULS, SLS1, SLS2, FIRE)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = 'database_260805.db'
+database_name = "database_261009.db"
+basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (KBOB v9.0 values)
 
 
 # create floor structure for solid wooden cross-section
@@ -77,9 +78,10 @@ start = time.time()
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names_rc_wd = ["'Solid_structural_timber'", "'Glue_laminated_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
+### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_solid, req, "wd_rec", mat_names_rc_wd,
-                                                              g2k, qk, max_iter, idx_vrc)
+                                                              g2k, qk, max_iter, idx_vrc, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 '''
@@ -90,9 +92,10 @@ vrfctn_members.append(vrfctn_members_new)
 
 mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
+### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_rib, req, "wd_rib", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc)
+                                                              g2k, qk, max_iter, idx_vrc, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 

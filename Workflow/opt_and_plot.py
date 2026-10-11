@@ -15,10 +15,54 @@ import class_to_excel_2
 import pandas as pd
 from scipy.spatial import ConvexHull
 
+### KBOB: source_filter helper
+# KBOB rows: no EPD_ID ('N/A' in the Excel becomes NULL in the DB) and SOURCE 'KBOB v9.0'; every other row counts as EPD
+KBOB_CONDITION = "(EPD_ID IS NULL AND SOURCE = 'KBOB v9.0')"
+
+
+def source_filter(basetype):
+    # SQL fragment selecting the data basis: product EPDs or generic KBOB values
+    if basetype == "kbob":
+        return f" AND {KBOB_CONDITION} AND Man_Ausschluss = 1 AND CAST(Total_GWP AS REAL) > 0 "
+    elif basetype == "epd":
+        return f" AND NOT {KBOB_CONDITION} AND ValidEPD = 1 AND Man_Ausschluss = 1 "
+    raise ValueError(f"basetype must be 'epd' or 'kbob', got {basetype}")
+
+
+### KBOB: low/high helper
+def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
+    # returns unique prod_id strings of the products with lowest and highest GWP of a material
+    # (only one entry if min == max, e.g. a single KBOB product)
+    # material: LIKE pattern for column MATERIAL; mech_prop: required MECH_PROP or None (any MECH_PROP)
+    mech_cond = "MECH_PROP = ?" if mech_prop is not None else "MECH_PROP IS NOT NULL"
+    inquiry = ("""
+            SELECT PRO_ID FROM products
+            WHERE "MATERIAL" LIKE ?
+              AND DENSITY IS NOT NULL
+              AND """ + mech_cond + source_filter(basetype) + """
+            ORDER BY CAST(Total_GWP AS REAL), PRO_ID
+            """
+    )
+    params = [material] if mech_prop is None else [material, mech_prop]
+    cursor.execute(inquiry, params)
+    result = [row[0] for row in cursor.fetchall()]
+    if not result:
+        raise ValueError(f"no product found for material {material}, mech_prop {mech_prop}, basetype {basetype}")
+    prod_ids = []
+    for prod_id in (result[0], result[-1]):  # lowest and highest GWP
+        prod_id_str = "'" + str(prod_id) + "'"
+        if prod_id_str not in prod_ids:
+            prod_ids.append(prod_id_str)
+    prod_ids.sort(key=lambda x: int(x.strip("'")))  # PRO_ID order, same section order as before
+    return prod_ids
+
+
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
+### KBOB: basetype kwarg
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin"):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin",
+                 basetype="epd"):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1) #if idx_verfctn isnt specified, pick a random
@@ -31,13 +75,12 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     cursor = connection.cursor()
     for mat_name in mat_names:
         # Wählt alle EPDs von einem Material -> "mat-name" (z.B. ready mixed concrete)
+        ### KBOB: basetype filter
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL                
                 AND MECH_PROP IS NOT NULL
-                AND ValidEPD = 1
-                AND Man_Ausschluss = 1
-                AND "MATERIAL" LIKE """ + mat_name
+                AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
         #            " material=" + mat_name)
@@ -79,103 +122,30 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highest emissions
-                # exclude not epd sources from the data.
-                inquiry = """
-                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
-                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
-                  AND DENSITY IS NOT NULL
-                  AND MECH_PROP = 'B500B'
-                  AND ValidEPD = 1
-                  AND Man_Ausschluss = 1
-                  AND CAST(Total_GWP AS REAL) IN (
-                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
-                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
-                        AND DENSITY IS NOT NULL 
-                        AND MECH_PROP = 'B500B' 
-                        AND ValidEPD = 1 
-                        AND Man_Ausschluss = 1
-
-                      UNION
-
-                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
-                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
-                        AND DENSITY IS NOT NULL 
-                        AND MECH_PROP = 'B500B' 
-                        AND ValidEPD = 1 
-                        AND Man_Ausschluss = 1
-                  )
-                """
-
-                cursor.execute(inquiry)
-                result = cursor.fetchall()
-                prod_id_low = result[0]
-                prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
-                prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
-                # create a rebar material objects with mech prop B500B and low rsp high emission values
-                rebar_low_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_low_str)
-                rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
-                # create initial cross-sections
-                section_00 = struct_analysis.RectangularConcrete(concrete, rebar_low_em, 1.0, 0.20,
-                                                                0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
-                                                                0, 0.15, 2)
-                section_01 = struct_analysis.RectangularConcrete(concrete, rebar_high_em, 1.0, 0.20,
-                                                                 0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
-                                                                 0, 0.15, 2)
-
-                # add sections to content-definition of plot-line
-                line_i0 = [section_00, floorstruc]
-                line_i1 = [section_01, floorstruc]
-                to_plot.extend([line_i0, line_i1])
+                ### KBOB: low/high helper
+                for rebar_prod_id in get_low_high_prod_ids(cursor, 'Steel_reinforcing_bar', 'B500B', basetype):
+                    # create a rebar material object with mech prop B500B and low rsp high emission values
+                    rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
+                    # create initial cross-section
+                    section_0 = struct_analysis.RectangularConcrete(concrete, rebar, 1.0, 0.20,
+                                                                    0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
+                                                                    0, 0.15, 2)
+                    # add section to content-definition of plot-line
+                    to_plot.append([section_0, floorstruc])
 
             elif crsec_type == "rc_rib":
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highes emissions
-                inquiry = """
-                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
-                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
-                  AND DENSITY IS NOT NULL
-                  AND MECH_PROP = 'B500B'
-                  AND ValidEPD = 1
-                  AND Man_Ausschluss = 1
-                  AND CAST(Total_GWP AS REAL) IN (
-                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
-                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
-                        AND DENSITY IS NOT NULL 
-                        AND MECH_PROP = 'B500B' 
-                        AND ValidEPD = 1 
-                        AND Man_Ausschluss = 1
-
-                      UNION
-
-                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
-                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
-                        AND DENSITY IS NOT NULL 
-                        AND MECH_PROP = 'B500B' 
-                        AND ValidEPD = 1 
-                        AND Man_Ausschluss = 1
-                  )
-                """
-                cursor.execute(inquiry)
-                result = cursor.fetchall()
-                prod_id_low = result[0]
-                prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
-                prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
-
-                # create a rebar material objects with mech prop B500B and low rsp high emission values
-                rebar_low_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_low_str)
-                rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
-
-                # create initial cross-sections
-                section_00 = struct_analysis.RibbedConcrete(concrete, rebar_low_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.018, 5, 0.008, 0.15, 2, 1, 2.0, 0.02, 0.03, 0.15)
-                section_01 = struct_analysis.RibbedConcrete(concrete, rebar_high_em, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15,0.008, 0.15, 0.018, 5, 0.008, 0.15, 2,1, 2.0, 0.02, 0.03, 0.15)
-                # add sections to content-definition of plot-line
-                line_i0 = [section_00, floorstruc]
-                line_i1 = [section_01, floorstruc]
-                to_plot.extend([line_i0, line_i1])
+                ### KBOB: low/high helper
+                for rebar_prod_id in get_low_high_prod_ids(cursor, 'Steel_reinforcing_bar', 'B500B', basetype):
+                    # create a rebar material object with mech prop B500B and low rsp high emission values
+                    rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
+                    # create initial cross-section
+                    section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.018, 5, 0.008, 0.15, 2, 1, 2.0, 0.02, 0.03, 0.15)
+                    # add section to content-definition of plot-line
+                    to_plot.append([section_0, floorstruc])
 
             elif crsec_type == "wd_rib":
                 # create a Wood material object
@@ -183,43 +153,16 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 timber1.get_design_values()
 
                 # search database for timber board material (CLT) with lowest and highest emissions
-                inquiry = ("""
-                                SELECT PRO_ID FROM products
-                                WHERE Total_GWP = (SELECT MIN(Total_GWP) FROM products
-                                                    WHERE "MATERIAL" LIKE '%3_and_5_plywood%'
-                                                    AND DENSITY IS NOT NULL
-                                                    AND MECH_PROP IS NOT NULL
-                                                    AND ValidEPD = 1)
-                                OR Total_GWP = (SELECT MAX(Total_GWP) FROM products
-                                                    WHERE "MATERIAL" LIKE '%3_and_5_plywood%'
-                                                    AND DENSITY IS NOT NULL
-                                                    AND MECH_PROP IS NOT NULL
-                                                    AND ValidEPD = 1)
-                                """
-                           )
-                cursor.execute(inquiry)
-                result = cursor.fetchall()
-                prod_id_low = result[0]
-                prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
-                prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
-
-                # create a timber material objects in timber board (CLT, C24) with and low rsp high emission values
-                clt_low_em = struct_analysis.Wood("'C24'", database_name, prod_id=prod_id_low_str)
-                clt_low_em.get_design_values()
-                clt_high_em = struct_analysis.Wood("'C24'", database_name, prod_id=prod_id_high_str)
-                clt_high_em.get_design_values()
-
-                # create initial cross-sections
-                section_00 = struct_analysis.RibWood(timber1, clt_low_em, clt_low_em, 4, 0.12, 0.22, 0.625,
-                                                     0.027, 0.027)
-                section_01 = struct_analysis.RibWood(timber1, clt_high_em, clt_high_em, 4, 0.12, 0.22, 0.625,
-                                                    0.027, 0.027)
-
-                # add sections to content-definition of plot-line
-                line_i0 = [section_00, floorstruc]
-                line_i1 = [section_01, floorstruc]
-                to_plot.extend([line_i0, line_i1])
+                ### KBOB: low/high helper
+                for clt_prod_id in get_low_high_prod_ids(cursor, '%3_and_5_plywood%', None, basetype):
+                    # create a timber material object in timber board (CLT, C24) with low rsp high emission values
+                    clt = struct_analysis.Wood("'C24'", database_name, prod_id=clt_prod_id)
+                    clt.get_design_values()
+                    # create initial cross-section
+                    section_0 = struct_analysis.RibWood(timber1, clt, clt, 4, 0.12, 0.22, 0.625,
+                                                        0.027, 0.027)
+                    # add section to content-definition of plot-line
+                    to_plot.append([section_0, floorstruc])
 
             else:
                 print("cross-section type is not defined inside function plot_dataset()")
@@ -280,7 +223,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                         material_lg = i[0].wood_type_1.mech_prop
                     else:
                         material_lg = "error: section material is not defined"
-                    legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name, fixed_params.get("t3")])
+                    ### KBOB: basetype in legend/filename
+                    legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name, fixed_params.get("t3"), basetype])
 
     #Filter out None values (infesible solutions):
     member_list = [[mem for mem in sublist if mem is not None] for sublist in member_list]
@@ -355,7 +299,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             if j == idx_vrfctn:
                 vrfctn_members[0].append(mem)
                 vrfctn_members[1].append(i)
-        sec_typ, mat, cri, opt, floor_name, t3_val = legend[i]
+        ### KBOB: basetype in legend/filename
+        sec_typ, mat, cri, opt, floor_name, t3_val, base = legend[i]
         # set line color
         if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
             color = 'darkgreen'
@@ -405,7 +350,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             linewidth = 1.0
         else:
             linewidth = 0.1
-        label = sec_typ + ", " + mat + ", " + cri + ", optimized for " + opt
+        ### KBOB: basetype in legend/filename
+        label = sec_typ + ", " + mat + ", " + cri + ", optimized for " + opt + ", " + base
         if t3_val is not None:
             label += f", t3={t3_val}"
         # plot data
@@ -493,7 +439,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
     # 3. Weiche für Export-Klasse und Ordner anhand des Präfixes ('wd' vs. alle anderen)
     # Use members_to_excel2 and folder 'Results' for all cross-section types (including wood 'wd')
-    filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}.xlsx"
+    ### KBOB: basetype in legend/filename
+    filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}_{basetype}.xlsx"
     class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
 
 
@@ -519,11 +466,17 @@ def plot_section(section):
                   f'di_stir / s_stir / n = {section.bw_bg[0]} / {section.bw_bg[1]} / {section.bw_bg[2] }\n'
                   f'c_nom = {100*section.c_nom:.1f} cm \n'
                   f'x/d = {section.x_p/section.d:.2f} \n'
-                  f'GWP = {section.co2:.0f} kg/m^2')
+                  f'GWP = {section.co2:.0f} kg/m^2 \n'
+                  ### KBOB: UBP/GE legend
+                  f'UBP = {section.ubp:.0f} UBP/m^2 \n'
+                  f'GE = {section.graue_energie:.0f} kWh/m^2')
     elif section.section_type == "wd_rec":  # Rectangular Wooden Cross-Section
         fig, ax, offset = plot_rectangle_with_dimensions(section.b, section.h, 'brown', '/')
         legend = (f'{section.wood_type.mech_prop}, prod_ID:{section.wood_type.prod_id} \n'
-                  f'GWP = {section.co2:.0f} kg/m^2')
+                  f'GWP = {section.co2:.0f} kg/m^2 \n'
+                  ### KBOB: UBP/GE legend
+                  f'UBP = {section.ubp:.0f} UBP/m^2 \n'
+                  f'GE = {section.graue_energie:.0f} kWh/m^2')
 
     elif section.section_type == "rc_rib": #Betonrippenquerschnitte
         fig, ax, offset = plot_rib_with_dimensions(section.b, section.b_w, section.h, section.h_f, 'green', 'x')
@@ -538,14 +491,20 @@ def plot_section(section):
               f'c_nom = {100 * section.c_nom:.1f} cm \n'
               f'x/d = {section.x_p / section.d:.2f} \n'
               f'h, hf, hw, b, bw = {section.h:.2f}, {section.h_f:.2f}, {section.h_w:.2f}, {section.b:.2f}, {section.b_w:.2f} \n'
-              f'GWP = {section.co2:.0f} kg/m^2')
+              f'GWP = {section.co2:.0f} kg/m^2 \n'
+              ### KBOB: UBP/GE legend
+              f'UBP = {section.ubp:.0f} UBP/m^2 \n'
+              f'GE = {section.graue_energie:.0f} kWh/m^2')
 
     elif section.section_type == "wd_rib": #Betonrippenquerschnitte
         fig, ax, offset = plot_wd_rib_with_dimensions(section.bw, section.h, section.b, section.t2, section.t3, 'brown', 'x')
         legend = (f'{section.wood_type_1.mech_prop}, prod_ID:{section.wood_type_1.prod_id} \n'
               f'length = {section.l0} \n'
               f'h, bw, b, t2, t3 = {section.h:.2f}, {section.bw:.2f}, {section.b:.2f}, {section.t2:.2f}, {section.t3:.2f} \n'
-              f'GWP = {section.co2:.0f} kg/m^2')
+              f'GWP = {section.co2:.0f} kg/m^2 \n'
+              ### KBOB: UBP/GE legend
+              f'UBP = {section.ubp:.0f} UBP/m^2 \n'
+              f'GE = {section.graue_energie:.0f} kWh/m^2')
 
     else:
         print("no plot for specified section_type defined yet")
@@ -743,7 +702,8 @@ def get_stirrup_positions(section):
 
 # PLOT DATASETS OF CROSS_SECTION WITH VARIED MATERIALS IN M-CHI PLOT AND PLOT THE OPTIMIZED SECTIONS FOR VALIDATION
 # ----------------------------------------------------------------------------------------------------------------------
-def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50):
+### KBOB: basetype kwarg
+def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50, basetype="epd"):
     # GENERATE INITIAL CROSS-SECTIONS
     # Search database (table products, attribute material) for products,
     # get prod_id of relevant materials from database and create initial cross-section for each product
@@ -754,8 +714,9 @@ def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50
     x_values = []
     y_values = []
     for mat_name in mat_names:
+        ### KBOB: basetype filter
         inquiry = ("SELECT PRO_ID FROM products WHERE"
-                   " MATERIAL=" + mat_name)
+                   " MATERIAL=" + mat_name + source_filter(basetype))
         cursor.execute(inquiry)
         result = cursor.fetchall()
         for i, prod_id in enumerate(result):

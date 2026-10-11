@@ -21,7 +21,10 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260811.db"
+### KBOB: new DB name
+database_name = "database_261009.db"
+### KBOB: basetype input
+basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
@@ -61,32 +64,36 @@ mat_names = ["'ready_mixed_concrete'"]
 
 alg = "TPE"
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section rib cross section
+### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rib", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc,"Simple Beam", alg )
+                                                              idx_vrc,"Simple Beam", alg, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 """
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section simple beam
+### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc,"Simple Beam", alg )
+                                                              idx_vrc,"Simple Beam", alg, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
 alg = "basinhoppin"
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section simple beam
+### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rib", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc,"Simple Beam", alg )
+                                                              idx_vrc,"Simple Beam", alg, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
 alg = "TPE"
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section simple beam
+### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rib", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc,"Simple Beam", alg )
+                                                              idx_vrc,"Simple Beam", alg, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 

@@ -12,7 +12,8 @@ df_material_prop = pd.read_excel(excel_file, sheet_name="material_prop", engine=
 df_floor_struc_prop = pd.read_excel(excel_file, sheet_name="floor_struc_prop", engine="openpyxl")
 
 # Verbindung zur SQLite-Datenbank herstellen (oder neu erstellen)
-conn = sqlite3.connect("database_260811.db") #name of database
+### KBOB: new DB name
+conn = sqlite3.connect("database_261009.db") #name of database
 
 # Daten in die Datenbank schreiben
 df_products.to_sql("products", conn, if_exists="replace", index=False)
