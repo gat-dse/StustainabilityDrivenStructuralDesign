@@ -21,9 +21,7 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-### KBOB: new DB name
 database_name = "database_261009.db"
-### KBOB: basetype input
 basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database

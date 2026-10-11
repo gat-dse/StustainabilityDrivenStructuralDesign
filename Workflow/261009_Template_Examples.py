@@ -11,7 +11,7 @@ import time
 #-----------------------------------------------------------------------------------------------------------------------
 # SETTINGS
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4, 6, 8, 10]
+lengths = [4, 6, 8, 10, 12]
 
 # Index of verified length (cross-sections of that length will be plotted); must be < len(lengths), -1 = random
 idx_vrc = len(lengths) - 1
@@ -32,7 +32,6 @@ optima = ["GWP"]  # options: "GWP" (min. GWP of cross-section), "h" (min. height
 
 # define database
 database_name = "database_261009.db"
-### KBOB: basetype input
 basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
 
 # define loads on member

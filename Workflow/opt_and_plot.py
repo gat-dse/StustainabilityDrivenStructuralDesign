@@ -15,10 +15,9 @@ import class_to_excel_2
 import pandas as pd
 from scipy.spatial import ConvexHull
 
-### KBOB: source_filter helper
-# KBOB rows: no EPD_ID ('N/A' in the Excel becomes NULL in the DB) and SOURCE 'KBOB v9.0'; every other row counts as EPD
-KBOB_CONDITION = "(EPD_ID IS NULL AND SOURCE = 'KBOB v9.0')"
-
+### KBOB CHANGES
+# KBOB rows: only they have a "KBOB ID-Nr." (empty for EPD rows, NULL in the DB); every other row counts as EPD
+KBOB_CONDITION = "(\"KBOB ID-Nr.\" IS NOT NULL)"
 
 def source_filter(basetype):
     # SQL fragment selecting the data basis: product EPDs or generic KBOB values
@@ -27,14 +26,25 @@ def source_filter(basetype):
     elif basetype == "epd":
         return f" AND NOT {KBOB_CONDITION} AND ValidEPD = 1 AND Man_Ausschluss = 1 "
     raise ValueError(f"basetype must be 'epd' or 'kbob', got {basetype}")
+### KBOB CHANGES
 
-
-### KBOB: low/high helper
+### KBOB CHANGES
+# To see the old version, run git show 36ba32b:Workflow/opt_and_plot.py (around lines 84–160).
 def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
     # returns unique prod_id strings of the products with lowest and highest GWP of a material
     # (only one entry if min == max, e.g. a single KBOB product)
     # material: LIKE pattern for column MATERIAL; mech_prop: required MECH_PROP or None (any MECH_PROP)
+    # condition on MECH_PROP: a given strength class (e.g. 'B500B') or, for None, any product that has one
     mech_cond = "MECH_PROP = ?" if mech_prop is not None else "MECH_PROP IS NOT NULL"
+    # SQL query, line by line:
+    #   SELECT PRO_ID ...          only the product IDs are needed, the material classes read the rest themselves
+    #   "MATERIAL" LIKE ?          material name, '?' is filled with `material` (allows '%' wildcards)
+    #   DENSITY IS NOT NULL        skip products without density: the material classes need it for the mass
+    #                              (volume * density) and float(None) would crash
+    #   mech_cond                  strength class condition from above
+    #   source_filter(basetype)    EPD or KBOB rows, see source_filter()
+    #   ORDER BY GWP, PRO_ID       sort ascending by GWP: first row = lowest, last row = highest GWP;
+    #                              PRO_ID decides between equal GWP values, so the result is always the same
     inquiry = ("""
             SELECT PRO_ID FROM products
             WHERE "MATERIAL" LIKE ?
@@ -43,23 +53,23 @@ def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
             ORDER BY CAST(Total_GWP AS REAL), PRO_ID
             """
     )
-    params = [material] if mech_prop is None else [material, mech_prop]
-    cursor.execute(inquiry, params)
-    result = [row[0] for row in cursor.fetchall()]
-    if not result:
+    params = [material] if mech_prop is None else [material, mech_prop]  # values for the '?' placeholders, in order
+    cursor.execute(inquiry, params)  # run the query; the parameters are inserted safely by sqlite3
+    result = [row[0] for row in cursor.fetchall()]  # rows are tuples (PRO_ID,) -> flat list of PRO_IDs, sorted by GWP
+    if not result:  # no matching product: stop with a clear message instead of an IndexError further down
         raise ValueError(f"no product found for material {material}, mech_prop {mech_prop}, basetype {basetype}")
-    prod_ids = []
-    for prod_id in (result[0], result[-1]):  # lowest and highest GWP
-        prod_id_str = "'" + str(prod_id) + "'"
-        if prod_id_str not in prod_ids:
+    prod_ids = []  # collects the selected IDs as SQL strings, e.g. "'123'"
+    for prod_id in (result[0], result[-1]):  # lowest and highest GWP (both the same row if only one product exists)
+        prod_id_str = "'" + str(prod_id) + "'"  # quote the ID, the material classes put it directly into their SQL
+        if prod_id_str not in prod_ids:  # skip the duplicate if min == max (e.g. only one KBOB rebar)
             prod_ids.append(prod_id_str)
-    prod_ids.sort(key=lambda x: int(x.strip("'")))  # PRO_ID order, same section order as before
-    return prod_ids
-
+    prod_ids.sort(key=lambda x: int(x.strip("'")))  # sort by PRO_ID (as a number, without quotes): same section
+                                                    # order as the old queries, which returned rows in PRO_ID order
+    return prod_ids  # 1 or 2 IDs; the caller builds one cross-section per ID
+### KBOB CHANGES
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
-### KBOB: basetype kwarg
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
                  g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin",
                  basetype="epd"):
@@ -75,13 +85,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     cursor = connection.cursor()
     for mat_name in mat_names:
         # Wählt alle EPDs von einem Material -> "mat-name" (z.B. ready mixed concrete)
-        ### KBOB: basetype filter
+        ### KBOB CHANGES
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL                
                 AND MECH_PROP IS NOT NULL
                 AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
         )
+        ### KBOB CHANGES
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
         #            " material=" + mat_name)
         cursor.execute(inquiry)
@@ -122,7 +133,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highest emissions
-                ### KBOB: low/high helper
                 for rebar_prod_id in get_low_high_prod_ids(cursor, 'Steel_reinforcing_bar', 'B500B', basetype):
                     # create a rebar material object with mech prop B500B and low rsp high emission values
                     rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
@@ -138,7 +148,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highes emissions
-                ### KBOB: low/high helper
                 for rebar_prod_id in get_low_high_prod_ids(cursor, 'Steel_reinforcing_bar', 'B500B', basetype):
                     # create a rebar material object with mech prop B500B and low rsp high emission values
                     rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
@@ -153,7 +162,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 timber1.get_design_values()
 
                 # search database for timber board material (CLT) with lowest and highest emissions
-                ### KBOB: low/high helper
                 for clt_prod_id in get_low_high_prod_ids(cursor, '%3_and_5_plywood%', None, basetype):
                     # create a timber material object in timber board (CLT, C24) with low rsp high emission values
                     clt = struct_analysis.Wood("'C24'", database_name, prod_id=clt_prod_id)

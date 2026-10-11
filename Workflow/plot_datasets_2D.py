@@ -11,8 +11,8 @@ import class_to_excel_2
 from scipy.spatial import ConvexHull
 
 ### KBOB: source filter (same conditions as in opt_and_plot.py)
-# KBOB rows: no EPD_ID ('N/A' in the Excel becomes NULL in the DB) and SOURCE 'KBOB v9.0'; every other row counts as EPD
-KBOB_CONDITION = "(EPD_ID IS NULL AND SOURCE = 'KBOB v9.0')"
+# KBOB rows: only they have a "KBOB ID-Nr." (empty for EPD rows, NULL in the DB); every other row counts as EPD
+KBOB_CONDITION = "(\"KBOB ID-Nr.\" IS NOT NULL)"
 
 
 def source_filter(basetype):

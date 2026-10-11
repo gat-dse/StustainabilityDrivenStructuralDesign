@@ -16,9 +16,9 @@ Replaces `HANDOFF_KBOB.md` (plan, now implemented, deleted) and includes the ope
 
 Source: `Database/260811_Datenbankdefinition.xlsx`, sheet `products` → `Database/Convert_Excel_to_DB.py` → `database_261009.db` (copy it to `Workflow/` after each conversion).
 
-- **KBOB vs. EPD:** a row is **KBOB** if `EPD_ID IS NULL` **and** `SOURCE = 'KBOB v9.0'` (57 rows). Every other row is **EPD**.
-  - KBOB rows have `EPD_ID = 'N/A'` in the Excel. `pd.read_excel` reads that as NaN and `to_sql` writes NULL.
-  - The `SOURCE` check keeps the 11 `Betonsortenrechner` rows (PRO_ID 12–22, also `EPD_ID` NULL) out of KBOB mode.
+- **KBOB vs. EPD:** a row is **KBOB** if `"KBOB ID-Nr." IS NOT NULL` (57 rows). Every other row is **EPD**.
+  - Only KBOB rows have a `KBOB ID-Nr.` in the Excel; it is empty for all other rows, and `to_sql` writes NULL. Checked 2026-10-11: exactly the 57 `SOURCE = 'KBOB v9.0'` rows have one.
+  - Changed on 2026-10-11 from `EPD_ID IS NULL AND SOURCE = 'KBOB v9.0'`. The new condition doesn't depend on the version string and can't become NULL when `SOURCE` is empty. The 11 `Betonsortenrechner` rows (PRO_ID 12–22) have no KBOB ID, so they stay out of KBOB mode.
 - **Filters** (`source_filter(basetype)`):
   - `epd`: `NOT KBOB AND ValidEPD = 1 AND Man_Ausschluss = 1`. This returns exactly the same products as before the change.
   - `kbob`: `KBOB AND Man_Ausschluss = 1 AND CAST(Total_GWP AS REAL) > 0`. The last condition drops the all-zero row 01.002.09.
@@ -88,8 +88,20 @@ Source: `Database/260811_Datenbankdefinition.xlsx`, sheet `products` → `Databa
 - **2D: `MIN_MAX = 1` also applies to KBOB.** Before the Excel update, all KBOB rows had `MIN_MAX = 0`, so a KBOB run found no concrete. It **failed silently**: no error, nothing optimized, no Excel file, but "Excel … erstellt" was still printed. Check `MIN_MAX` whenever KBOB rows are added.
 - **2D needs at least two slab sizes.** With one size, the envelope polygon (shapely) raises `ValueError: A linearring requires at least 4 coordinates`.
 - **2D `Slab` class** opens `260625_slab_properties.db` by relative path → run from `Workflow/`.
-- **`plot_datasets_2D.py`** still contains the duplicated rebar queries, including one `cursor.execute(inquiry)` that runs twice (rc_rib). Left as is on purpose (scope: EPD/KBOB only).
-- **Floor structure** (`MatLayer` / `floor_struc_prop`) has no UBP/GE columns yet, so `GWP_tot` has no UBP/GE counterpart. Out of scope.
+- **The duplicated rebar queries in plot_datasets_2D.py**:
+  In plot_dataset, the branches rc_rec (l.~90) and rc_rib (l.~140) each contain the same rebar min/max query that we merged into get_low_high_prod_ids in the 1D file. The 2D copy was deliberately left unchanged at the time. Only source_filter(basetype) was added, and result[1] was changed to result[-1]. That leaves these problems:
+  1. cursor.execute(inquiry) twice in a row in rc_rib. This is harmless: the second call just runs the same query again, and only that result is read. It wastes a little time and is a copy-paste leftover.
+  2. low / high labels can be swapped. The IN (MIN, MAX) query returns rows in PRO_ID order, not GWP order. With the current EPD data:
+   - result[0] = PRO_ID 120 (GWP 821, the highest), and it goes into rebar_low_em.
+   - result[-1] = PRO_ID 123 (GWP 303, the lowest), and it goes into rebar_high_em.
+   - Both lines are computed anyway, so the plots are correct, but the variable names are wrong. It's the same issue as the old 1D code.
+  3. KBOB computes everything twice. There is only one KBOB rebar, so result[0] and result[-1] are the same product. section_00 and section_01 are identical, and every optimization runs twice and gets plotted twice.
+    4. Ties. If two rebars share the min or max GWP, the query returns more than 2 rows, and result[-1] is not guaranteed to be the max.
+  5. The same query runs once per concrete product, for example 6 times for 6 concretes, always with the same result. This is not a bug, just unnecessary work.
+  The fix is to copy get_low_high_prod_ids into plot_datasets_2D.py (like source_filter), or import it, and loop over the returned IDs the same way as in 1D. That fixes 1–4.
+
+  One thing to check before changing rc_rib: unlike in 1D, section_00 and section_01 there don't only differ by rebar. They also have different starting parameters (…, 0.018, 2, … vs. …, 0.018, 3, …). A shared loop would give both the same starting values, so you'd need to decide whether that difference is intended. According to the summary, the 2D workflow currently only runs rc_rec anyway.
+- **Floor structure BODEN AUFBAU** (`MatLayer` / `floor_struc_prop`) has no UBP/GE columns yet, so `GWP_tot` has no UBP/GE counterpart. Out of scope.
 
 ## 6. Open problems (from `HANDOFF_OP.md`, not fixed)
 
