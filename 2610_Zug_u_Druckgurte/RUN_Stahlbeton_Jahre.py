@@ -27,18 +27,21 @@ HERE = Path(__file__).resolve().parent
 XLSX = HERE / "Zementemissionen-jh.xlsx"
 
 STEEL = "CH mix"        # Betonstahl: "CH mix" (Excel Zeile 14) oder "Gerlafingen" (Zeile 16)
-RHO_T = base.RHO_T      # Bewehrungsgehalt Zuggurt (wie RUN.py, 8 %)
+RHO_T = base.RHO_T      # Bewehrungsgehalt Zuggurt (wie RUN.py, 10 %)
 RHO_C = base.RHO_C      # Bewehrungsgehalt Druckgurt (wie RUN.py, 0.6 %)
 GAMMA_S = 7850          # kg/m3
 
-# Betonsorten: (Spaltenkopf Zeile 4, Jahr in Zeile 3 oder None, Jahr für Plot, Kurzname, Farbe)
+# Betonsorten: (Spaltenkopf Zeile 4, Jahr in Zeile 3 oder None, Jahr für Plot, Kurzname, Farbe, Art)
+# Art: "rc" = Stahlbeton (Zug + Druck), "cc" = umschnürter Stahlbeton (nur Druck, wie RUN.py)
 # Die Spalten werden über den Kopf gesucht -> eingefügte Spalten im Excel stören nicht.
 CONCRETES = [
-    ("CEM I", 1990, 1990, "CEM I (fossil)",      "#5b3a29"),
-    ("CEM I", 2026, 2026, "CEM I (CH mix)",      "#b5651d"),
-    ("ND Kibeco", None, 2026, "ND Kibeco (Reco200)", "#2e9e44"),
-    ("Beton 2050", None, 2050, "Beton 2050",          "#1f78b4"),
-    ("Beton 2050 mit CCUS", None, 2050, "Beton 2050 mit CCUS", "#6a3d9a"),
+    ("CEM I", 1990, 1990, "CEM I (fossil)",           "#5b3a29", "rc"),   # dunkelbraun
+    ("CEM I", 2026, 2026, "CEM I (CH mix)",           "#c8a27a", "rc"),   # hellbraun
+    ("NPK C CEMIIB", None, 2026, "KBOB CEM II/B",     "#d35400", "rc"),   # dunkelorange
+    ("NPK C CEMIIB", None, 2026, "KBOB CEM II/B umschnürt", "#f5a04a", "cc"),  # hellorange
+    ("ND Kibeco", None, 2026, "ND Kibeco (Reco200)",  "#2e9e44", "rc"),   # grün
+    ("Beton 2050", None, 2050, "Beton 2050",          "#1a3c8c", "rc"),   # dunkelblau
+    ("Beton 2050 mit CCUS", None, 2050, "Beton 2050 mit CCUS", "#6baed6", "rc"),  # hellblau
 ]
 
 
@@ -62,13 +65,13 @@ def read_emissions(path=XLSX):
     from openpyxl.utils import get_column_letter
     ws = openpyxl.load_workbook(path, data_only=True).active
     rows = []
-    for header, xl_year, year, name, color in CONCRETES:
+    for header, xl_year, year, name, color, kind in CONCRETES:
         c = _find_column(ws, header, xl_year)
         e_c = ws.cell(row=12, column=c).value
         col = get_column_letter(c)
         if e_c is None:
             raise ValueError(f"Zelle {col}12 leer – Excel einmal speichern (Formelwerte fehlen).")
-        rows.append(dict(col=col, year=year, name=name, color=color, e_c=float(e_c)))
+        rows.append(dict(col=col, year=year, name=name, color=color, e_c=float(e_c), kind=kind))
     c0 = _find_column(ws, "CEM I", 1990)
     steel = {"Gerlafingen": ws.cell(row=16, column=c0).value,               # kgCO2 / 100 kg
              "CH mix": ws.cell(row=14, column=c0).value}
@@ -76,35 +79,53 @@ def read_emissions(path=XLSX):
     return rows, e_s
 
 
-def N_rc_e(u, e_c, e_s):
-    """Stahlbeton-Gurt N(u) [N] für die CO2-Werte e_c (Beton) und e_s (Stahl)."""
+def N_rc_e(u, e_c, e_s, kind="rc"):
+    """Gurt N(u) [N] für die CO2-Werte e_c (Beton) und e_s (Stahl).
+    kind="rc": Stahlbeton (Zug RHO_T, Druck RHO_C); kind="cc": umschnürter Stahlbeton
+    (nur Druck, RHO_W / RHO_L wie RUN.py)."""
+    if kind == "cc":
+        return base.N_cc(u, base.RHO_W, base.RHO_L, e_c, e_s)
     return base.N_rc_tc(u, e_c, e_s)
+
+
+def label(r):
+    """Legendentext einer Betonsorte."""
+    if r["kind"] == "cc":
+        return (f"{r['year']}: {r['name']}  ($\\rho_w$ = {base.RHO_W:.1%}, "
+                f"$\\rho_l$ = {base.RHO_L:.1%})")
+    return f"{r['year']}: {r['name']}  ($e_c$ = {r['e_c']:.0f} kgCO$_2$/m$^3$)"
 
 
 # =============================================================================
 # 2) Plot N(u) + Querschnitte
 # =============================================================================
-def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png"):
+def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dark=False,
+         y_top=10.0, compact=False):
+    """compact=True: ohne (a)/(b), Querschnitte rechts neben dem Diagramm untereinander."""
     uu = np.linspace(u_min, u_max, n) * mm
     es = e_s[STEEL]
 
-    fig = plt.figure(figsize=(15, 13))
-    gs = fig.add_gridspec(2, 1, height_ratios=[3.0, 1.0], hspace=0.12,
-                          left=0.08, right=0.90, top=0.97, bottom=0.10)
-    ax = fig.add_subplot(gs[0])
-    axc = fig.add_subplot(gs[1])
+    if compact:
+        fig = plt.figure(figsize=(21, 12))
+        ax = fig.add_axes([0.05, 0.04, 0.63, 0.92])
+        axc = None
+    else:
+        fig = plt.figure(figsize=(15, 13))
+        gs = fig.add_gridspec(2, 1, height_ratios=[3.0, 1.0], hspace=0.12,
+                              left=0.08, right=0.90, top=0.97, bottom=0.10)
+        ax = fig.add_subplot(gs[0])
+        axc = fig.add_subplot(gs[1])
 
     tens, comp = [], []
     for r in rows:
         col = r["color"]
-        e_c = r["e_c"]
-        N = N_rc_e(uu, e_c, es) / 1e6
-        ax.plot(uu / mm, base._hide_zero(uu, N), color=col, lw=2.8, zorder=4,
-                label=f"{r['year']}: {r['name']}  ($e_c$ = {r['e_c']:.0f} kgCO$_2$/m$^3$)")
+        e_c, kind = r["e_c"], r["kind"]
+        N = N_rc_e(uu, e_c, es, kind) / 1e6
+        ax.plot(uu / mm, base._hide_zero(uu, N), color=col, lw=2.8, zorder=4, label=label(r))
         for sign, store, x_edge in ((+1, tens, u_max), (-1, comp, u_min)):
-            u_ult = base._ultimate_u(lambda u, k: N_rc_e(u, e_c, es), None, sign)
+            u_ult = base._ultimate_u(lambda u, k: N_rc_e(u, e_c, es, kind), None, sign)
             if abs(u_ult) > abs(x_edge) * mm:
-                store.append((float(N_rc_e(x_edge * mm, e_c, es) / 1e6), u_ult, col))
+                store.append((float(N_rc_e(x_edge * mm, e_c, es, kind) / 1e6), u_ult, col))
     if tens:
         base._end_arrows(ax, tens, u_max, +1, min_gap=0.9)
     if comp:
@@ -114,7 +135,8 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png"):
     Nall = [l.get_ydata() for l in ax.lines]
     ymax = np.nanmax([np.nanmax(y) for y in Nall]) * 1.15
     ymin = np.nanmin([np.nanmin(y) for y in Nall]) * 1.15
-    ymax = max(ymax, 0.6 * abs(ymin))          # Platz für Legende im Zugbereich
+    if y_top is not None:                      # Zugbereich nur bis y_top [MN]
+        ymax = y_top + 0.6                     # etwas Luft für die Pfeilspitze über 10 MN
     ax.set_xlim(u_min - 0.1, u_max + 0.3)
     ax.set_ylim(ymin, ymax)
     for s in ("top", "right"):
@@ -124,7 +146,7 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png"):
     ax.plot(1, 0, ">k", ms=11, transform=ax.get_yaxis_transform(), clip_on=False)
     ax.plot(0, 1, "^k", ms=11, transform=ax.get_xaxis_transform(), clip_on=False)
     ax.set_xticks(np.arange(u_min, u_max + 0.01, 0.5))
-    ax.set_yticks(np.arange(np.ceil(ymin / 2.5) * 2.5, ymax, 2.5))
+    ax.set_yticks(np.arange(np.ceil(ymin / 2.5) * 2.5, ymax + 0.01, 2.5))
     ax.xaxis.set_major_formatter(lambda x, p: "" if abs(x) < 1e-9 else f"{x:.1f}")
     ax.yaxis.set_major_formatter(lambda y, p: "" if abs(y) < 1e-9 else f"{y:g}")
     ax.tick_params(direction="in", length=5, labelsize=13)
@@ -137,31 +159,97 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png"):
     ax.text(1.6, ymax * 0.97, "Zuggurt", fontsize=18, ha="center", va="top", bbox=box)
     ax.text(-2.6, ymin * 0.97, "Druckgurt", fontsize=18, ha="center", va="bottom", bbox=box)
 
-    leg1 = ax.legend(loc="upper left", frameon=False, fontsize=12.5,
+    leg1 = ax.legend(loc="lower right", bbox_to_anchor=(1.0, 0.02), frameon=False, fontsize=12.5,
                      title=f"Stahlbeton C30/37, $\\rho_s$ = {RHO_T:.0%} (Zug), {RHO_C:.1%} (Druck)", title_fontsize=13.5)
     leg1._legend_box.align = "left"
     ax.add_artist(leg1)
-    ax.text(0.98, 0.04, f"Betonstahl {STEEL}: $e_s$ = {base._fmt(es)} kgCO$_2$/m$^3$\n"
-            "Budget: 100 kgCO$_2$ pro m Gurtlänge", transform=ax.transAxes,
-            ha="right", va="bottom", fontsize=13, linespacing=1.6)
+    ax.text(u_min, 0.92 * ymax, f"Betonstahl {STEEL}: $e_s$ = {base._fmt(es)} kgCO$_2$/m$^3$\n"
+            "Budget: 100 kgCO$_2$ pro m Gurtlänge",
+            ha="left", va="top", fontsize=13, linespacing=1.6)
 
-    _sections(axc, rows, es)
-    ax.text(-0.06, 1.0, "(a)", transform=ax.transAxes, fontsize=17, va="top")
-    axc.text(-0.06, 1.0, "(b)", transform=axc.transAxes, fontsize=17, va="top")
+    if compact:
+        _sections_column(fig, rows, es)
+    else:
+        _sections(axc, rows, es)
+        ax.text(-0.06, 1.0, "(a)", transform=ax.transAxes, fontsize=17, va="top")
+        axc.text(-0.06, 1.0, "(b)", transform=axc.transAxes, fontsize=17, va="top")
+    if dark:
+        base.invert_bw(fig)
     base.save_fig(fig, HERE / fname, bbox_inches="tight", pad_inches=0.2)
     return fig
+
+
+def _sections_column(fig, rows, e_s, x_fig=0.72, top_fig=0.96, scale_in=1.9,
+                     text_in=0.95, gap_in=0.15, fontsize=12.5):
+    """Querschnitte untereinander, linke Kanten bündig, Text rechts daneben.
+    scale_in = Zoll pro 1000 mm (gleicher Massstab für alle Querschnitte)."""
+    gk_c, gk_s = base.gamma["c"] * base.g / 1000, base.gamma["s"] * base.g / 1000
+    g_rc = lambda A, r: A * ((1 - r) * gk_c + r * gk_s)
+    mm_per_in = 1000.0 / scale_in
+    info = []
+    for r in rows:
+        if r["kind"] == "cc":
+            A = base.A_cc(base.RHO_W, base.RHO_L, r["e_c"], e_s)
+            sq = [(np.sqrt(A) / mm, 0.85)]
+            lines = [f"Druck: $\\rho_w$ = {base.RHO_W:.1%}, $\\rho_l$ = {base.RHO_L:.1%}",
+                     f"   $A$ = {base._fmt(A * 1e6)} mm$^2$, "
+                     f"$g_{{0k}}$ = {A * (gk_c + (base.RHO_W + base.RHO_L) * gk_s):.1f} kN/m"]
+        else:
+            A_t = base.A_rc(RHO_T, r["e_c"], e_s)
+            A_c = base.A_rc(RHO_C, r["e_c"], e_s)
+            sq = [(np.sqrt(A_c) / mm, 0.40), (np.sqrt(A_t) / mm, 0.85)]
+            lines = [f"Zug ($\\rho_s$ = {RHO_T:.0%}): $A$ = {base._fmt(A_t * 1e6)} mm$^2$, "
+                     f"$g_{{0k}}$ = {g_rc(A_t, RHO_T):.1f} kN/m",
+                     f"Druck ($\\rho_s$ = {RHO_C:.1%}): $A$ = {base._fmt(A_c * 1e6)} mm$^2$, "
+                     f"$g_{{0k}}$ = {g_rc(A_c, RHO_C):.1f} kN/m"]
+        title = f"$\\bf{{{r['year']}}}$: {r['name']}  ($e_c$ = {r['e_c']:.0f} kgCO$_2$/m$^3$)"
+        info.append((r, sq, [title] + lines))
+    a_max = max(a for _, sq, _ in info for a, _ in sq)
+    text_mm, gap_mm = text_in * mm_per_in, gap_in * mm_per_in
+    heights = [max(max(a for a, _ in sq), text_mm) for _, sq, _ in info]
+    H = sum(heights) + gap_mm * (len(info) - 1)
+    Wmm = a_max + 0.15 * mm_per_in + 3.6 * mm_per_in        # Quadrat + Abstand + Text
+    fw, fh = fig.get_size_inches()
+    axc = fig.add_axes([x_fig, top_fig - H / mm_per_in / fh, Wmm / mm_per_in / fw, H / mm_per_in / fh])
+    y = H
+    x_text = a_max + 0.15 * mm_per_in
+    for (r, sq, lines), h in zip(info, heights):
+        y_top = y
+        for a, alpha in sq:                                   # linke Kante bündig bei x = 0
+            axc.add_patch(Rectangle((0, y_top - a), a, a, color=r["color"], alpha=alpha, lw=0))
+        axc.text(x_text, y_top, "\n".join(lines), ha="left", va="top", fontsize=fontsize,
+                 linespacing=1.35)
+        y -= h + gap_mm
+    axc.set_xlim(0, Wmm)
+    axc.set_ylim(0, H)
+    axc.set_aspect("equal", anchor="NW")
+    axc.axis("off")
+    return axc
 
 
 def _sections(axc, rows, e_s):
     """Querschnitte massstäblich: hell = Druckgurt (RHO_C), dunkel = Zuggurt (RHO_T)."""
     gk_c, gk_s = base.gamma["c"] * base.g / 1000, base.gamma["s"] * base.g / 1000
     g_rc = lambda A, r: A * ((1 - r) * gk_c + r * gk_s)
-    W = 1300.0
+    W = 1150.0
     for i, r in enumerate(rows):
+        x0 = i * W
+        if r["kind"] == "cc":                       # umschnürter Stahlbeton (nur Druck)
+            A = base.A_cc(base.RHO_W, base.RHO_L, r["e_c"], e_s)
+            a = np.sqrt(A) / mm
+            axc.add_patch(Rectangle((x0, 0), a, a, color=r["color"], alpha=0.85, lw=0))
+            txt = ["$\\bf{" + str(r["year"]) + "}$", r["name"].replace(" umschnürt", "\numschnürt"),
+                   f"$e_c$ = {r['e_c']:.0f} kgCO$_2$/m$^3$",
+                   f"Druck: $\\rho_w$ = {base.RHO_W:.1%},",
+                   f"   $\\rho_l$ = {base.RHO_L:.1%}",
+                   f"   $A$ = {base._fmt(A * 1e6)} mm$^2$",
+                   f"   $g_{{0k}}$ = {A * (gk_c + (base.RHO_W + base.RHO_L) * gk_s):.1f} kN/m"]
+            axc.annotate("\n".join(txt), xy=(x0, 0), xytext=(0, -10), textcoords="offset points",
+                         ha="left", va="top", fontsize=12, linespacing=1.5, annotation_clip=False)
+            continue
         A_t = base.A_rc(RHO_T, r["e_c"], e_s)
         A_c = base.A_rc(RHO_C, r["e_c"], e_s)
         a_t, a_c = np.sqrt(A_t) / mm, np.sqrt(A_c) / mm
-        x0 = i * W
         axc.add_patch(Rectangle((x0, 0), a_c, a_c, color=r["color"], alpha=0.40, lw=0))
         axc.add_patch(Rectangle((x0, 0), a_t, a_t, color=r["color"], alpha=0.85, lw=0))
         txt = ["$\\bf{" + str(r["year"]) + "}$", r["name"],
@@ -187,15 +275,20 @@ def table(rows, e_s):
     for r in rows:
         line = {"Jahr": r["year"], "Beton": r["name"], "e_c [kgCO2/m3]": r["e_c"]}
         es = e_s[STEEL]
-        A_t = base.A_rc(RHO_T, r["e_c"], es)
-        A_c = base.A_rc(RHO_C, r["e_c"], es)
-        uu = np.linspace(-3.5, 60, 6000) * mm
-        N = N_rc_e(uu, r["e_c"], es) / 1e6
+        if r["kind"] == "cc":
+            A_t = np.nan
+            A_c = base.A_cc(base.RHO_W, base.RHO_L, r["e_c"], es)
+            uu = np.linspace(-40, 60, 8000) * mm
+        else:
+            A_t = base.A_rc(RHO_T, r["e_c"], es)
+            A_c = base.A_rc(RHO_C, r["e_c"], es)
+            uu = np.linspace(-3.5, 60, 6000) * mm
+        N = N_rc_e(uu, r["e_c"], es, r["kind"]) / 1e6
         line[f"A Zug (rho={RHO_T:.1%}) [mm²]"] = A_t * 1e6
         line[f"a Zug [mm]"] = np.sqrt(A_t) / mm
         line[f"A Druck (rho={RHO_C:.1%}) [mm²]"] = A_c * 1e6
         line[f"a Druck [mm]"] = np.sqrt(A_c) / mm
-        line["N_Zug,max [MN]"] = N.max()
+        line["N_Zug,max [MN]"] = N.max() if r["kind"] != "cc" else np.nan
         line["N_Druck,max [MN]"] = -N.min()
         out.append(line)
     import pandas as pd
@@ -211,4 +304,7 @@ if __name__ == "__main__":
         print(tab)
     tab.to_csv(HERE / "stahlbeton_jahre.csv", float_format="%.2f")
     plot(rows, e_s)
+    plot(rows, e_s, fname="stahlbeton_jahre_dark.png", dark=True)   # schwarz/weiss invertiert
+    plot(rows, e_s, fname="stahlbeton_jahre_kompakt.png", compact=True)  # Querschnitte rechts
+    plot(rows, e_s, fname="stahlbeton_jahre_kompakt_dark.png", compact=True, dark=True)
     plt.show()

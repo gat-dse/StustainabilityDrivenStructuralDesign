@@ -47,7 +47,7 @@ def _style_axis(ax, u_max, y_max, ylabel, title):
     ax.text(0.5, 1.0, title, transform=ax.transAxes, fontsize=18, ha="center", va="top", bbox=box)
 
 
-def plot(rows, e_s, u_max=4, n=2001, fname="stahlbeton_jahre_subplots.png"):
+def plot(rows, e_s, u_max=4, n=2001, fname="stahlbeton_jahre_subplots.png", dark=False):
     uu = np.linspace(0, u_max, n) * mm
     es = e_s[STEEL]
 
@@ -60,21 +60,25 @@ def plot(rows, e_s, u_max=4, n=2001, fname="stahlbeton_jahre_subplots.png"):
 
     curves = []
     for r in rows:
-        Nt = jahre.N_rc_e(uu, r["e_c"], es) / 1e6           # Zug
-        Nd = -jahre.N_rc_e(-uu, r["e_c"], es) / 1e6         # Druck (positiv)
+        Nt = jahre.N_rc_e(uu, r["e_c"], es, r["kind"]) / 1e6        # Zug
+        Nd = -jahre.N_rc_e(-uu, r["e_c"], es, r["kind"]) / 1e6      # Druck (positiv)
         curves.append((r, Nt, Nd))
 
     y_max = 1.15 * max(max(np.max(Nt), np.max(Nd)) for _, Nt, Nd in curves)
     y_max = np.ceil(y_max / 2.5) * 2.5
 
+    handles = {}
     for ax, sign, idx in ((axt, +1, 1), (axd, -1, 2)):
         ends = []
         for c in curves:
             r, N = c[0], c[idx]
-            ax.plot(uu / mm, base._hide_zero(uu, N), color=r["color"], lw=2.8, zorder=4,
-                    label=f"{r['year']}: {r['name']}  ($e_c$ = {r['e_c']:.0f} kgCO$_2$/m$^3$)")
-            e_c = r["e_c"]
-            u_ult = base._ultimate_u(lambda u, k: jahre.N_rc_e(u, e_c, es), None, sign)
+            if np.max(np.abs(N)) < 1e-9:                         # trägt in dieser Richtung nicht
+                continue
+            ln, = ax.plot(uu / mm, base._hide_zero(uu, N), color=r["color"], lw=2.8, zorder=4,
+                          label=jahre.label(r))
+            handles.setdefault(r["name"], ln)
+            e_c, kind = r["e_c"], r["kind"]
+            u_ult = base._ultimate_u(lambda u, k: jahre.N_rc_e(u, e_c, es, kind), None, sign)
             if abs(u_ult) > u_max * mm:
                 ends.append((float(N[-1]), u_ult, r["color"]))
         if ends:
@@ -83,17 +87,20 @@ def plot(rows, e_s, u_max=4, n=2001, fname="stahlbeton_jahre_subplots.png"):
     _style_axis(axt, u_max, y_max, "$N_{Rd}$ [MN]", f"Zuggurt, $\\rho_s$ = {RHO_T:.0%}")
     _style_axis(axd, u_max, y_max, "$N_{Rd}^{-}$ [MN]", f"Druckgurt, $\\rho_s$ = {RHO_C:.1%}")
 
-    leg = axt.legend(loc="upper left", bbox_to_anchor=(0.06, 0.93), frameon=False, fontsize=12,
+    leg = axt.legend(handles=[handles[r["name"]] for r in rows if r["name"] in handles],
+                     loc="upper left", bbox_to_anchor=(0.06, 0.93), frameon=False, fontsize=12,
                      title="Stahlbeton C30/37", title_fontsize=13)
     leg._legend_box.align = "left"
-    axd.text(0.98, 0.88, f"Betonstahl {STEEL}: $e_s$ = {base._fmt(es)} kgCO$_2$/m$^3$\n"
-             "Budget: 100 kgCO$_2$ pro m Gurtlänge", transform=axd.transAxes,
-             ha="right", va="top", fontsize=12.5, linespacing=1.6)
+    axt.text(0.08, 0.52, f"Betonstahl {STEEL}: $e_s$ = {base._fmt(es)} kgCO$_2$/m$^3$\n"
+             "Budget: 100 kgCO$_2$ pro m Gurtlänge", transform=axt.transAxes,
+             ha="left", va="top", fontsize=12.5, linespacing=1.6)
 
     _sections(axc, rows, es)
     for ax, lab in ((axt, "a)"), (axd, "b)"), (axc, "c)")):
         ax.text(-0.07 if ax is not axc else -0.03, 1.02, lab, transform=ax.transAxes,
                 fontsize=17, va="bottom")
+    if dark:
+        base.invert_bw(fig)
     base.save_fig(fig, HERE / fname, bbox_inches="tight", pad_inches=0.2)
     return fig
 
@@ -112,4 +119,5 @@ if __name__ == "__main__":
                            "display.max_columns", None):
         print(tab)
     plot(rows, e_s)
+    plot(rows, e_s, fname="stahlbeton_jahre_subplots_dark.png", dark=True)   # invertiert
     plt.show()
