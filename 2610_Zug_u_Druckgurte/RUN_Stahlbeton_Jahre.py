@@ -88,8 +88,10 @@ def N_rc_e(u, e_c, e_s, kind="rc"):
     return base.N_rc_tc(u, e_c, e_s)
 
 
-def label(r):
+def label(r, short=False):
     """Legendentext einer Betonsorte."""
+    if short:
+        return f"{r['year']}: {r['name']}"
     if r["kind"] == "cc":
         return (f"{r['year']}: {r['name']}  ($\\rho_w$ = {base.RHO_W:.1%}, "
                 f"$\\rho_l$ = {base.RHO_L:.1%})")
@@ -100,12 +102,23 @@ def label(r):
 # 2) Plot N(u) + Querschnitte
 # =============================================================================
 def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dark=False,
-         y_top=10.0, compact=False):
-    """compact=True: ohne (a)/(b), Querschnitte rechts neben dem Diagramm untereinander."""
+         y_top=10.0, compact=False, slide=False, FS=16):
+    """compact=True: ohne (a)/(b), Querschnitte rechts neben dem Diagramm untereinander.
+    slide=True: wie compact, aber im Folienformat 16:9 mit einheitlicher, grosser Schrift
+    (Grundgrösse FS [pt])."""
+    if slide:
+        compact = True
+    # Schriftgrössen [pt]
+    F = (dict(tick=FS - 1, axis=FS + 2, box=FS + 2, legend=FS - 1, text=FS - 1, end=FS - 1)
+         if slide else dict(tick=13, axis=17, box=18, legend=12.5, text=13, end=14))
     uu = np.linspace(u_min, u_max, n) * mm
     es = e_s[STEEL]
 
-    if compact:
+    if slide:
+        fig = plt.figure(figsize=(16, 9))
+        ax = fig.add_axes([0.045, 0.04, 0.535, 0.92])
+        axc = None
+    elif compact:
         fig = plt.figure(figsize=(21, 12))
         ax = fig.add_axes([0.05, 0.04, 0.63, 0.92])
         axc = None
@@ -121,15 +134,15 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dar
         col = r["color"]
         e_c, kind = r["e_c"], r["kind"]
         N = N_rc_e(uu, e_c, es, kind) / 1e6
-        ax.plot(uu / mm, base._hide_zero(uu, N), color=col, lw=2.8, zorder=4, label=label(r))
+        ax.plot(uu / mm, base._hide_zero(uu, N), color=col, lw=2.8, zorder=4, label=label(r, short=slide))
         for sign, store, x_edge in ((+1, tens, u_max), (-1, comp, u_min)):
             u_ult = base._ultimate_u(lambda u, k: N_rc_e(u, e_c, es, kind), None, sign)
             if abs(u_ult) > abs(x_edge) * mm:
                 store.append((float(N_rc_e(x_edge * mm, e_c, es, kind) / 1e6), u_ult, col))
     if tens:
-        base._end_arrows(ax, tens, u_max, +1, min_gap=0.9)
+        base._end_arrows(ax, tens, u_max, +1, min_gap=1.1 if slide else 0.9, fontsize=F["end"])
     if comp:
-        base._end_arrows(ax, comp, u_min, -1, min_gap=0.9)
+        base._end_arrows(ax, comp, u_min, -1, min_gap=1.1 if slide else 0.9, fontsize=F["end"])
 
     # Achsen im Ursprung
     Nall = [l.get_ydata() for l in ax.lines]
@@ -146,28 +159,37 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dar
     ax.plot(1, 0, ">k", ms=11, transform=ax.get_yaxis_transform(), clip_on=False)
     ax.plot(0, 1, "^k", ms=11, transform=ax.get_xaxis_transform(), clip_on=False)
     ax.set_xticks(np.arange(u_min, u_max + 0.01, 0.5))
-    ax.set_yticks(np.arange(np.ceil(ymin / 2.5) * 2.5, ymax + 0.01, 2.5))
+    yt = 5.0 if slide else 2.5
+    ax.set_yticks(np.arange(np.ceil(ymin / yt) * yt, ymax + 0.01, yt))
     ax.xaxis.set_major_formatter(lambda x, p: "" if abs(x) < 1e-9 else f"{x:.1f}")
     ax.yaxis.set_major_formatter(lambda y, p: "" if abs(y) < 1e-9 else f"{y:g}")
-    ax.tick_params(direction="in", length=5, labelsize=13)
+    ax.tick_params(direction="in", length=5, labelsize=F["tick"])
     for lab in ax.get_xticklabels() + ax.get_yticklabels():
         lab.set_bbox(dict(facecolor="white", edgecolor="none", alpha=0.7, pad=0.5))
-    ax.text(0.15, ymax, "$N_{Rd}$ [MN]", fontsize=17, ha="left", va="top")
-    ax.text(u_max + 0.35, -0.03 * (ymax - ymin), "$u$ [mm]", fontsize=17, ha="left", va="top",
+    ax.text(0.15, ymax, "$N_{Rd}$ [MN]", fontsize=F["axis"], ha="left", va="top")
+    ax.text(u_max + 0.35, -0.03 * (ymax - ymin), "$u$ [mm]", fontsize=F["axis"], ha="left", va="top",
             clip_on=False)
     box = dict(boxstyle="square,pad=0.3", fc="white", ec="k", lw=1.2)
-    ax.text(1.6, ymax * 0.97, "Zuggurt", fontsize=18, ha="center", va="top", bbox=box)
-    ax.text(-2.6, ymin * 0.97, "Druckgurt", fontsize=18, ha="center", va="bottom", bbox=box)
+    ax.text(1.6 if not slide else 2.0, ymax * 0.97, "Zuggurt", fontsize=F["box"], ha="center",
+            va="top", bbox=box)
+    ax.text(-2.6, ymin * 0.97, "Druckgurt", fontsize=F["box"], ha="center", va="bottom", bbox=box)
 
-    leg1 = ax.legend(loc="lower right", bbox_to_anchor=(1.0, 0.02), frameon=False, fontsize=12.5,
-                     title=f"Stahlbeton C30/37, $\\rho_s$ = {RHO_T:.0%} (Zug), {RHO_C:.1%} (Druck)", title_fontsize=13.5)
+    sep = "\n" if slide else " "
+    leg1 = ax.legend(loc="lower right", bbox_to_anchor=(1.0, 0.02), frameon=False,
+                     fontsize=F["legend"],
+                     title=f"Stahlbeton C30/37,{sep}$\\rho_s$ = {RHO_T:.0%} (Zug), {RHO_C:.1%} (Druck)",
+                     title_fontsize=F["legend"] + 1)
     leg1._legend_box.align = "left"
     ax.add_artist(leg1)
     ax.text(u_min, 0.92 * ymax, f"Betonstahl {STEEL}: $e_s$ = {base._fmt(es)} kgCO$_2$/m$^3$\n"
-            "Budget: 100 kgCO$_2$ pro m Gurtlänge",
-            ha="left", va="top", fontsize=13, linespacing=1.6)
+            "Budget: 100 kgCO$_2$ pro m Gurtlänge"
+            + ("\n$e_c$ in kgCO$_2$/m$^3$" if slide else ""),
+            ha="left", va="top", fontsize=F["text"], linespacing=1.5)
 
-    if compact:
+    if slide:
+        _sections_column(fig, rows, es, x_fig=0.665, top_fig=0.97, scale_in=1.2,
+                         text_in=0.82, gap_in=0.13, fontsize=FS - 1, short=True)
+    elif compact:
         _sections_column(fig, rows, es)
     else:
         _sections(axc, rows, es)
@@ -180,7 +202,7 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dar
 
 
 def _sections_column(fig, rows, e_s, x_fig=0.72, top_fig=0.96, scale_in=1.9,
-                     text_in=0.95, gap_in=0.15, fontsize=12.5):
+                     text_in=0.95, gap_in=0.15, fontsize=12.5, short=False):
     """Querschnitte untereinander, linke Kanten bündig, Text rechts daneben.
     scale_in = Zoll pro 1000 mm (gleicher Massstab für alle Querschnitte)."""
     gk_c, gk_s = base.gamma["c"] * base.g / 1000, base.gamma["s"] * base.g / 1000
@@ -203,12 +225,21 @@ def _sections_column(fig, rows, e_s, x_fig=0.72, top_fig=0.96, scale_in=1.9,
                      f"Druck ($\\rho_s$ = {RHO_C:.1%}): $A$ = {base._fmt(A_c * 1e6)} mm$^2$, "
                      f"$g_{{0k}}$ = {g_rc(A_c, RHO_C):.1f} kN/m"]
         title = f"$\\bf{{{r['year']}}}$: {r['name']}  ($e_c$ = {r['e_c']:.0f} kgCO$_2$/m$^3$)"
+        if short:                                    # kompakter Text fürs Folienformat
+            title = (f"$\\bf{{{r['year']}}}$: {r['name']}, $e_c$ = {r['e_c']:.0f}"
+                     + (f", $\\rho_w$ = {base.RHO_W:.1%}" if r["kind"] == "cc" else ""))
+            if r["kind"] == "cc":
+                lines = [f"Druck: $A$ = {base._fmt(A * 1e6)} mm$^2$, "
+                         f"$g_{{0k}}$ = {A * (gk_c + (base.RHO_W + base.RHO_L) * gk_s):.1f} kN/m"]
+            else:
+                lines = [f"Zug: $A$ = {base._fmt(A_t * 1e6)} mm$^2$, $g_{{0k}}$ = {g_rc(A_t, RHO_T):.1f} kN/m",
+                         f"Druck: $A$ = {base._fmt(A_c * 1e6)} mm$^2$, $g_{{0k}}$ = {g_rc(A_c, RHO_C):.1f} kN/m"]
         info.append((r, sq, [title] + lines))
     a_max = max(a for _, sq, _ in info for a, _ in sq)
     text_mm, gap_mm = text_in * mm_per_in, gap_in * mm_per_in
     heights = [max(max(a for a, _ in sq), text_mm) for _, sq, _ in info]
     H = sum(heights) + gap_mm * (len(info) - 1)
-    Wmm = a_max + 0.15 * mm_per_in + 3.6 * mm_per_in        # Quadrat + Abstand + Text
+    Wmm = a_max + 0.15 * mm_per_in + (3.4 if short else 3.6) * mm_per_in   # Quadrat + Abstand + Text
     fw, fh = fig.get_size_inches()
     axc = fig.add_axes([x_fig, top_fig - H / mm_per_in / fh, Wmm / mm_per_in / fw, H / mm_per_in / fh])
     y = H
@@ -307,4 +338,6 @@ if __name__ == "__main__":
     plot(rows, e_s, fname="stahlbeton_jahre_dark.png", dark=True)   # schwarz/weiss invertiert
     plot(rows, e_s, fname="stahlbeton_jahre_kompakt.png", compact=True)  # Querschnitte rechts
     plot(rows, e_s, fname="stahlbeton_jahre_kompakt_dark.png", compact=True, dark=True)
+    plot(rows, e_s, fname="stahlbeton_jahre_folie.png", slide=True)            # Folie 16:9
+    plot(rows, e_s, fname="stahlbeton_jahre_folie_dark.png", slide=True, dark=True)
     plt.show()

@@ -631,7 +631,7 @@ def _ultimate_u(f, k, sign=+1, u_max=0.3):
     return uu[nz[-1]] if len(nz) else 0.0
 
 
-def _end_arrows(ax, items, x_edge, side, min_gap):
+def _end_arrows(ax, items, x_edge, side, min_gap, fontsize=14):
     """Pfeile + Bruchverformung am Diagrammrand für Kurven, die über den Rand hinaus gehen."""
     items = sorted(items, key=lambda t: t[0])
     y_txt = [y for y, *_ in items]
@@ -645,7 +645,7 @@ def _end_arrows(ax, items, x_edge, side, min_gap):
                     arrowprops=dict(arrowstyle="-|>", color=col, lw=2.2, mutation_scale=16),
                     annotation_clip=False)
         ax.text(x_edge + dx + 0.05 * side, yt, f"{abs(u_ult) / mm:.0f} mm", color=col,
-                ha="left" if side > 0 else "right", va="center", fontsize=14, clip_on=False)
+                ha="left" if side > 0 else "right", va="center", fontsize=fontsize, clip_on=False)
 
 
 def plot(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung.png", note="", dark=False):
@@ -735,12 +735,22 @@ SECTION_LAYOUT = [["rc", "cc", "t", "t24"], ["pc", "a", "s"]]
 
 
 def plot_compact(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung_kompakt.png",
-                 note="", dark=False, inset=(0.25, -26.8, 4.15, 22.0), layout=SECTION_LAYOUT):
+                 note="", dark=False, inset=(0.25, -26.8, 4.15, 22.0), layout=SECTION_LAYOUT,
+                 figsize=(15, 13.5), fs=1.0, ytick=2.5, xy_override=None,
+                 sec=dict(W=1650.0, text_mm=1750.0, fontsize=11.5, linespacing=1.35),
+                 margins=(0.08, 0.90, 0.97, 0.04), names=None, zug_x=2.6,
+                 fonts=None, druck_xy=None):
     """Wie plot(), aber ohne Teilbeschriftungen (a)/(b); die Querschnitte stehen im
-    unteren rechten Quadranten. inset = (u0, N0, Breite, Höhe) in Diagrammkoordinaten."""
+    unteren rechten Quadranten. inset = (u0, N0, Breite, Höhe) in Diagrammkoordinaten.
+    figsize/fs/ytick/sec/xy_override erlauben z.B. ein breites Folienformat (plot_slide)."""
     uu = np.linspace(u_min, u_max, n) * mm
-    fig, ax = plt.subplots(figsize=(15, 13.5))
-    fig.subplots_adjust(left=0.08, right=0.90, top=0.97, bottom=0.04)
+    # Schriftgrössen [pt]: label = Materialbeschriftung, tick = Achsenzahlen, axis = Achsentitel,
+    # box = Zug-/Druckgurt, legend = Legende, end = Bruchverformung am Rand
+    F = dict(label=15 * fs, tick=13 * fs, axis=17 * fs, box=18 * fs, legend=13 * fs, end=14 * fs)
+    F.update(fonts or {})
+    fig, ax = plt.subplots(figsize=figsize)
+    l_, r_, t_, b_ = margins
+    fig.subplots_adjust(left=l_, right=r_, top=t_, bottom=b_)
 
     tens, comp = [], []
     for m in MATERIALS:
@@ -755,16 +765,18 @@ def plot_compact(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformu
             u_ult = _ultimate_u(f, k50, sign)
             if abs(u_ult) > abs(x_edge) * mm:
                 store.append((float(f(x_edge * mm, k50) / 1e6), u_ult, col))
-    _end_arrows(ax, tens, u_max, +1, min_gap=1.2)
-    _end_arrows(ax, comp, u_min, -1, min_gap=1.2)
+    gap = 1.2 * F["end"] / 14 * 13.5 / figsize[1] * (ylim[1] - ylim[0]) / 46
+    _end_arrows(ax, tens, u_max, +1, min_gap=gap, fontsize=F["end"])
+    _end_arrows(ax, comp, u_min, -1, min_gap=gap, fontsize=F["end"])
 
     # Beschriftungen (vorgespannt: knapp unter die u-Achse, da unten rechts Querschnitte)
-    xy_override = {"pc": (3.55, -2.7)}
+    xy_override = {"pc": (3.55, -2.7)} if xy_override is None else xy_override
     for m in MATERIALS:
         u_t = m["note_u"]
         y_t = np.interp(u_t, uu / mm, m["N50"])
-        ax.annotate(m.get("name_c" if u_t < 0 else "name_t", m["name"]), xy=(u_t, y_t),
-                    xytext=xy_override.get(m["key"], m["xytext"]), fontsize=15,
+        label = (names or {}).get(m["key"], m.get("name_c" if u_t < 0 else "name_t", m["name"]))
+        ax.annotate(label, xy=(u_t, y_t),
+                    xytext=xy_override.get(m["key"], m["xytext"]), fontsize=F["label"],
                     ha="center", va="center", color=m["color"], zorder=6,
                     arrowprops=dict(arrowstyle="-|>", color=m["color"], lw=1.3, mutation_scale=14,
                                     shrinkA=4, shrinkB=1,
@@ -780,26 +792,30 @@ def plot_compact(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformu
     ax.plot(1, 0, ">k", ms=11, transform=ax.get_yaxis_transform(), clip_on=False)
     ax.plot(0, 1, "^k", ms=11, transform=ax.get_xaxis_transform(), clip_on=False)
     ax.set_xticks(np.arange(u_min, u_max + 0.01, 0.5))
-    ax.set_yticks(np.arange(-25, ylim[1], 2.5))
+    ax.set_yticks(np.arange(np.ceil(ylim[0] / ytick) * ytick, ylim[1], ytick))
     ax.xaxis.set_major_formatter(lambda x, p: "" if abs(x) < 1e-9 else f"{x:.1f}")
     ax.yaxis.set_major_formatter(lambda y, p: "" if abs(y) < 1e-9 else f"{y:g}")
-    ax.tick_params(direction="in", length=5, labelsize=13)
+    ax.tick_params(direction="in", length=5, labelsize=F["tick"])
     for lab in ax.get_xticklabels() + ax.get_yticklabels():
         lab.set_bbox(dict(facecolor="white", edgecolor="none", alpha=0.7, pad=0.5))
-    ax.text(0.15, ylim[1], "$N_{Rd}$ [MN]", fontsize=17, ha="left", va="top")
-    ax.text(u_max + 0.35, -0.6, "$u$ [mm]", fontsize=17, ha="left", va="top", clip_on=False)
+    ax.text(0.15, ylim[1], "$N_{Rd}$ [MN]", fontsize=F["axis"], ha="left", va="top")
+    ax.text(u_max + 0.35, -0.6, "$u$ [mm]", fontsize=F["axis"], ha="left", va="top", clip_on=False)
     box = dict(boxstyle="square,pad=0.3", fc="white", ec="k", lw=1.2)
-    ax.text(2.6, 18.7, "Zuggurt", fontsize=18, ha="center", va="top", bbox=box)
-    ax.text(-3.4, -26.6, "Druckgurt", fontsize=18, ha="center", va="bottom", bbox=box)
+    ax.text(zug_x, ylim[1] - 0.3, "Zuggurt", fontsize=F["box"], ha="center", va="top", bbox=box)
+    if druck_xy is None:
+        ax.text(-3.4, ylim[0] + 0.4, "Druckgurt", fontsize=F["box"], ha="center", va="bottom", bbox=box)
+    else:
+        ax.text(*druck_xy, "Druckgurt", fontsize=F["box"], ha="center", va="center", bbox=box)
 
     handles = [Line2D([], [], color="k", lw=2.8, label="Median"),
                Line2D([], [], color="k", lw=1.1, ls=(0, (3, 2)), label="10%- / 90%-Fraktil")]
-    ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=13)
-    ax.text(-3.98, 13.2, "Budget: 100 kgCO$_2$ pro m Gurtlänge" + note, fontsize=13, ha="left")
+    leg = ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=F["legend"],
+                    title="Budget: 100 kgCO$_2$ pro m Gurtlänge" + note, title_fontsize=F["legend"])
+    leg._legend_box.align = "left"
 
     # Querschnitte im Quadranten unten rechts
     axc = ax.inset_axes(list(inset), transform=ax.transData)
-    _sections(axc, layout=layout, W=1650.0, text_mm=1750.0, fontsize=11.5, linespacing=1.35)
+    _sections(axc, layout=layout, **sec)
     axc.set_anchor("NE")
 
     if dark:
@@ -807,6 +823,22 @@ def plot_compact(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformu
     save_fig(fig, fname, bbox_inches="tight", pad_inches=0.2)
     return fig
 
+
+def plot_slide(fname="last_verformung_folie.png", note="", dark=False):
+    """Kompakte Darstellung im Folienformat 16:9 (breit, einheitliche, grosse Schrift)."""
+    FS = 16                                         # Grundschriftgrösse [pt]
+    return plot_compact(
+        fname=fname, note=note, dark=dark, figsize=(16, 9), ytick=5,
+        ylim=(-22.5, 19), margins=(0.055, 0.93, 0.96, 0.03),
+        fonts=dict(label=FS + 1, tick=FS - 1, axis=FS + 2, box=FS + 2, legend=FS, end=FS - 1),
+        inset=(0.15, -22.4, 4.75, 20.6),
+        layout=[["rc", "cc", "a", "pc"], ["t", "t24", "s"]],
+        sec=dict(W=4300.0, fontsize=FS - 1, linespacing=1.15, line_mm=545.0),
+        zug_x=4.1, druck_xy=(-3.0, -3.3),
+        names={"pc": f"Stahlbeton C30/37,\nvorgespannt (10 MPa)\n$\\rho_p$ = {RHO_P:.1%}"},
+        xy_override={"pc": (2.7, 15.6), "a": (3.85, 13.6), "t": (1.45, 16.0),
+                     "t24": (-0.75, 14.5), "s": (-3.6, -18.1), "rc": (-1.95, -18.1),
+                     "cc": (-2.7, -21.0)})
 
 def invert_bw(fig):
     """Schwarz und Weiss vertauschen (Hintergrund schwarz, Text/Achsen weiss).
@@ -881,12 +913,13 @@ def invert_bw(fig):
                 lab.set_bbox(dict(facecolor="black", edgecolor="none", alpha=0.7, pad=0.5))
 
 def _sections(axc, exclude=(), titles=None, layout=None, W=1250.0, text_mm=1500.0,
-              fontsize=12.5, linespacing=1.5):
+              fontsize=12.5, linespacing=1.5, line_mm=None):
     """Querschnitte (Median-e) als Quadrate im gleichen Massstab + A und g0k.
     exclude: Material-Keys, die weggelassen werden; titles: {key: Titel} zum Überschreiben.
     layout: None = eine Zeile; sonst Liste von Zeilen mit Material-Keys, z.B.
             [["rc", "cc", "t", "t24"], ["pc", "a", "s"]]  (W = Spaltenbreite, text_mm = Platz
-            für den Text unter den Quadraten, beides in mm im Querschnittsmassstab)."""
+            für den Text unter den Quadraten, beides in mm im Querschnittsmassstab).
+    line_mm: falls gesetzt, wird die Texthöhe je Zeile aus der Zeilenzahl bestimmt."""
     gk = {k: v * g / 1000 for k, v in gamma.items()}          # kN/m3
     A_rct = A_rc(RHO_T, e["c"], e["s"])
     A_rcc = A_rc(RHO_C, e["c"], e["s"])
@@ -932,12 +965,15 @@ def _sections(axc, exclude=(), titles=None, layout=None, W=1250.0, text_mm=1500.
         keys = {s_[1] for s_ in secs}
         rows = [[k for k in row if k in keys] for row in layout]
         size = {s_[1]: np.sqrt(s_[2]) / mm for s_ in secs}
+        nlin = {s_[1]: len(s_[3]) + 2 + (1 if "|" in s_[0] else 0) - (1 if s_[4] is None else 0)
+                for s_ in secs}
         y, ncol = 0.0, max(len(r) for r in rows)
         for row in rows:
             amax = max(size[k] for k in row)
             for j, k in enumerate(row):
                 pos[k] = (j * W, y - amax)
-            y -= amax + text_mm
+            th = text_mm if line_mm is None else max(nlin[k] for k in row) * line_mm + 150
+            y -= amax + th
         y_top, y_bottom = 0.0, y
     for name, key, A, lines, g0k, A_inner, mode in secs:
         a = np.sqrt(A) / mm
@@ -1020,6 +1056,8 @@ if __name__ == "__main__":
     plot(fname="last_verformung_dark.png", dark=True)      # invertiert: schwarzer Hintergrund
     plot_compact()                                          # kompakt: Querschnitte unten rechts
     plot_compact(fname="last_verformung_kompakt_dark.png", dark=True)
+    plot_slide()                                            # Folienformat 16:9
+    plot_slide(fname="last_verformung_folie_dark.png", dark=True)
 
     # gleicher Plot und gleiche Tabelle, CO2-Werte inkl. Transport (LKW)
     with emissions(e_tr):
@@ -1033,6 +1071,9 @@ if __name__ == "__main__":
         plot_compact(fname="last_verformung_transport_kompakt.png", note=" (inkl. Transport LKW)")
         plot_compact(fname="last_verformung_transport_kompakt_dark.png",
                      note=" (inkl. Transport LKW)", dark=True)
+        plot_slide(fname="last_verformung_transport_folie.png", note=" (inkl. Transport LKW)")
+        plot_slide(fname="last_verformung_transport_folie_dark.png",
+                   note=" (inkl. Transport LKW)", dark=True)
 
     study_rho_w()
     study_rho_rc()
