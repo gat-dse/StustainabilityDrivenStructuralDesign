@@ -1,0 +1,68 @@
+# file contains code for verification of members with wooden cross-sections
+
+
+# IMPORT
+import create_dummy_database  # file for creating a "dummy database", as long as no real database is available
+import struct_analysis  # file with code for structural analysis
+import struct_optimization_2D
+import struct_optimization  # file with code for structural optimization
+#import matplotlib.pyplot as plt
+import plot_datasets  # file with code for structural optimization
+import matplotlib.pyplot as plt
+
+# INPUT
+# create dummy-database
+database_name = "database_260506_Hochbau.db"  # define database name
+#create_dummy_database.create_database(database_name)  # create database
+
+# create material for reinforced concrete cross-section, derive corresponding design values
+concrete1 = struct_analysis.ReadyMixedConcrete("'C25/30'", database_name)  # create a Concrete material object
+concrete1.get_design_values()
+rebar1 = struct_analysis.SteelReinforcingBar("'B500B'", database_name)  # create a Concrete material object
+rebar1.get_design_values()
+
+# create reinforced concrete rectangular cross-section
+section = struct_analysis.RectangularConcrete(concrete1, rebar1, 1.0, 0.24, 0.012, 0.15, 0.008, 0.15, 0.01, 0.15, 0.02, 0.15, 0.0, 0.15, 0)
+
+# create floor structure for solid concrete cross-section
+bodenaufbau = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
+                                 ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False]]
+bodenaufbau_rc = struct_analysis.FloorStruc(bodenaufbau, database_name)
+
+requirements = struct_analysis.Requirements()
+
+# define loads on member
+g2k = 0.75e3  # n.t. Einbauten
+qk = 2e3  # Nutzlast
+
+# define service limit state criteria
+req = struct_analysis.Requirements()
+
+length= 12
+
+
+# create slab system
+system = struct_analysis.BeamSimpleSup(length)
+
+
+# create rc member
+member = struct_analysis.Member1D(section, system, bodenaufbau_rc, requirements, g2k, qk)
+opt_section = struct_optimization.get_optimized_section(member, "ENV", "GWP", 50)
+
+print('Faktor für gerissen', opt_section.f_faktor)
+print('BEew.-Gehalt unten', opt_section.roh)
+print('BEew.-Gehalt oben', opt_section.rohs)
+print("d =", opt_section.d)
+print("hmin =", opt_section.hmin_c)
+print('Hoehe QS', opt_section.h)
+
+print("w_install=", round(member.w_install,5))
+print("w_install_ger=", round(member.w_install_ger,5))
+
+
+# # # plot cross-section of members for verification
+vrfctn_member = plot_datasets.plot_section(opt_section)
+
+# SHOW FIGURE
+plt.show()
+
