@@ -11,7 +11,7 @@ Budget von 100 kgCO2 pro m Gurtlänge, für verschiedene Betone aus dem treeze-B
 Die Materialmodelle werden aus RUN.py übernommen; hier ändern sich nur die CO2-Werte:
   e_c  [kgCO2/m3 Beton]  = "kgCO2 total" (Zeile 12) der jeweiligen Betonsorte
   e_s  [kgCO2/m3 Stahl]  = kgCO2 pro 100 kg Bewehrung (Zeilen 14/16) / 100 kg * 7850 kg/m3
-                           Stahlsorte wählbar über STEEL ("CH mix" oder "Gerlafingen")
+                           Stahlsorte wählbar über STEEL ("Nexigen", "CH mix" oder "Gerlafingen")
 """
 
 from pathlib import Path
@@ -26,7 +26,8 @@ mm, MPa = base.mm, base.MPa
 HERE = Path(__file__).resolve().parent
 XLSX = HERE / "Zementemissionen-jh.xlsx"
 
-STEEL = "CH mix"        # Betonstahl: "CH mix" (Excel Zeile 14) oder "Gerlafingen" (Zeile 16)
+STEEL = "CH mix"       # Betonstahl: "Nexigen", "CH mix" (Excel Zeile 14) oder "Gerlafingen" (Zeile 16)
+E_NEXIGEN = 368         # Nexigen Bewehrungsstahl [kgCO2-eq/t]
 RHO_T = base.RHO_T      # Bewehrungsgehalt Zuggurt (wie RUN.py, 10 %)
 RHO_C = base.RHO_C      # Bewehrungsgehalt Druckgurt (wie RUN.py, 0.6 %)
 GAMMA_S = 7850          # kg/m3
@@ -76,6 +77,7 @@ def read_emissions(path=XLSX):
     steel = {"Gerlafingen": ws.cell(row=16, column=c0).value,               # kgCO2 / 100 kg
              "CH mix": ws.cell(row=14, column=c0).value}
     e_s = {k: v / 100 * GAMMA_S for k, v in steel.items()}                # kgCO2 / m3 Stahl
+    e_s["Nexigen"] = E_NEXIGEN / 1000 * GAMMA_S                           # 368 kg/t -> 2'889 kg/m3
     return rows, e_s
 
 
@@ -102,7 +104,7 @@ def label(r, short=False):
 # 2) Plot N(u) + Querschnitte
 # =============================================================================
 def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dark=False,
-         y_top=10.0, compact=False, slide=False, FS=16):
+         y_top=15.0, compact=False, slide=False, FS=16):
     """compact=True: ohne (a)/(b), Querschnitte rechts neben dem Diagramm untereinander.
     slide=True: wie compact, aber im Folienformat 16:9 mit einheitlicher, grosser Schrift
     (Grundgrösse FS [pt])."""
