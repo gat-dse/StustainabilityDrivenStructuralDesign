@@ -5,4 +5,4 @@ __pycache__
 .db
 .claude
 .xlsx
-*.xlsx
+*.xlsx.DS_Store
