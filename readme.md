@@ -7,6 +7,12 @@ Python 3.14 (python.org installer). Install the packages into a local environmen
 python3.14 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
+To activate the environment in a terminal (optional; the prompt then shows `(.venv)` and `python` uses the venv):
+```bash
+source .venv/bin/activate   # run from the repo root
+deactivate                  # to leave it again
+```
+Activation only applies to the current terminal window. Calling `.venv/bin/python` directly (as in the steps below) works without activating.
 In PyCharm, select `.venv/bin/python` as the project interpreter (Settings → Project → Python Interpreter → Add → Existing).
 
 Requirements: numpy, scipy, pandas, openpyxl, matplotlib, seaborn, shapely, optuna (versions in `requirements.txt`).
