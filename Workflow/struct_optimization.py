@@ -27,7 +27,6 @@ class RandomDisplacementBounds(object):
 
 
 # define database
-### KBOB: new DB name
 database_name = "database_261009.db"
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database

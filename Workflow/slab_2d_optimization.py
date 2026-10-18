@@ -21,9 +21,7 @@ criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-### KBOB: new DB name
 database_name = "database_261009.db"
-### KBOB: basetype input
 basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
@@ -67,7 +65,6 @@ length_x = [3.0, 4.0,]
 length_y = [3.0, 4.0]
 support = ["LL-frei"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc, basetype=basetype)
@@ -81,7 +78,6 @@ length_x = [3.0, 4.0,]
 length_y = [3.0, 4.0]
 support = ["LL-eingespannt"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = plot_datasets_2D.plot_dataset(length_x,length_y,support, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc, basetype=basetype)

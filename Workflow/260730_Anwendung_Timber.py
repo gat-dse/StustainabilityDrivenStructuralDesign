@@ -78,7 +78,6 @@ start = time.time()
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names_rc_wd = ["'Solid_structural_timber'", "'Glue_laminated_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_solid, req, "wd_rec", mat_names_rc_wd,
                                                               g2k, qk, max_iter, idx_vrc, basetype=basetype)
@@ -92,7 +91,6 @@ vrfctn_members.append(vrfctn_members_new)
 
 mat_names = ["'Glue_laminated_timber'", "'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_wd_rib, req, "wd_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc, basetype=basetype)

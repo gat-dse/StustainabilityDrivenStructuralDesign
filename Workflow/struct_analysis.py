@@ -52,7 +52,6 @@ class Wood:
         result = cursor.fetchall()
         self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate, self.creep_coef = result[0]
         
-        ### KBOB CHANGES
         # get GWP, UBP, GE properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -65,7 +64,6 @@ class Wood:
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
         self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
         self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
-        ### KBOB CHANGES
 
         self.density = float(density)
         self.cost = 0
@@ -100,7 +98,6 @@ class ReadyMixedConcrete:
         #self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         
         
-        ### KBOB CHANGES
         # get GWP, UBP, GE properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -115,7 +112,6 @@ class ReadyMixedConcrete:
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
         self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
         self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
-        ### KBOB CHANGES
 
         self.density = float(density)
         self.cost = 0
@@ -144,7 +140,6 @@ class SteelReinforcingBar:
         self.fsk, self.Es = result[0]
         
         
-        ### KBOB CHANGES
         # get GWP, UBP, GE properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
@@ -157,7 +152,6 @@ class SteelReinforcingBar:
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
         self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
         self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
-        ### KBOB CHANGES
 
         self.density = float(density)
         self.cost = 0
@@ -251,10 +245,8 @@ class RectangularWood(SupStrucRectangular, Section):
         self.ei1 = self.wood_type.Emmean * self.iy  # elastic stiffness [Nm^2]
         self.co2 = self.a_brutt * self.wood_type.GWP * self.wood_type.density  # [kg_CO2_eq/m]
        
-        ### KBOB CHANGES
         self.ubp = self.a_brutt * self.wood_type.UBP * self.wood_type.density  # [UBP/m]
         self.graue_energie = self.a_brutt * self.wood_type.graue_energie * self.wood_type.density  # [kWh oil-eq/m]
-        ### KBOB CHANGES
 
         self.cost = self.a_brutt * self.wood_type.cost # [CHF] #TODO: Not implemented yet!
         self.ei_b = ei_b  # stiffness perpendicular to direction of span [Nm^2]
@@ -365,14 +357,12 @@ class RectangularConcrete(SupStrucRectangular):
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete)
    
-        ### KBOB CHANGES
         self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density  # [UBP/m]
         self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density  # [UBP/m]
         self.ubp = self.ubp_rebar + self.ubp_concrete
         self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density  # [kWh oil-eq/m]
         self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density  # [kWh oil-eq/m]
         self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
-        ### KBOB CHANGES
 
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
@@ -580,14 +570,12 @@ class FlatSlab2D(SupStrucRectangular):
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete)
 
-        ### KBOB CHANGES
         self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density  # [UBP/m]
         self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density  # [UBP/m]
         self.ubp = self.ubp_rebar + self.ubp_concrete
         self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density  # [kWh oil-eq/m]
         self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density  # [kWh oil-eq/m]
         self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
-        ### KBOB CHANGES
 
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
@@ -903,7 +891,6 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.co2 = (self.co2_rebar + self.co2_concrete) #[kgCO2_eq/m2]
         
 
-        ### KBOB CHANGES
         # same formula as GWP (incl. the known unit error for rib spacing b != 1 m) -> fix all three together later
         self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density/self.b  # [UBP/m2]
         self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density /self.b  # [UBP/m2]
@@ -911,7 +898,6 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density/self.b  # [kWh oil-eq/m2]
         self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density /self.b  # [kWh oil-eq/m2]
         self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
-        ### KBOB CHANGES
 
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
@@ -1230,10 +1216,8 @@ class RibWood(SupStrucRibWood):
 
         self.co2 = (self.bw * self.h * self.wood_type_1.GWP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m2]
 
-        ### KBOB CHANGES
         self.ubp = (self.bw * self.h * self.wood_type_1.UBP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.UBP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.UBP * self.wood_type_3.density  # [UBP/m2]
         self.graue_energie = (self.bw * self.h * self.wood_type_1.graue_energie * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.graue_energie * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.graue_energie * self.wood_type_3.density  # [kWh oil-eq/m2]
-        ### KBOB CHANGES
         
         self.cost = self.bw * self.h / self.b * self.wood_type_1.cost + 1 * self.t2 * self.wood_type_2.cost + 1 * self.t3  * self.wood_type_3.cost #[CHF/m2]
         self.ei_b = ei_b  # stiffness perpendicular to direction of span

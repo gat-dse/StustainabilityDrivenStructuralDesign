@@ -63,7 +63,6 @@ mat_names = ["'ready_mixed_concrete'"]
 
 # retrieve data from database, find optimal cross-sections and plot results for solid cross-section
 """
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
                                                               idx_vrc, system="Continuous 1D", basetype=basetype)
@@ -71,7 +70,6 @@ data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 """
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc, basetype=basetype)
@@ -79,7 +77,6 @@ data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 """
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-### KBOB: basetype input
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
                                                               g2k, qk, max_iter, idx_vrc, system="Continuous 1D", basetype=basetype)

@@ -15,7 +15,6 @@ import class_to_excel_2
 import pandas as pd
 from scipy.spatial import ConvexHull
 
-### KBOB CHANGES
 # KBOB rows: only they have a "KBOB ID-Nr." (empty for EPD rows, NULL in the DB); every other row counts as EPD
 KBOB_CONDITION = "(\"KBOB ID-Nr.\" IS NOT NULL)"
 
@@ -26,10 +25,8 @@ def source_filter(basetype):
     elif basetype == "epd":
         return f" AND NOT {KBOB_CONDITION} AND ValidEPD = 1 AND Man_Ausschluss = 1 "
     raise ValueError(f"basetype must be 'epd' or 'kbob', got {basetype}")
-### KBOB CHANGES
 
-### KBOB CHANGES
-# To see the old version, run git show 36ba32b:Workflow/opt_and_plot.py (around lines 84–160).
+# To see the old version, run git show 36ba32b:Workflow/opt_and_plot.py (around lines 80–205).
 def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
     # returns unique prod_id strings of the products with lowest and highest GWP of a material
     # (only one entry if min == max, e.g. a single KBOB product)
@@ -39,12 +36,14 @@ def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
     # SQL query, line by line:
     #   SELECT PRO_ID ...          only the product IDs are needed, the material classes read the rest themselves
     #   "MATERIAL" LIKE ?          material name, '?' is filled with `material` (allows '%' wildcards)
+    #                              (old plywood query: outer WHERE without material filter)
     #   DENSITY IS NOT NULL        skip products without density: the material classes need it for the mass
     #                              (volume * density) and float(None) would crash
     #   mech_cond                  strength class condition from above
-    #   source_filter(basetype)    EPD or KBOB rows, see source_filter()
+    #   source_filter(basetype)    EPD or KBOB rows, see source_filter() (old plywood query: no Man_Ausschluss)
     #   ORDER BY GWP, PRO_ID       sort ascending by GWP: first row = lowest, last row = highest GWP;
     #                              PRO_ID decides between equal GWP values, so the result is always the same
+    #                              (old: no ORDER BY -> low/high swapped, ties gave >2 rows)
     inquiry = ("""
             SELECT PRO_ID FROM products
             WHERE "MATERIAL" LIKE ?
@@ -56,17 +55,16 @@ def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
     params = [material] if mech_prop is None else [material, mech_prop]  # values for the '?' placeholders, in order
     cursor.execute(inquiry, params)  # run the query; the parameters are inserted safely by sqlite3
     result = [row[0] for row in cursor.fetchall()]  # rows are tuples (PRO_ID,) -> flat list of PRO_IDs, sorted by GWP
-    if not result:  # no matching product: stop with a clear message instead of an IndexError further down
+    if not result:  # no matching product: clear message (old: IndexError)
         raise ValueError(f"no product found for material {material}, mech_prop {mech_prop}, basetype {basetype}")
     prod_ids = []  # collects the selected IDs as SQL strings, e.g. "'123'"
-    for prod_id in (result[0], result[-1]):  # lowest and highest GWP (both the same row if only one product exists)
+    for prod_id in (result[0], result[-1]):  # lowest and highest GWP (old: result[1] -> IndexError with 1 product)
         prod_id_str = "'" + str(prod_id) + "'"  # quote the ID, the material classes put it directly into their SQL
         if prod_id_str not in prod_ids:  # skip the duplicate if min == max (e.g. only one KBOB rebar)
-            prod_ids.append(prod_id_str)
+            prod_ids.append(prod_id_str)  # (old: 2 identical sections)
     prod_ids.sort(key=lambda x: int(x.strip("'")))  # sort by PRO_ID (as a number, without quotes): same section
                                                     # order as the old queries, which returned rows in PRO_ID order
     return prod_ids  # 1 or 2 IDs; the caller builds one cross-section per ID
-### KBOB CHANGES
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
@@ -85,14 +83,12 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     cursor = connection.cursor()
     for mat_name in mat_names:
         # Wählt alle EPDs von einem Material -> "mat-name" (z.B. ready mixed concrete)
-        ### KBOB CHANGES
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL                
                 AND MECH_PROP IS NOT NULL
                 AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
         )
-        ### KBOB CHANGES
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
         #            " material=" + mat_name)
         cursor.execute(inquiry)
@@ -231,7 +227,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                         material_lg = i[0].wood_type_1.mech_prop
                     else:
                         material_lg = "error: section material is not defined"
-                    ### KBOB: basetype in legend/filename
                     legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name, fixed_params.get("t3"), basetype])
 
     #Filter out None values (infesible solutions):
@@ -307,7 +302,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             if j == idx_vrfctn:
                 vrfctn_members[0].append(mem)
                 vrfctn_members[1].append(i)
-        ### KBOB: basetype in legend/filename
         sec_typ, mat, cri, opt, floor_name, t3_val, base = legend[i]
         # set line color
         if sec_typ == "rc_rec" and system == "Simple Beam" and floor_name == "massiv":
@@ -358,7 +352,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             linewidth = 1.0
         else:
             linewidth = 0.1
-        ### KBOB: basetype in legend/filename
         label = sec_typ + ", " + mat + ", " + cri + ", optimized for " + opt + ", " + base
         if t3_val is not None:
             label += f", t3={t3_val}"
@@ -447,7 +440,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
     # 3. Weiche für Export-Klasse und Ordner anhand des Präfixes ('wd' vs. alle anderen)
     # Use members_to_excel2 and folder 'Results' for all cross-section types (including wood 'wd')
-    ### KBOB: basetype in legend/filename
     filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}_{basetype}.xlsx"
     class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
 
@@ -475,14 +467,12 @@ def plot_section(section):
                   f'c_nom = {100*section.c_nom:.1f} cm \n'
                   f'x/d = {section.x_p/section.d:.2f} \n'
                   f'GWP = {section.co2:.0f} kg/m^2 \n'
-                  ### KBOB: UBP/GE legend
                   f'UBP = {section.ubp:.0f} UBP/m^2 \n'
                   f'GE = {section.graue_energie:.0f} kWh/m^2')
     elif section.section_type == "wd_rec":  # Rectangular Wooden Cross-Section
         fig, ax, offset = plot_rectangle_with_dimensions(section.b, section.h, 'brown', '/')
         legend = (f'{section.wood_type.mech_prop}, prod_ID:{section.wood_type.prod_id} \n'
                   f'GWP = {section.co2:.0f} kg/m^2 \n'
-                  ### KBOB: UBP/GE legend
                   f'UBP = {section.ubp:.0f} UBP/m^2 \n'
                   f'GE = {section.graue_energie:.0f} kWh/m^2')
 
@@ -500,7 +490,6 @@ def plot_section(section):
               f'x/d = {section.x_p / section.d:.2f} \n'
               f'h, hf, hw, b, bw = {section.h:.2f}, {section.h_f:.2f}, {section.h_w:.2f}, {section.b:.2f}, {section.b_w:.2f} \n'
               f'GWP = {section.co2:.0f} kg/m^2 \n'
-              ### KBOB: UBP/GE legend
               f'UBP = {section.ubp:.0f} UBP/m^2 \n'
               f'GE = {section.graue_energie:.0f} kWh/m^2')
 
@@ -510,7 +499,6 @@ def plot_section(section):
               f'length = {section.l0} \n'
               f'h, bw, b, t2, t3 = {section.h:.2f}, {section.bw:.2f}, {section.b:.2f}, {section.t2:.2f}, {section.t3:.2f} \n'
               f'GWP = {section.co2:.0f} kg/m^2 \n'
-              ### KBOB: UBP/GE legend
               f'UBP = {section.ubp:.0f} UBP/m^2 \n'
               f'GE = {section.graue_energie:.0f} kWh/m^2')
 
@@ -710,7 +698,6 @@ def get_stirrup_positions(section):
 
 # PLOT DATASETS OF CROSS_SECTION WITH VARIED MATERIALS IN M-CHI PLOT AND PLOT THE OPTIMIZED SECTIONS FOR VALIDATION
 # ----------------------------------------------------------------------------------------------------------------------
-### KBOB: basetype kwarg
 def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50, basetype="epd"):
     # GENERATE INITIAL CROSS-SECTIONS
     # Search database (table products, attribute material) for products,
@@ -722,7 +709,6 @@ def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50
     x_values = []
     y_values = []
     for mat_name in mat_names:
-        ### KBOB: basetype filter
         inquiry = ("SELECT PRO_ID FROM products WHERE"
                    " MATERIAL=" + mat_name + source_filter(basetype))
         cursor.execute(inquiry)
