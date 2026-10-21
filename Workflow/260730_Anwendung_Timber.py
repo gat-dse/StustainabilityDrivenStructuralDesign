@@ -10,7 +10,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,6,8, 10]
+lengths = [4,6,8,10]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -25,12 +25,13 @@ optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 # define database
 database_name = 'database_260805.db'
 
-
+'''
 # create floor structure for solid wooden cross-section
 bodenaufbau_vollholzdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                                  ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False],
                                  ["'Kies gebrochen'", 0.12, False]]
 bodenaufbau_wd_solid = struct_analysis.FloorStruc(bodenaufbau_vollholzdecke, database_name)
+'''
 
 
 # create floor structure for ribbed wooden cross-section

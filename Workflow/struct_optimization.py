@@ -97,7 +97,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
             di_yu, s_yu, di_yo, s_yo,
             m.floorstruc, m.requirements,
             to_opt, criterion,
-            m.g2k, m.qk,
+            m.g2k, m.qk_area,
             optimise_stufe1
         ]
 
@@ -182,7 +182,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
             m.floorstruc,
             m.requirements,
             to_opt, criterion,
-            m.g2k, m.qk,
+            m.g2k, m.qk_area,
             h_opt, di_xu_opt,
             optimise_stufe2
         ]
@@ -285,7 +285,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
             di_yo, s_yo,
             m.floorstruc, m.requirements,
             to_opt, criterion,
-            m.g2k, m.qk,
+            m.g2k, m.qk_area,
             optimise
         ]
 
@@ -634,7 +634,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
 
     co, st = m.section.concrete_type, m.section.rebar_type
     add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, s_pb_bw, n_pb_bw, m.floorstruc,
-               m.requirements, to_opt, criterion, m.g2k, m.qk, c_nom, phi, xi, jnt_srch]
+               m.requirements, to_opt, criterion, m.g2k, m.qk_area, c_nom, phi, xi, jnt_srch]
 
 
     # TPE-Algorithmus mit Optuna
@@ -1010,7 +1010,7 @@ def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter= 20, alg="TPE")
 def wd_rqs_h(h, args):
     m, criterion = args
     querschnitt = struct_analysis.RectangularWood(m.section.wood_type, m.section.b, h, m.section.phi)
-    member = struct_analysis.Member1D(querschnitt, m.system, m.floorstruc, m.requirements, m.g2k, m.qk)
+    member = struct_analysis.Member1D(querschnitt, m.system, m.floorstruc, m.requirements, m.g2k, m.qk_area)
     member.calc_qk_zul_gzt()
     if criterion == "ULS":
         to_minimize = abs(member.qk - member.qk_zul_gzt)
@@ -1094,7 +1094,7 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
     ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
 
-    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area]
 
 # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
@@ -1121,7 +1121,7 @@ H_KANDIDATEN_GL = [0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.5
 
 
 def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_FIX_WDRIB, t3=T_KANDIDATEN_WDRIB[0]):
-    #t2 und t3 sind fix vorgegeben und werden nicht optimiert. Pro Spannwetie wird diese Funktion zweimal aufgerufen: einmal je Wert aus T_KANDIDATEN_WDRIB für t3 (Beplankung oben)
+    #t2 und t3 sind fix vorgegeben und werden nicht optimiert. Pro Spannweite wird diese Funktion zweimal aufgerufen: einmal je Wert aus T_KANDIDATEN_WDRIB für t3 (Beplankung oben)
     # definition of initial values for variables, which are going to be optimized
     h0 = m.section.h
     bw0 = m.section.bw
@@ -1162,7 +1162,7 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_
         # keine handelsübliche Kombination innerhalb der Randbedingungen (R60) verfügbar
         return None
 
-    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area]
 
     # TPE-Algorithmus mit Optuna
     def objective(trial):
@@ -1198,6 +1198,14 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_
     b = study.best_params["b"]
 
     optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, bw, h, b, t2, t3)
+
+    # Check feasibility (analog opt_gzt_wd_rqs): wd_rib_rqs returns the pure objective value (co2 or h) only if all
+    # penalties of the criterion are 0. If even the best candidate violates a requirement, no section is returned.
+    best_value = wd_rib_rqs([bw, h, t2, t3, b], add_arg)
+    pure_value = optimized_section.co2 if to_opt == "GWP" else optimized_section.h
+    if best_value > pure_value * (1 + 1e-9):
+        return None
+
     return optimized_section
 
 #inner function for optimizing wood sections for criteria ULS or SLS in terms of GWP or height
