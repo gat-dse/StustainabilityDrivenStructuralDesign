@@ -91,19 +91,49 @@ c = {
 # 2) CO2-Werte e [kgCO2/m3] für die Plots (S. 10, inkl. 10%/90%-Fraktile)
 # =============================================================================
 e = {
-    "c": 204, "c10": 189, "c90": 218,
-    "s": 4466, "s10": 3134, "s90": 5662,
-    "a": 5838, "a10": 2756, "a90": 9663,
-    "p": 8590, "p10": 4004, "p90": 14630,
-    "t": 130, "t10": 76, "t90": 188,
-    "t24": 115, "t2410": 47, "t2490": 198,
+    "c": 207, "c10": 175, "c90": 244,
+    "s": 4416, "s10": 3287, "s90": 4963,
+    "a": 4824, "a10": 3743, "a90": 12378,
+    "p": 7965, "p10": 3991, "p90": 11982,
+    "t": 100, "t10": 71, "t90": 153,
+    "t24": 55, "t2410": 53, "t2490": 74,
     # ohne Fraktile (Werte S. 1)
     "u": 1100, "cf": 20 * 1550, "gf": 10 * 1700,
 }
 
+# CO2-Werte INKL. TRANSPORT (LKW) [kgCO2/m3]
+# Quelle: "261008_Mathcad Werte.xlsx", Blatt "Werte fib Betontag",
+#         Spalten H (Median), I (90%-Quantil), J (10%-Quantil)
+e_tr = {
+    "c": 207, "c10": 175, "c90": 244,           # Beton C30/37 (Zeile 30, unverändert)
+    "s": 5311, "s10": 3838, "s90": 5560,        # Bewehrungsstahl B500B (Zeile 8)
+    "a": 5375, "a10": 4322, "a90": 13884,       # Baustahl S355 (Zeile 14)
+    "p": 9802, "p10": 5185, "p90": 12716,       # Spannstahl (Zeile 11)
+    "t": 160, "t10": 120, "t90": 209,           # BSH GL24h (Zeile 20)
+    "t24": 181, "t2410": 130, "t2490": 227,     # Vollholz C24 (Zeile 17)
+    "u": 1100, "cf": 20 * 1550, "gf": 10 * 1700,
+}
 
-# Hinweis: e_p10, e_p90 und e_t2490 sind im Ausdruck abgeschnitten; sie wurden
-# aus den auf S. 12 ausgegebenen Seitenlängen zurückgerechnet (4004 / 14630 / 198).
+
+class emissions:
+    """Kontext: CO2-Werte vorübergehend austauschen, z.B. `with emissions(e_tr): plot()`.
+    Alle Funktionen lesen das globale `e`, daher wird dessen Inhalt ersetzt und danach
+    wiederhergestellt."""
+
+    def __init__(self, values):
+        self.values = dict(values)          # Kopie (auch emissions(e) ist erlaubt)
+
+    def __enter__(self):
+        self._backup = dict(e)
+        e.clear()
+        e.update(self.values)
+        return e
+
+    def __exit__(self, *exc):
+        e.clear()
+        e.update(self._backup)
+        return False
+
 
 
 # =============================================================================
@@ -334,7 +364,8 @@ def N_rc(u, rho, c_ec, c_es):
             return rho * A * sigma_srs(eps, s_r, D, f_sd, f_su, E_sh, rho, tb0, tb1)
         return 0.0
     if eps >= eps_c2d:
-        return A * sigma_cc(eps) + rho * A * sigma_s(eps, f_sd, f_su, E_sh)
+        # Beton auf Nettofläche (1 - rho) * A, Stahl auf rho * A
+        return (1 - rho) * A * sigma_cc(eps) + rho * A * sigma_s(eps, f_sd, f_su, E_sh)
     return 0.0
 
 
@@ -429,6 +460,54 @@ def N_cc_max(rho_w, rho_l, c_ec=None, c_es=None):
     return float(np.max(-N_cc(uu, rho_w, rho_l, c_ec, c_es)))
 
 
+def study_rho_rc(rho_list=None, fname="bewehrungsgehalt_variation.png"):
+    """Variation der Längsbewehrung rho_s beim Stahlbeton-Gurt (Median e):
+    a) Zuggurt: max. Zugkraft und Bruchverformung, b) Druckgurt: max. Druckkraft.
+    Je ohne und mit Transport (LKW). Grenzen SIA 262: rho_min Zug nach 4.3.1.2,
+    Druckglieder 0.6 % <= rho <= 8 % (5.5.4.2 / 5.5.4.5)."""
+    rho_list = np.linspace(0.003, 0.15, 60) if rho_list is None else np.asarray(rho_list)
+    u_t = np.linspace(1e-3, 80, 4000) * mm
+    u_c = -np.linspace(1e-4, -eps_c2d * 1e3, 1500) * mm
+    # SIA 262, 4.3.1.2: rho_min = f_ct,eff / f_sd mit f_ct,eff = k_t f_ctm, k_t = 1/(1+0.5 t)
+    rho_min_t = f_ctm / (1 + 0.5 * 0.4) / f_sd                 # t ~ 0.4 m
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5.5))
+    print("\nStahlbeton-Gurt, Variation rho_s (Median e):")
+    for lab, ev, ls in (("ohne Transport", e, "-"), ("mit Transport LKW", e_tr, "--")):
+        with emissions(ev):
+            Nt, ut, Nc = [], [], []
+            for r in rho_list:
+                N = N_rc(u_t, r, e["c"], e["s"]) / 1e6
+                Nt.append(N.max())
+                ut.append(u_t[np.nonzero(N > 0)[0][-1]] / mm)
+                Nc.append(np.max(-N_rc(u_c, r, e["c"], e["s"])) / 1e6)
+            N_bare = BUDGET / e["s"] * f_sd / 1e6
+        ax1.plot(rho_list * 100, Nt, "k", ls=ls, lw=2, label=f"Stahlbeton, {lab}")
+        ax1.axhline(N_bare, color="#7b4ea3", ls=ls, lw=1.2,
+                    label=f"Betonstahl nackt, {lab}")
+        ax2.plot(rho_list * 100, Nc, "k", ls=ls, lw=2, label=f"Stahlbeton, {lab}")
+        print(f"  {lab}: Zug N_max(rho_T={RHO_T:.1%}) = {np.interp(RHO_T, rho_list, Nt):.2f} MN, "
+              f"Druck N_max(rho_C={RHO_C:.1%}) = {np.interp(RHO_C, rho_list, Nc):.2f} MN, "
+              f"Druck N_max(8%) = {np.interp(0.08, rho_list, Nc):.2f} MN")
+    for ax in (ax1, ax2):
+        ax.axvspan(0, (rho_min_t if ax is ax1 else RHO_L_MIN) * 100, color="0.85", lw=0)
+        ax.grid(alpha=0.3)
+        ax.set_xlabel("Längsbewehrungsgehalt $\\rho_s$ [%]")
+        ax.set_xlim(0, rho_list[-1] * 100)
+    ax2.axvspan(RHO_L_MAX * 100, rho_list[-1] * 100, color="0.85", lw=0)
+    ax1.axvline(RHO_T * 100, color="#2e9e44", lw=1.5)
+    ax2.axvline(RHO_C * 100, color="#2e9e44", lw=1.5)
+    ax1.set_ylabel("max. Zugkraft $N_{Rd}$ [MN]")
+    ax2.set_ylabel("max. Druckkraft $N_{Rd}^{-}$ [MN]")
+    ax1.set_title("a) Zuggurt (grau: < $\\rho_{min}$ SIA 262, 4.3.1.2)", loc="left")
+    ax2.set_title("b) Druckgurt (grau: ausserhalb 0.6–8 %, SIA 262, 5.5.4)", loc="left")
+    ax2.set_ylim(0, None)
+    ax1.legend(frameon=False, fontsize=10.5, loc="lower right")
+    ax2.legend(frameon=False, fontsize=10.5, loc="lower right")
+    fig.tight_layout()
+    save_fig(fig, fname)
+    return fig
+
+
 def study_rho_w(rho_w_max=0.15, rho_l_list=(RHO_L_MIN, 0.02, 0.04, RHO_L_MAX), n=301,
                 fname="umschnuerung_variation.png"):
     """Variation des Umschnürungsgrads rho_w: N_max(rho_w) für mehrere rho_l
@@ -452,11 +531,11 @@ def study_rho_w(rho_w_max=0.15, rho_l_list=(RHO_L_MIN, 0.02, 0.04, RHO_L_MAX), n
             f"$k_c$ = 4 (SIA 262, Gl. 29)\n$\\rho_w$ = {RHO_W_KCMAX:.2%}", fontsize=11, va="bottom")
     ax.set_xlabel("Umschnürungsgrad $\\rho_w$ (volumetrisch) [%]")
     ax.set_ylabel("max. Druckkraft $|N|$ [MN]")
-    ax.set_title("Umschnürter Beton C30/37 – 100 kgCO$_2$ pro m Gurtlänge (Median $e$)")
+    ax.set_title("Umschnürter Beton C30/37 – 100 kgCO$_2$ pro m Gurtlänge (Median)")
     ax.grid(alpha=0.3)
     ax.legend(frameon=False, loc="upper right")
     fig.tight_layout()
-    fig.savefig(fname, dpi=150)
+    save_fig(fig, fname)
     print(f"  -> Maximum: N = {best[0]:.2f} MN bei rho_w = {best[1]:.2%}, rho_l = {best[2]:.1%}")
     return rws, res, best
 
@@ -467,15 +546,34 @@ def study_rho_w(rho_w_max=0.15, rho_l_list=(RHO_L_MIN, 0.02, 0.04, RHO_L_MAX), n
 from matplotlib.patches import Rectangle
 from matplotlib.lines import Line2D
 
-RHO = 0.05
+# Stahlbeton: unterschiedliche Bewehrungsgehalte für Zug- und Druckgurt (wie Vorlage)
+RHO_T = 0.10            # Zuggurt (bewusst hoch gewählt, vgl. study_rho_rc)
+RHO_C = 0.006           # Druckgurt (= Mindestbewehrung SIA 262, 5.5.4.2)
+RHO = RHO_T             # Kompatibilität (alte Skripte)
 SIG_CP = 10 * MPa
+RHO_P = SIG_CP / (0.7 * 1.15 * f_pd)     # Spannstahlgehalt A_p / A_c (= 0.9 %)
+
+
+def N_rc_tc(u, c_ec, c_es):
+    """Stahlbeton-Gurt: Zug (u > 0) mit RHO_T, Druck (u <= 0) mit RHO_C."""
+    u = np.asarray(u, dtype=float)
+    return np.where(u > 0, N_rc(u, RHO_T, c_ec, c_es), N_rc(u, RHO_C, c_ec, c_es))
 
 plt.rcParams.update({
     "font.family": "serif",
     "font.serif": ["Times New Roman", "Liberation Serif", "STIXGeneral", "DejaVu Serif"],
     "mathtext.fontset": "stix",
     "font.size": 13,
+    "pdf.fonttype": 42,          # Schriften im PDF als Text (editierbar, z.B. in Illustrator)
 })
+
+
+def save_fig(fig, fname, **kw):
+    """Speichert die Abbildung als PNG und zusätzlich als PDF (gleicher Name, Endung .pdf)."""
+    from pathlib import Path
+    fname = Path(fname)
+    fig.savefig(fname.with_suffix(".png"), dpi=150, **kw)
+    fig.savefig(fname.with_suffix(".pdf"), **kw)
 
 
 def _fmt(x, nd=0):
@@ -493,15 +591,17 @@ MATERIALS = [
     dict(key="s", name="Betonstahl\nB500B (nackt)", color="#7b4ea3",
          f=lambda u, k: N_s(u, e[k]), keys=("s", "s10", "s90"),
          note_u=-3.8, xytext=(-3.65, -19.6), rad=0.1),
-    dict(key="rc", name="Stahlbeton\nC30/37, $\\rho_s$=5%", color="#2e9e44",
-         f=lambda u, ks: N_rc(u, RHO, e[ks[0]], e[ks[1]]),
+    dict(key="rc", name=f"Stahlbeton C30/37\n$\\rho_s$={RHO_T:.0%} (Zug), {RHO_C:.1%} (Druck)",
+         name_t=f"Stahlbeton\nC30/37, $\\rho_s$={RHO_T:.0%}",
+         name_c=f"Stahlbeton\nC30/37, $\\rho_s$={RHO_C:.1%}", color="#2e9e44",
+         f=lambda u, ks: N_rc_tc(u, e[ks[0]], e[ks[1]]),
          keys=(("c", "s"), ("c10", "s10"), ("c90", "s90")),
          note_u=-2.6, xytext=(-2.15, -19.6), rad=0.2),
     dict(key="cc", name=f"Umschnürter Beton C30/37\n$\\rho_w$={RHO_W:.1%}, $\\rho_l$={RHO_L:.1%}", color="#0f6e6e",
          f=lambda u, ks: N_cc(u, RHO_W, RHO_L, e[ks[0]], e[ks[1]]),
          keys=(("c", "s"), ("c10", "s10"), ("c90", "s90")),
          note_u=-2.85, xytext=(-2.85, -23.4), rad=0.0),
-    dict(key="pc", name="Stahlbeton C30/37,\nvorgespannt (10 MPa)", color="#d62728",
+    dict(key="pc", name=f"Stahlbeton C30/37,\nvorgespannt (10 MPa)\n$\\rho_p$ = {RHO_P:.1%}", color="#d62728",
          f=lambda u, ks: N_pc(u, SIG_CP, e[ks[0]], e[ks[1]]),
          keys=(("c", "p"), ("c10", "p10"), ("c90", "p90")),
          note_u=3.35, xytext=(3.1, -4.0), rad=0.15),
@@ -531,7 +631,7 @@ def _ultimate_u(f, k, sign=+1, u_max=0.3):
     return uu[nz[-1]] if len(nz) else 0.0
 
 
-def _end_arrows(ax, items, x_edge, side, min_gap):
+def _end_arrows(ax, items, x_edge, side, min_gap, fontsize=14):
     """Pfeile + Bruchverformung am Diagrammrand für Kurven, die über den Rand hinaus gehen."""
     items = sorted(items, key=lambda t: t[0])
     y_txt = [y for y, *_ in items]
@@ -545,10 +645,10 @@ def _end_arrows(ax, items, x_edge, side, min_gap):
                     arrowprops=dict(arrowstyle="-|>", color=col, lw=2.2, mutation_scale=16),
                     annotation_clip=False)
         ax.text(x_edge + dx + 0.05 * side, yt, f"{abs(u_ult) / mm:.0f} mm", color=col,
-                ha="left" if side > 0 else "right", va="center", fontsize=14, clip_on=False)
+                ha="left" if side > 0 else "right", va="center", fontsize=fontsize, clip_on=False)
 
 
-def plot(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung.png"):
+def plot(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung.png", note="", dark=False):
     uu = np.linspace(u_min, u_max, n) * mm
 
     fig = plt.figure(figsize=(15, 13.5))
@@ -581,9 +681,9 @@ def plot(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung.png")
     for m in MATERIALS:
         u_t = m["note_u"]
         y_t = np.interp(u_t, uu / mm, m["N50"])
-        ax.annotate(m["name"], xy=(u_t, y_t), xytext=m["xytext"], fontsize=15,
-                    ha="center", va="center", color="k", zorder=6,
-                    arrowprops=dict(arrowstyle="-|>", color="k", lw=1.1, mutation_scale=14,
+        ax.annotate(m.get("name_c" if u_t < 0 else "name_t", m["name"]), xy=(u_t, y_t), xytext=m["xytext"], fontsize=15,
+                    ha="center", va="center", color=m["color"], zorder=6,
+                    arrowprops=dict(arrowstyle="-|>", color=m["color"], lw=1.3, mutation_scale=14,
                                     shrinkA=4, shrinkB=1,
                                     connectionstyle=f"arc3,rad={m['rad']}"))
 
@@ -612,11 +712,11 @@ def plot(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung.png")
     ax.text(-3.4, -26.6, "Druckgurt", fontsize=18, ha="center", va="bottom", bbox=box)
 
     # Legende Streuband
-    handles = [Line2D([], [], color="k", lw=2.8, label="Median $e$"),
+    handles = [Line2D([], [], color="k", lw=2.8, label="Median"),
                Line2D([], [], color="k", lw=1.1, ls=(0, (3, 2)),
-                      label="10%- / 90%-Fraktil $e$")]
+                      label="10%- / 90%-Fraktil")]
     ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=13)
-    ax.text(-3.98, 13.2, "Budget: 100 kgCO$_2$ pro m Gurtlänge", fontsize=13, ha="left")
+    ax.text(-3.98, 13.2, "Budget: 100 kgCO$_2$ pro m Gurtlänge" + note, fontsize=13, ha="left")
 
     # --- (c) Querschnitte massstäblich --------------------------------------
     _sections(axc)
@@ -624,58 +724,284 @@ def plot(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung.png")
     ax.text(-0.06, 1.0, "(a)", transform=ax.transAxes, fontsize=17, va="top")
     axc.text(-0.06, 1.0, "(b)", transform=axc.transAxes, fontsize=17, va="top")
 
-    fig.savefig(fname, dpi=150, bbox_inches="tight", pad_inches=0.2)
+    if dark:
+        invert_bw(fig)
+    save_fig(fig, fname, bbox_inches="tight", pad_inches=0.2)
     return fig
 
 
-def _sections(axc):
-    """Querschnitte (Median-e) als Quadrate im gleichen Massstab + A und g0k."""
+# Kompakte Darstellung: ein Diagramm, Querschnitte im leeren Quadranten unten rechts
+SECTION_LAYOUT = [["rc", "cc", "t", "t24"], ["pc", "a", "s"]]
+
+
+def plot_compact(u_min=-4, u_max=4, n=4001, ylim=(-27, 19), fname="last_verformung_kompakt.png",
+                 note="", dark=False, inset=(0.25, -26.8, 4.15, 22.0), layout=SECTION_LAYOUT,
+                 figsize=(15, 13.5), fs=1.0, ytick=2.5, xy_override=None,
+                 sec=dict(W=1650.0, text_mm=1750.0, fontsize=11.5, linespacing=1.35),
+                 margins=(0.08, 0.90, 0.97, 0.04), names=None, zug_x=2.6,
+                 fonts=None, druck_xy=None):
+    """Wie plot(), aber ohne Teilbeschriftungen (a)/(b); die Querschnitte stehen im
+    unteren rechten Quadranten. inset = (u0, N0, Breite, Höhe) in Diagrammkoordinaten.
+    figsize/fs/ytick/sec/xy_override erlauben z.B. ein breites Folienformat (plot_slide)."""
+    uu = np.linspace(u_min, u_max, n) * mm
+    # Schriftgrössen [pt]: label = Materialbeschriftung, tick = Achsenzahlen, axis = Achsentitel,
+    # box = Zug-/Druckgurt, legend = Legende, end = Bruchverformung am Rand
+    F = dict(label=15 * fs, tick=13 * fs, axis=17 * fs, box=18 * fs, legend=13 * fs, end=14 * fs)
+    F.update(fonts or {})
+    fig, ax = plt.subplots(figsize=figsize)
+    l_, r_, t_, b_ = margins
+    fig.subplots_adjust(left=l_, right=r_, top=t_, bottom=b_)
+
+    tens, comp = [], []
+    for m in MATERIALS:
+        f, (k50, k10, k90), col = m["f"], m["keys"], m["color"]
+        N50, N10, N90 = (f(uu, k) / 1e6 for k in (k50, k10, k90))
+        ax.fill_between(uu / mm, N10, N90, color=col, alpha=0.35, lw=0, zorder=1)
+        for Nf in (N10, N90):
+            ax.plot(uu / mm, _hide_zero(uu, Nf), color=col, ls=(0, (3, 2)), lw=1.1, zorder=2)
+        ax.plot(uu / mm, _hide_zero(uu, N50), color=col, lw=2.8, zorder=4)
+        m["N50"] = N50
+        for sign, store, x_edge in ((+1, tens, u_max), (-1, comp, u_min)):
+            u_ult = _ultimate_u(f, k50, sign)
+            if abs(u_ult) > abs(x_edge) * mm:
+                store.append((float(f(x_edge * mm, k50) / 1e6), u_ult, col))
+    gap = 1.2 * F["end"] / 14 * 13.5 / figsize[1] * (ylim[1] - ylim[0]) / 46
+    _end_arrows(ax, tens, u_max, +1, min_gap=gap, fontsize=F["end"])
+    _end_arrows(ax, comp, u_min, -1, min_gap=gap, fontsize=F["end"])
+
+    # Beschriftungen (vorgespannt: knapp unter die u-Achse, da unten rechts Querschnitte)
+    xy_override = {"pc": (3.55, -2.7)} if xy_override is None else xy_override
+    for m in MATERIALS:
+        u_t = m["note_u"]
+        y_t = np.interp(u_t, uu / mm, m["N50"])
+        label = (names or {}).get(m["key"], m.get("name_c" if u_t < 0 else "name_t", m["name"]))
+        ax.annotate(label, xy=(u_t, y_t),
+                    xytext=xy_override.get(m["key"], m["xytext"]), fontsize=F["label"],
+                    ha="center", va="center", color=m["color"], zorder=6,
+                    arrowprops=dict(arrowstyle="-|>", color=m["color"], lw=1.3, mutation_scale=14,
+                                    shrinkA=4, shrinkB=1,
+                                    connectionstyle=f"arc3,rad={m['rad']}"))
+
+    ax.set_xlim(u_min - 0.1, u_max + 0.3)
+    ax.set_ylim(*ylim)
+    for s_ in ("top", "right"):
+        ax.spines[s_].set_visible(False)
+    ax.spines["left"].set_position(("data", 0))
+    ax.spines["bottom"].set_position(("data", 0))
+    ax.spines["left"].set_zorder(5)
+    ax.plot(1, 0, ">k", ms=11, transform=ax.get_yaxis_transform(), clip_on=False)
+    ax.plot(0, 1, "^k", ms=11, transform=ax.get_xaxis_transform(), clip_on=False)
+    ax.set_xticks(np.arange(u_min, u_max + 0.01, 0.5))
+    ax.set_yticks(np.arange(np.ceil(ylim[0] / ytick) * ytick, ylim[1], ytick))
+    ax.xaxis.set_major_formatter(lambda x, p: "" if abs(x) < 1e-9 else f"{x:.1f}")
+    ax.yaxis.set_major_formatter(lambda y, p: "" if abs(y) < 1e-9 else f"{y:g}")
+    ax.tick_params(direction="in", length=5, labelsize=F["tick"])
+    for lab in ax.get_xticklabels() + ax.get_yticklabels():
+        lab.set_bbox(dict(facecolor="white", edgecolor="none", alpha=0.7, pad=0.5))
+    ax.text(0.15, ylim[1], "$N_{Rd}$ [MN]", fontsize=F["axis"], ha="left", va="top")
+    ax.text(u_max + 0.35, -0.6, "$u$ [mm]", fontsize=F["axis"], ha="left", va="top", clip_on=False)
+    box = dict(boxstyle="square,pad=0.3", fc="white", ec="k", lw=1.2)
+    ax.text(zug_x, ylim[1] - 0.3, "Zuggurt", fontsize=F["box"], ha="center", va="top", bbox=box)
+    if druck_xy is None:
+        ax.text(-3.4, ylim[0] + 0.4, "Druckgurt", fontsize=F["box"], ha="center", va="bottom", bbox=box)
+    else:
+        ax.text(*druck_xy, "Druckgurt", fontsize=F["box"], ha="center", va="center", bbox=box)
+
+    handles = [Line2D([], [], color="k", lw=2.8, label="Median"),
+               Line2D([], [], color="k", lw=1.1, ls=(0, (3, 2)), label="10%- / 90%-Fraktil")]
+    leg = ax.legend(handles=handles, loc="upper left", frameon=False, fontsize=F["legend"],
+                    title="Budget: 100 kgCO$_2$ pro m Gurtlänge" + note, title_fontsize=F["legend"])
+    leg._legend_box.align = "left"
+
+    # Querschnitte im Quadranten unten rechts
+    axc = ax.inset_axes(list(inset), transform=ax.transData)
+    _sections(axc, layout=layout, **sec)
+    axc.set_anchor("NE")
+
+    if dark:
+        invert_bw(fig)
+    save_fig(fig, fname, bbox_inches="tight", pad_inches=0.2)
+    return fig
+
+
+def plot_slide(fname="last_verformung_folie.png", note="", dark=False):
+    """Kompakte Darstellung im Folienformat 16:9 (breit, einheitliche, grosse Schrift)."""
+    FS = 16                                         # Grundschriftgrösse [pt]
+    return plot_compact(
+        fname=fname, note=note, dark=dark, figsize=(16, 9), ytick=5,
+        ylim=(-22.5, 19), margins=(0.055, 0.93, 0.96, 0.03),
+        fonts=dict(label=FS + 1, tick=FS - 1, axis=FS + 2, box=FS + 2, legend=FS, end=FS - 1),
+        inset=(0.15, -22.4, 4.75, 20.6),
+        layout=[["rc", "cc", "a", "pc"], ["t", "t24", "s"]],
+        sec=dict(W=4300.0, fontsize=FS - 1, linespacing=1.15, line_mm=545.0),
+        zug_x=4.1, druck_xy=(-3.0, -3.3),
+        names={"pc": f"Stahlbeton C30/37,\nvorgespannt (10 MPa)\n$\\rho_p$ = {RHO_P:.1%}"},
+        xy_override={"pc": (2.7, 15.6), "a": (3.85, 13.6), "t": (1.45, 16.0),
+                     "t24": (-0.75, 14.5), "s": (-3.6, -18.1), "rc": (-1.95, -18.1),
+                     "cc": (-2.7, -21.0)})
+
+def invert_bw(fig):
+    """Schwarz und Weiss vertauschen (Hintergrund schwarz, Text/Achsen weiss).
+    Die Materialfarben bleiben erhalten: halbtransparente Flächen werden so angepasst,
+    dass sie auf Schwarz gleich hell wirken wie auf Weiss."""
+    from matplotlib.colors import to_rgba
+    from matplotlib.text import Text
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch, Rectangle
+    from matplotlib.collections import PolyCollection
+
+    def swap(c):
+        if c is None or (isinstance(c, str) and c in ("none", "auto")):
+            return c
+        r, g, b, a = to_rgba(c)
+        if a == 0:
+            return c
+        if (r, g, b) == (0.0, 0.0, 0.0):
+            return (1.0, 1.0, 1.0, a)
+        if (r, g, b) == (1.0, 1.0, 1.0):
+            return (0.0, 0.0, 0.0, a)
+        return c
+
+    def on_white(c):
+        """Halbtransparente Farbe -> deckende Farbe mit gleichem Aussehen wie auf Weiss."""
+        r, g, b, a = to_rgba(c)
+        return (a * r + 1 - a, a * g + 1 - a, a * b + 1 - a, 1.0)
+
+    fig.canvas.draw()                                  # Tick-Beschriftungen erzeugen
+    fig.set_facecolor("black")
+    seen = set()
+    for o in fig.findobj():
+        if id(o) in seen:                              # Objekte nur einmal umfärben
+            continue
+        seen.add(id(o))
+        if isinstance(o, Text):
+            o.set_color(swap(o.get_color()))
+            bb = o.get_bbox_patch()
+            if bb is not None:
+                bb.set_facecolor(swap(bb.get_facecolor()))
+                bb.set_edgecolor(swap(bb.get_edgecolor()))
+            ap = getattr(o, "arrow_patch", None)
+            if ap is not None:
+                ap.set_color(swap(ap.get_edgecolor()))
+        elif isinstance(o, Line2D):
+            mfc, mec = o.get_markerfacecolor(), o.get_markeredgecolor()
+            o.set_color(swap(o.get_color()))
+            o.set_markerfacecolor(swap(mfc))
+            o.set_markeredgecolor(swap(mec))
+        elif isinstance(o, PolyCollection):           # Streubänder: etwas kräftiger
+            fc = o.get_facecolor()
+            if len(fc):
+                fc = fc.copy()
+                fc[:, 3] = np.minimum(1.0, fc[:, 3] * 1.6)
+                o.set_facecolor(fc)
+                o.set_alpha(None)
+        elif isinstance(o, Rectangle) and o.axes is not None and o is not o.axes.patch \
+                and o.get_fill() and to_rgba(o.get_facecolor())[3] < 1:
+            fc = o.get_facecolor()                         # Querschnitte
+            o.set_alpha(None)
+            o.set_facecolor(on_white(fc))
+        elif isinstance(o, Patch) and o is not fig.patch:
+            o.set_edgecolor(swap(o.get_edgecolor()))
+            if o.get_fill():
+                o.set_facecolor(swap(o.get_facecolor()))
+    for ax in fig.axes:
+        ax.set_facecolor("black")
+        ax.tick_params(colors="white", which="both")
+        for lab in ax.get_xticklabels() + ax.get_yticklabels():
+            lab.set_color("white")
+            if lab.get_bbox_patch() is not None:
+                lab.set_bbox(dict(facecolor="black", edgecolor="none", alpha=0.7, pad=0.5))
+
+def _sections(axc, exclude=(), titles=None, layout=None, W=1250.0, text_mm=1500.0,
+              fontsize=12.5, linespacing=1.5, line_mm=None):
+    """Querschnitte (Median-e) als Quadrate im gleichen Massstab + A und g0k.
+    exclude: Material-Keys, die weggelassen werden; titles: {key: Titel} zum Überschreiben.
+    layout: None = eine Zeile; sonst Liste von Zeilen mit Material-Keys, z.B.
+            [["rc", "cc", "t", "t24"], ["pc", "a", "s"]]  (W = Spaltenbreite, text_mm = Platz
+            für den Text unter den Quadraten, beides in mm im Querschnittsmassstab).
+    line_mm: falls gesetzt, wird die Texthöhe je Zeile aus der Zeilenzahl bestimmt."""
     gk = {k: v * g / 1000 for k, v in gamma.items()}          # kN/m3
-    A_rcm = A_rc(RHO, e["c"], e["s"])
+    A_rct = A_rc(RHO_T, e["c"], e["s"])
+    A_rcc = A_rc(RHO_C, e["c"], e["s"])
     A_ccm = A_cc(RHO_W, RHO_L, e["c"], e["s"])
     A_p = A_pc(SIG_CP, e["c"], e["p"])
     A_cp = A_pc_concrete(SIG_CP, e["c"], e["p"])
+    g_rc = lambda A, r: A * ((1 - r) * gk["c"] + r * gk["s"])
+    # (Titel|Untertitel, key, A aussen, Zeilen, g0k, A innen, Darstellung)
     secs = [
         ("vorgespannter Beton|$\\sigma_{cp}$ = 10 MPa", "pc", A_cp + A_p,
-         [f"$A_p$ = {_fmt(A_p * 1e6)} mm$^2$", f"$A_c$ = {_fmt(A_cp * 1e6)} mm$^2$"],
-         A_cp * gk["c"] + A_p * gk["p"], A_p),
+         [f"$\\rho_p$ = {RHO_P:.1%}", f"$A_p$ = {_fmt(A_p * 1e6)} mm$^2$", f"$A_c$ = {_fmt(A_cp * 1e6)} mm$^2$"],
+         A_cp * gk["c"] + A_p * gk["p"], A_p, "center"),
         ("Baustahl", "a", A_single(e["a"]),
-         [f"$A$ = {_fmt(A_single(e['a']) * 1e6)} mm$^2$"], A_single(e["a"]) * gk["a"], None),
+         [f"$A$ = {_fmt(A_single(e['a']) * 1e6)} mm$^2$"], A_single(e["a"]) * gk["a"], None, None),
         ("Betonstahl", "s", A_single(e["s"]),
-         [f"$A$ = {_fmt(A_single(e['s']) * 1e6)} mm$^2$"], A_single(e["s"]) * gk["s"], None),
-        (f"Stahlbeton C30/37|$\\rho_s$ = {RHO:.0%}", "rc", A_rcm,
-         [f"$A$ = {_fmt(A_rcm * 1e6)} mm$^2$"],
-         A_rcm * ((1 - RHO) * gk["c"] + RHO * gk["s"]), None),
+         [f"$A$ = {_fmt(A_single(e['s']) * 1e6)} mm$^2$"], A_single(e["s"]) * gk["s"], None, None),
+        ("Stahlbeton C30/37", "rc", A_rcc,
+         [f"Zug: $\\rho_s$ = {RHO_T:.0%}",
+          f"   $A$ = {_fmt(A_rct * 1e6)} mm$^2$",
+          f"   $g_{{0k}}$ = {g_rc(A_rct, RHO_T):.1f} kN/m",
+          f"Druck: $\\rho_s$ = {RHO_C:.1%}",
+          f"   $A$ = {_fmt(A_rcc * 1e6)} mm$^2$",
+          f"   $g_{{0k}}$ = {g_rc(A_rcc, RHO_C):.1f} kN/m"],
+         None, A_rct, "corner"),
         (f"Umschnürter Beton|$\\rho_w$ = {RHO_W:.1%}, $\\rho_l$ = {RHO_L:.1%}", "cc", A_ccm,
          [f"$A$ = {_fmt(A_ccm * 1e6)} mm$^2$"],
-         A_ccm * (gk["c"] + (RHO_W + RHO_L) * gk["s"]), None),
+         A_ccm * (gk["c"] + (RHO_W + RHO_L) * gk["s"]), None, None),
         ("Brettschichtholz|GL24h", "t", A_single(e["t"]),
-         [f"$A$ = {_fmt(A_single(e['t']) * 1e6)} mm$^2$"], A_single(e["t"]) * gk["t"], None),
+         [f"$A$ = {_fmt(A_single(e['t']) * 1e6)} mm$^2$"], A_single(e["t"]) * gk["t"], None, None),
         ("Vollholz|C24", "t24", A_single(e["t24"]),
-         [f"$A$ = {_fmt(A_single(e['t24']) * 1e6)} mm$^2$"], A_single(e["t24"]) * gk["t24"], None),
+         [f"$A$ = {_fmt(A_single(e['t24']) * 1e6)} mm$^2$"], A_single(e["t24"]) * gk["t24"], None, None),
     ]
+    secs = [s_ for s_ in secs if s_[1] not in exclude]
+    titles = titles or {}
     col = {m["key"]: m["color"] for m in MATERIALS}
-    W = 1150.0                                                 # Platz je Querschnitt [mm]
-    for i, (name, key, A, lines, g0k, A_inner) in enumerate(secs):
+    # Position (x0, yb = Unterkante Quadrat) je Querschnitt
+    pos, y_bottom = {}, 0.0
+    if layout is None:
+        for i, s_ in enumerate(secs):
+            pos[s_[1]] = (i * W, 0.0)
+        ncol, y_top = len(secs), 1000.0
+    else:
+        keys = {s_[1] for s_ in secs}
+        rows = [[k for k in row if k in keys] for row in layout]
+        size = {s_[1]: np.sqrt(s_[2]) / mm for s_ in secs}
+        nlin = {s_[1]: len(s_[3]) + 2 + (1 if "|" in s_[0] else 0) - (1 if s_[4] is None else 0)
+                for s_ in secs}
+        y, ncol = 0.0, max(len(r) for r in rows)
+        for row in rows:
+            amax = max(size[k] for k in row)
+            for j, k in enumerate(row):
+                pos[k] = (j * W, y - amax)
+            th = text_mm if line_mm is None else max(nlin[k] for k in row) * line_mm + 150
+            y -= amax + th
+        y_top, y_bottom = 0.0, y
+    for name, key, A, lines, g0k, A_inner, mode in secs:
         a = np.sqrt(A) / mm
-        x0 = i * W
-        if A_inner is None:
-            axc.add_patch(Rectangle((x0, 0), a, a, color=col[key], alpha=0.7, lw=0))
-        else:                                                  # Beton hell, Spannstahl voll
-            axc.add_patch(Rectangle((x0, 0), a, a, color=col[key], alpha=0.25, lw=0))
+        x0, yb = pos[key]
+        if mode is None:
+            axc.add_patch(Rectangle((x0, yb), a, a, color=col[key], alpha=0.7, lw=0))
+        elif mode == "center":                                 # Beton hell, Spannstahl voll
+            axc.add_patch(Rectangle((x0, yb), a, a, color=col[key], alpha=0.25, lw=0))
             ai = np.sqrt(A_inner) / mm
-            axc.add_patch(Rectangle((x0 + (a - ai) / 2, (a - ai) / 2), ai, ai,
+            axc.add_patch(Rectangle((x0 + (a - ai) / 2, yb + (a - ai) / 2), ai, ai,
                                     color=col[key], alpha=0.9, lw=0))
+        else:                                                  # Stahlbeton: Druck hell, Zug dunkel
+            axc.add_patch(Rectangle((x0, yb), a, a, color=col[key], alpha=0.45, lw=0))
+            ai = np.sqrt(A_inner) / mm
+            axc.add_patch(Rectangle((x0, yb), ai, ai, color=col[key], alpha=0.85, lw=0))
+        name = titles.get(key, name)
         title, _, sub = name.partition("|")
         txt = ["$\\bf{" + title.replace(" ", "~") + "}$"] + ([sub] if sub else [])
-        txt += lines + [f"$a$ = {_fmt(a)} mm", f"$g_{{0k}}$ = {g0k:.1f} kN/m"]
-        axc.annotate("\n".join(txt), xy=(x0, 0), xytext=(0, -10), textcoords="offset points",
-                     ha="left", va="top", fontsize=12.5, linespacing=1.5, annotation_clip=False)
-    axc.set_xlim(-30, len(secs) * W)
-    axc.set_ylim(0, 1000)
+        txt += lines
+        if g0k is not None:
+            txt += [f"$g_{{0k}}$ = {g0k:.1f} kN/m"]
+        axc.annotate("\n".join(txt), xy=(x0, yb), xytext=(0, -8), textcoords="offset points",
+                     ha="left", va="top", fontsize=fontsize, linespacing=linespacing,
+                     annotation_clip=False)
+    axc.set_xlim(-30, ncol * W)
+    axc.set_ylim(y_bottom, y_top)
     axc.set_aspect("equal", anchor="NW")
     axc.axis("off")
-
 
 # =============================================================================
 # 6) Querschnittsflächen und Seitenlängen (S. 12, quadratische Querschnitte)
@@ -685,7 +1011,9 @@ def section_table():
     cases = [
         ("Baustahl", "a", lambda k: A_single(e[k]), ["a", "a10", "a90"]),
         ("Betonstahl", "s", lambda k: A_single(e[k]), ["s", "s10", "s90"]),
-        ("Stahlbeton ρ=0.05", "rc", lambda ks: A_rc(RHO, e[ks[0]], e[ks[1]]),
+        (f"Stahlbeton Zug ρ={RHO_T:.3f}", "rc", lambda ks: A_rc(RHO_T, e[ks[0]], e[ks[1]]),
+         [("c", "s"), ("c10", "s10"), ("c90", "s90")]),
+        (f"Stahlbeton Druck ρ={RHO_C:.3f}", "rc", lambda ks: A_rc(RHO_C, e[ks[0]], e[ks[1]]),
          [("c", "s"), ("c10", "s10"), ("c90", "s90")]),
         ("Spannbeton σcp=10 MPa (A_p)", "pc", lambda ks: A_pc(SIG_CP, e[ks[0]], e[ks[1]]),
          [("c", "p"), ("c10", "p10"), ("c90", "p90")]),
@@ -725,5 +1053,28 @@ if __name__ == "__main__":
     for w in check_sia(RHO_W, RHO_L):
         print("SIA-Hinweis:", w)
     plot()
+    plot(fname="last_verformung_dark.png", dark=True)      # invertiert: schwarzer Hintergrund
+    plot_compact()                                          # kompakt: Querschnitte unten rechts
+    plot_compact(fname="last_verformung_kompakt_dark.png", dark=True)
+    plot_slide()                                            # Folienformat 16:9
+    plot_slide(fname="last_verformung_folie_dark.png", dark=True)
+
+    # gleicher Plot und gleiche Tabelle, CO2-Werte inkl. Transport (LKW)
+    with emissions(e_tr):
+        tab_tr = section_table()
+        try:
+            tab_tr.to_csv("querschnitte_transport.csv", float_format="%.1f")
+        except AttributeError:
+            pass
+        plot(fname="last_verformung_transport.png", note=" (inkl. Transport LKW)")
+        plot(fname="last_verformung_transport_dark.png", note=" (inkl. Transport LKW)", dark=True)
+        plot_compact(fname="last_verformung_transport_kompakt.png", note=" (inkl. Transport LKW)")
+        plot_compact(fname="last_verformung_transport_kompakt_dark.png",
+                     note=" (inkl. Transport LKW)", dark=True)
+        plot_slide(fname="last_verformung_transport_folie.png", note=" (inkl. Transport LKW)")
+        plot_slide(fname="last_verformung_transport_folie_dark.png",
+                   note=" (inkl. Transport LKW)", dark=True)
+
     study_rho_w()
-    plt.show()
+    study_rho_rc()
+    plt.show()

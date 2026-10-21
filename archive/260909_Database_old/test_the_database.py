@@ -1,6 +1,7 @@
 import sqlite3  # import modul for SQLite
 
-database_name = 'database_251030.db'
+### KBOB: new DB name
+database_name = 'database_261009.db'
 
 connection = sqlite3.connect(database_name)
 cursor = connection.cursor()

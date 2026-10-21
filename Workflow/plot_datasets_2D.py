@@ -10,11 +10,52 @@ from scipy.interpolate import interp1d
 import class_to_excel_2
 from scipy.spatial import ConvexHull
 
+# source filter (same conditions as in opt_and_plot.py)
+# KBOB rows: only they have a "KBOB ID-Nr." (empty for EPD rows, NULL in the DB); every other row counts as EPD
+KBOB_CONDITION = "(\"KBOB ID-Nr.\" IS NOT NULL)"
+
+
+def source_filter(basetype):
+    # SQL fragment selecting the data basis: product EPDs or generic KBOB values
+    if basetype == "kbob":
+        return f" AND {KBOB_CONDITION} AND Man_Ausschluss = 1 AND CAST(Total_GWP AS REAL) > 0 "
+    elif basetype == "epd":
+        return f" AND NOT {KBOB_CONDITION} AND ValidEPD = 1 AND Man_Ausschluss = 1 "
+    raise ValueError(f"basetype must be 'epd' or 'kbob', got {basetype}")
+
+
+# copy of get_low_high_prod_ids from opt_and_plot.py (comments there)
+def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
+    # returns unique prod_id strings of the products with lowest and highest GWP of a material
+    # (only one entry if min == max, e.g. a single KBOB product)
+    mech_cond = "MECH_PROP = ?" if mech_prop is not None else "MECH_PROP IS NOT NULL"
+    # ORDER BY GWP: first row = lowest, last row = highest (old: no ORDER BY -> low/high swapped, ties gave >2 rows)
+    inquiry = ("""
+            SELECT PRO_ID FROM products
+            WHERE "MATERIAL" LIKE ?
+              AND DENSITY IS NOT NULL
+              AND """ + mech_cond + source_filter(basetype) + """
+            ORDER BY CAST(Total_GWP AS REAL), PRO_ID
+            """
+    )
+    params = [material] if mech_prop is None else [material, mech_prop]
+    cursor.execute(inquiry, params)
+    result = [row[0] for row in cursor.fetchall()]
+    if not result:  # clear message (old: IndexError)
+        raise ValueError(f"no product found for material {material}, mech_prop {mech_prop}, basetype {basetype}")
+    prod_ids = []
+    for prod_id in (result[0], result[-1]):  # lowest and highest GWP
+        prod_id_str = "'" + str(prod_id) + "'"
+        if prod_id_str not in prod_ids:  # skip the duplicate if min == max (old: KBOB computed twice)
+            prod_ids.append(prod_id_str)
+    prod_ids.sort(key=lambda x: int(x.strip("'")))  # PRO_ID order, same section order as the old query
+    return prod_ids
+
 
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(length_x,length_y, support, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, basetype="epd"):
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(length_x)-1)
@@ -25,6 +66,9 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     to_plot = []
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
+    # search rebar B500B with lowest and highest emissions once (old: once per concrete)
+    if crsec_type == "rc_rec":
+        rebar_prod_ids = get_low_high_prod_ids(cursor, 'Steel_reinforcing_bar', 'B500B', basetype)
     for mat_name in mat_names:
         inquiry = ("""
                 SELECT PRO_ID FROM products
@@ -32,10 +76,8 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
                 AND MECH_PROP IS NOT NULL
                 AND MECH_PROP NOT LIKE '%GL30%'
-                AND ValidEPD = 1
                 AND  MIN_MAX = 1
-                AND Man_Ausschluss = 1
-                AND "MATERIAL" LIKE """ + mat_name
+                AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
         #            " material=" + mat_name)
@@ -73,73 +115,35 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
-                # search database for rebar material of type B500B with lowest and highest emissions
-                # exclude not epd sources from the data.
-                inquiry = """
-                                SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
-                                WHERE "MATERIAL" = 'Steel_reinforcing_bar'
-                                  AND DENSITY IS NOT NULL
-                                  AND MECH_PROP = 'B500B'
-                                  AND ValidEPD = 1
-                                  AND Man_Ausschluss = 1
-                                  AND CAST(Total_GWP AS REAL) IN (
-                                      SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
-                                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
-                                        AND DENSITY IS NOT NULL 
-                                        AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
-
-                                      UNION
-
-                                      SELECT MAX(CAST(Total_GWP AS REAL)) FROM products 
-                                      WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
-                                        AND DENSITY IS NOT NULL 
-                                        AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
-                                  )
-                                """
-                cursor.execute(inquiry)
-                result = cursor.fetchall()
-                prod_id_low = result[0]
-                prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
-                prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
-                # create a rebar material objects with mech prop B500B and low rsp high emission values
-                rebar_low_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_low_str)
-                rebar_high_em = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=prod_id_high_str)
-                # create initial cross-sections
-                section_00 = struct_analysis.FlatSlab2D(concrete, rebar_low_em, 1.0, 0.20,
-                                                                 0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
-                                                                 0, 0.15, 0,2.0,0.02,0.0, 0.15)
-                section_01 = struct_analysis.FlatSlab2D(concrete, rebar_high_em, 1.0, 0.20,
-                                                                 0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
-                                                                 0, 0.15, 0,2.0,0.02,0.0, 0.15)
-                # add sections to content-definition of plot-line
-                line_i0 = [section_00, floorstruc]
-                line_i1 = [section_01, floorstruc]
-                to_plot.extend([line_i0, line_i1])
+                # one section per unique rebar (lowest / highest GWP), no duplicate if only one exists
+                # To see the old version, run git show 36ba32b:Workflow/plot_datasets_2D.py (around lines 72–122).
+                for rebar_prod_id in rebar_prod_ids:
+                    # create a rebar material object with mech prop B500B and low rsp high emission values
+                    rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
+                    # create initial cross-section
+                    section_0 = struct_analysis.FlatSlab2D(concrete, rebar, 1.0, 0.20,
+                                                           0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
+                                                           0, 0.15, 0,2.0,0.02,0.0, 0.15)
+                    # add section to content-definition of plot-line
+                    to_plot.append([section_0, floorstruc])
 
             elif crsec_type == "rc_rib":
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 # search database for rebar material of type B500B with lowest and highes emissions
-                inquiry = """
+                inquiry = f"""
                                 SELECT PRO_ID, MECH_PROP, Total_GWP FROM products
                                 WHERE "MATERIAL" = 'Steel_reinforcing_bar'
                                   AND DENSITY IS NOT NULL
                                   AND MECH_PROP = 'B500B'
-                                  AND ValidEPD = 1
-                                  AND Man_Ausschluss = 1
+                                  {source_filter(basetype)}
                                   AND CAST(Total_GWP AS REAL) IN (
                                       SELECT MIN(CAST(Total_GWP AS REAL)) FROM products 
                                       WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
                                         AND DENSITY IS NOT NULL 
                                         AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
+                                        {source_filter(basetype)}
 
                                       UNION
 
@@ -147,16 +151,15 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                                       WHERE "MATERIAL" = 'Steel_reinforcing_bar' 
                                         AND DENSITY IS NOT NULL 
                                         AND MECH_PROP = 'B500B' 
-                                        AND ValidEPD = 1 
-                                        AND Man_Ausschluss = 1
+                                        {source_filter(basetype)}
                                   )
                                 """
-                cursor.execute(inquiry)
                 cursor.execute(inquiry)
                 result = cursor.fetchall()
                 prod_id_low = result[0]
                 prod_id_low_str = "'" + str(prod_id_low[0]) + "'"
-                prod_id_high = result[1]
+                # result[-1] instead of result[1], KBOB has only one B500B rebar (low = high)
+                prod_id_high = result[-1]
                 prod_id_high_str = "'" + str(prod_id_high[0]) + "'"
 
                 # create a rebar material objects with mech prop B500B and low rsp high emission values
@@ -305,11 +308,11 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
             for member in pair
     ]
     if crsec_type == "rc_rec" and sup == "LL-eingespannt":
-        class_to_excel_2.members_to_excel2(members_2d, "Members_2D_LL_eingespannt.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_eingespannt_{basetype}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "LL-frei":
-        class_to_excel_2.members_to_excel2(members_2d, "Members_2D_LL_frei.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_frei_{basetype}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "PL-eingespannt":
-        class_to_excel_2.members_to_excel2(members_2d, "Members_2D_PL_eingespannt.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_PL_eingespannt_{basetype}.xlsx", folder="Results")
     else:
         print("cross-section type is not defined inside function plot_dataset() for Excel-generation")
 

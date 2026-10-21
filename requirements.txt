@@ -1,0 +1,10 @@
+# Python packages needed to run Workflow/ and Database/ (tested with Python 3.14.8)
+# Install: python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt
+numpy==2.5.3
+scipy==1.18.1
+pandas==3.0.6
+openpyxl==3.1.5
+matplotlib==3.11.2
+seaborn==0.13.2
+shapely==2.2.0
+optuna==5.0.0
