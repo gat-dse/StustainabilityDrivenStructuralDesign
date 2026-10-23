@@ -26,12 +26,13 @@ optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 database_name = "database_261009.db"
 basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (KBOB v9.0 values)
 
-
+'''
 # create floor structure for solid wooden cross-section
 bodenaufbau_vollholzdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
                                  ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False],
                                  ["'Kies gebrochen'", 0.12, False]]
 bodenaufbau_wd_solid = struct_analysis.FloorStruc(bodenaufbau_vollholzdecke, database_name)
+'''
 
 
 # create floor structure for ribbed wooden cross-section

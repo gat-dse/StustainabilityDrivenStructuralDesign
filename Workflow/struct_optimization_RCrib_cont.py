@@ -50,7 +50,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, b, s_xu, di_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,
+        add_arg = [m.system, co, st, b, s_xu, di_xu, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area,
                    optimise]
     else:
         optimise = "unten"
@@ -67,7 +67,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, b, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk,
+        add_arg = [m.system, co, st, b, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area,
                    optimise]
 
     # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
@@ -122,7 +122,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2): #max_
 #     optimise = "oben" if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m) else "unten"
 #
 #     add_arg_base = [m.system, co, st, b, s_xu, di_xu, s_xo, di_yu, s_yu, di_yo, s_yo,
-#                     m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk, optimise]
+#                     m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area, optimise]
 #
 #     best = {"obj": float("inf"), "h": None, "di_xo": None}
 #
@@ -308,7 +308,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
 
         co, st = m.section.concrete_type, m.section.rebar_type
-        add_arg = [m.system, co, st, l0, di_xu, s_xu, di_x_w, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk, optimise]
+        add_arg = [m.system, co, st, l0, di_xu, s_xu, di_x_w, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area, optimise]
 
         # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
         bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
@@ -349,7 +349,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
 
         co, st = m.section.concrete_type, m.section.rebar_type
         add_arg = [m.system, co, st, l0, di_xu, s_xu, di_xo, s_xo, n_x_w, di_pb_bw, s_pb_bw, n_pb_bw, m.floorstruc,
-                   m.requirements, to_opt, criterion, m.g2k, m.qk, optimise]
+                   m.requirements, to_opt, criterion, m.g2k, m.qk_area, optimise]
 
         # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
         bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
@@ -483,7 +483,7 @@ def opt_gzt_wd_rqs(member, criterion="ULS"):
 def wd_rqs_h(h, args):
     m, criterion = args
     querschnitt = struct_analysis.RectangularWood(m.section.wood_type, m.section.b, h, m.section.phi)
-    member = struct_analysis.Member1D(querschnitt, m.system, m.floorstruc, m.requirements, m.g2k, m.qk)
+    member = struct_analysis.Member1D(querschnitt, m.system, m.floorstruc, m.requirements, m.g2k, m.qk_area)
     member.calc_qk_zul_gzt()
     if criterion == "ULS":
         to_minimize = abs(member.qk - member.qk_zul_gzt)
@@ -560,7 +560,7 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
     ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
 
-    add_arg = [m.system, ti1, ti2, ti3, l0, a, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
+    add_arg = [m.system, ti1, ti2, ti3, l0, a, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area]
 
 # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))

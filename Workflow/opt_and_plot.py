@@ -213,7 +213,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
                         #Handle infeasible solutions (e.g. span too large for wd_rec crosssection)
                         if opt_section is None:
-                            print(f"Warning:No feasible wood section <= 28 cm for span {length}m")
+                            print(f"Warning: no feasible {crsec_type} section for span {length} m {fixed_params} "
+                                  f"-> no section in output")
                             members.append(None)
                             opt_member = None
                         else:
@@ -235,54 +236,26 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                         material_lg = "error: section material is not defined"
                     legend.append([i[0].section_type, material_lg, criterion, optimum, floorstruc.name, fixed_params.get("t3"), basetype])
 
-    #Filter out None values (infesible solutions):
-    member_list = [[mem for mem in sublist if mem is not None] for sublist in member_list]
+    # Infeasible solutions stay as None in member_list, so that member_list[i][j] still belongs to lengths[j].
+    # (Removing them would shift the indices and zip(*...) would cut the envelopes of all materials to the
+    # shortest list.) Envelopes are calculated per length over the feasible members only; lengths without any
+    # feasible member are left out.
+    members_per_length = [[mem for mem in col if mem is not None] for col in zip(*member_list)]
+    idx_feasible = [j for j, mems in enumerate(members_per_length) if mems]
+    lengths_filtered = [lengths[j] for j in idx_feasible]
 
     # CREATE DATA OF ENVELOPE AREA OF DATASET
-    # create data of envelope area for subplot 1: structural height
-    h = [[mem.section.h for mem in sublist] for sublist in member_list]
-    h_min = [min(values) if values else None for values in zip(*h)]
-    h_max = [max(values) if values else None for values in zip(*h)]
-    h_mean = [sum(values) / len(values) if values else None for values in list(zip(*h))]
-    
-    # Filter out None values for min/max/mean
-    h_min = [v for v in h_min if v is not None]
-    h_max = [v for v in h_max if v is not None]
-    h_mean = [v for v in h_mean if v is not None]
-    
-    # Update lengths to match the filtered data
-    lengths_filtered = lengths[:len(h_min)]
-
-    # create data of envelope area for subplot 2: total height
-    h_tot = [[mem.section.h+mem.floorstruc.h_Floor for mem in sublist] for sublist in member_list]
-    h_tot_min = [min(values) if values else None for values in zip(*h_tot)]
-    h_tot_max = [max(values) if values else None for values in zip(*h_tot)]
-    h_tot_mean = [sum(values) / len(values) if values else None for values in list(zip(*h_tot))]
-    h_tot_min = [v for v in h_tot_min if v is not None]
-    h_tot_max = [v for v in h_tot_max if v is not None]
-    h_tot_mean = [v for v in h_tot_mean if v is not None]
-
-    # create data of envelope area data subplot 3: co2 of structure
-    co2 = [[mem.section.co2 for mem in sublist] for sublist in member_list]
-    co2_min = [min(values) if values else None for values in zip(*co2)]
-    co2_max = [max(values) if values else None for values in zip(*co2)]
-    co2_mean = [sum(values) / len(values) if values else None for values in list(zip(*co2))]
-    co2_min = [v for v in co2_min if v is not None]
-    co2_max = [v for v in co2_max if v is not None]
-    co2_mean = [v for v in co2_mean if v is not None]
-
-    # create data of envelope area for subplot 4: total co2
-    co2_tot = [[mem.section.co2+mem.floorstruc.co2_Floor for mem in sublist] for sublist in member_list]
-    co2_tot_min = [min(values) if values else None for values in zip(*co2_tot)]
-    co2_tot_max = [max(values) if values else None for values in zip(*co2_tot)]
-    co2_tot_mean = [sum(values) / len(values) if values else None for values in list(zip(*co2_tot))]
-    co2_tot_min = [v for v in co2_tot_min if v is not None]
-    co2_tot_max = [v for v in co2_tot_max if v is not None]
-    co2_tot_mean = [v for v in co2_tot_mean if v is not None]
-
-    values_min = [h_min, h_tot_min, co2_min, co2_tot_min]
-    values_max = [h_max, h_tot_max, co2_max, co2_tot_max]
-    values_mean = [h_mean, h_tot_mean, co2_mean, co2_tot_mean]
+    # subplot 1: structural height, subplot 2: total height, subplot 3: co2 of structure, subplot 4: total co2
+    value_getters = [lambda mem: mem.section.h,
+                     lambda mem: mem.section.h + mem.floorstruc.h_Floor,
+                     lambda mem: mem.section.co2,
+                     lambda mem: mem.section.co2 + mem.floorstruc.co2_Floor]
+    values_min, values_max, values_mean = [], [], []
+    for get_value in value_getters:
+        per_length = [[get_value(mem) for mem in members_per_length[j]] for j in idx_feasible]
+        values_min.append([min(values) for values in per_length])
+        values_max.append([max(values) for values in per_length])
+        values_mean.append([sum(values) / len(values) for values in per_length])
 
     # CREATE DATASET
 
@@ -300,6 +273,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     for i, members in enumerate(member_list):
         plotdata = [[], [], [], []]
         for j, mem in enumerate(members):
+            if mem is None:  # no feasible section for lengths[j]
+                continue
             plotdata[0].append(mem.section.h)
 
             plotdata[1].append(mem.section.h + mem.floorstruc.h_Floor)
@@ -374,7 +349,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             plt.fill(x, y, alpha=0.05, facecolor=color, edgecolor = color, linewidth = 1.5)
             # plot lines
             #plt.plot(lengths_filtered, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
-            data_max[idx] = max(data_max[idx], max(data))
+            data_max[idx] = max([data_max[idx]] + data)
             # # plot points of verification into graph
             # ver_x, ver_y = lengths_filtered[idx_vrfctn], data[idx_vrfctn]
             # plt.plot(ver_x, ver_y, 'o', color='black', markersize=2)
@@ -390,6 +365,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         member
         for pair in member_list
         for member in pair
+        if member is not None
     ]
 
     '''if crsec_type == "wd_rec":
