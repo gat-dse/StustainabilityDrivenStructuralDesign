@@ -28,18 +28,17 @@ DEFAULTS = {
     "g2k": 0.75e3,              # n.t. Einbauten [N/m2]
     "qk": 2e3,                  # Nutzlast [N/m2]
     "use": "Wohnen",            # building use (Nutzung), only a label in the results; qk must fit it
+    "mean_gwp": True,           # True: one additional "mean section" per run: concrete rsp. timber (all mat_names
+                                # together), rebar and board are the real products closest to the mean GWP;
+                                # wd_rib: worse of the two t3 cases; only for basetype "epd", ignored for "kbob"
 }
 
 #-----------------------------------------------------------------------------------------------------------------------
-# RUNS: one entry = one dataset in the Excel of its material group. Comment out entries that are not needed.
-# required: "crsec_type" and "floor"
-#   crsec_type   floor (allowed combinations, see ALLOWED_FLOORS in part 2)
-#   "rc_rec"     "massiv", "Schuettung"
-#   "rc_rib"     "Schuettung", "massiv"
-#   "wd_rec"     "Vollholz"
-#   "wd_rib"     "Hohlkasten"
-# optional: every key of DEFAULTS, plus "mat_names" (list), "label" (Excel)
-runs = [
+# RUNS: Comment out entries that are not needed.
+#   crsec_types: "rc_rec, rc_rib, wd_rec, wd_rib"
+#   floor: "massiv, schuettung, Vollholz, Hohlkasten"
+#   not every combination is allowed (see ALLOWED_FLOORS in part 2)!
+RUNS = [
     {"crsec_type": "rc_rec", "floor": "massiv", "max_iter": 10},
     {"crsec_type": "rc_rib", "floor": "Schuettung", "max_iter": 10},
     {"crsec_type": "wd_rec", "floor": "Vollholz", "max_iter": 10},
@@ -159,6 +158,8 @@ def check_run(i, entry, run):
         values = run[key]
         if not (isinstance(values, list) and values and set(values) <= set(allowed) and len(set(values)) == len(values)):
             err.append(f"{key} must be a non-empty list of different values from {allowed}, got {values!r}")
+    if not isinstance(run["mean_gwp"], bool):
+        err.append(f"mean_gwp must be True or False, got {run['mean_gwp']!r}")
     if not (isinstance(run["use"], str) and run["use"]):
         err.append(f"use must be a non-empty text, got {run['use']!r}")
     for key in ("g2k", "qk"):
@@ -214,6 +215,7 @@ def effective_key(run):
     # settings that really change the result (wd ignores alg, wd_rec ignores optima)
     return (run["crsec_type"], run["system"], run["floor"], run["basetype"], run["max_iter"], tuple(run["lengths"]),
             tuple(run["criteria"]), tuple(run["mat_names"]), run["g2k"], run["qk"],
+            run["mean_gwp"] and run["basetype"] == "epd",
             None if run["crsec_type"][:2] == "wd" else run["alg"],
             None if run["crsec_type"] == "wd_rec" else tuple(run["optima"]))
 
@@ -232,7 +234,7 @@ def prepare_runs(runs):
         run["nr"] = i
         run.setdefault("mat_names", MATERIALS[run["crsec_type"][:2]])
         # default label: main keys + every other setting that differs from DEFAULTS
-        extra = [f"{k}={entry[k]}" for k in ("alg", "max_iter", "lengths", "criteria", "optima", "g2k", "qk", "use")
+        extra = [f"{k}={entry[k]}" for k in ("alg", "max_iter", "lengths", "criteria", "optima", "g2k", "qk", "use", "mean_gwp")
                  if k in entry and entry[k] != DEFAULTS[k]]
         run.setdefault("label", ", ".join([run["crsec_type"], run["system"], run["floor"], run["basetype"]] + extra))
         batch.append(run)
@@ -261,7 +263,7 @@ def prepare_runs(runs):
 
 def runs_table(batch):
     cols = ["nr", "label", "crsec_type", "system", "floor", "basetype", "alg", "max_iter", "lengths", "criteria",
-            "optima", "g2k", "qk", "use", "mat_names", "file_tag"]
+            "optima", "g2k", "qk", "use", "mean_gwp", "mat_names", "file_tag"]
     return pd.DataFrame([{c: (str(r[c]) if isinstance(r[c], list) else r[c]) for c in cols} for r in batch])
 
 
@@ -362,7 +364,7 @@ def member_row(entry, run, k):
             **({"alg": run["alg"]} if run["crsec_type"][:2] == "rc" else {}),
             "g2k [kN/m2]": run["g2k"] / 1e3, "qk [kN/m2]": run["qk"] / 1e3, "feasible": mem is not None},
         "geometry": {"l_tot [m]": entry["length"], **geo},
-        "material selection": mats,
+        "material selection": {"mean_section": entry["mean_section"], **mats},
     }
     if mem is not None:
         fl = mem.floorstruc
@@ -399,9 +401,30 @@ def write_sheet(writer, name, df):
     ws.freeze_panes = "B2"
 
 
+def keep_worse_t3(results):
+    # mean section of wd_rib: of the two fixed t3 cases only the worse one per span, criterion and optimum is kept
+    # (conservative: higher GWP rsp. higher section; infeasible if one of the two cases is infeasible)
+    def worse(a, b):
+        if a["member"] is None or b["member"] is None:
+            return a if a["member"] is None else b
+        sec_a, sec_b = a["member"].section, b["member"].section
+        if a["optimum"] == "GWP":
+            return a if sec_a.co2 >= sec_b.co2 else b
+        return a if sec_a.h + sec_a.t2 + sec_a.t3 >= sec_b.h + sec_b.t2 + sec_b.t3 else b
+
+    kept, worst = [], {}
+    for entry in results:
+        if not (entry["mean_section"] and entry["t3"] is not None):
+            kept.append(entry)
+            continue
+        key = (entry["criterion"], entry["optimum"], entry["length"])
+        worst[key] = worse(worst[key], entry) if key in worst else entry
+    return kept + list(worst.values())
+
+
 #-----------------------------------------------------------------------------------------------------------------------
 # CHECK RUNS (stops here if anything is wrong)
-batch = prepare_runs(runs)
+batch = prepare_runs(RUNS)
 df_runs = runs_table(batch)
 print(f"{len(batch)} run(s), all checks passed:")
 print(df_runs.drop(columns=["mat_names"]).to_string(index=False))
@@ -427,7 +450,7 @@ for run in batch:
             run["lengths"], database_name, run["criteria"], run["optima"], get_floor(run["floor"]), req,
             run["crsec_type"], run["mat_names"], run["g2k"], run["qk"], run["max_iter"], len(run["lengths"]) - 1,
             system=run["system"], alg=run["alg"], basetype=run["basetype"],
-            results=results, file_tag=run["file_tag"])
+            results=results, file_tag=run["file_tag"], mean_gwp=run["mean_gwp"])
     except Exception as e:
         traceback.print_exc()
         failed.append((run["nr"], run["label"], repr(e)))
@@ -435,7 +458,7 @@ for run in batch:
     if not results:
         failed.append((run["nr"], run["label"], "no products found (check mat_names / basetype)"))
         continue
-    rows += [member_row(entry, run, k) for k, entry in enumerate(results)]
+    rows += [member_row(entry, run, k) for k, entry in enumerate(keep_worse_t3(results))]
 
 # Ende der Optimierung
 dauer = time.time() - start
