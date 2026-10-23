@@ -1,64 +1,85 @@
-# Summary: `Workflow/261009_Template_Examples.py` (updated 2026-10-18)
-
-EPD/KBOB background and open problems: `archive/261018_cleanup_and_database/SUMMARY_KBOB_EPD.md`.
+# Template_Examples – Summary
 
 ## 1. Purpose
-Template for running 1D examples (rc_rec, rc_rib, wd_rec, wd_rib; Simple Beam / Continuous 1D / Two span 1D 1D) with different setups in one batch. Copy the file and adjust only Part 1. All runs end up in one combined Excel and, optionally, one figure.
+`Workflow/261009_Template_Examples.py` runs a batch of 1D optimizations (rc_rec, rc_rib, wd_rec, wd_rib on Simple Beam / Continuous 1D / Two span 1D 1D) and writes the results into **one Excel file per material group** (concrete, wood). Plotting happens later, in a separate step, from these files.
 
-## 2. Structure
-**Part 1 – Settings (adjust here)**
-- `CHECK_ONLY`: only check the runs and print the overview table, no optimization.
-- `PLOT`: draw, save (`.png`) and show the figure of all runs; `False` → only Excel.
-- `DEFAULTS`: `system`, `basetype` (epd/kbob), `alg`, `max_iter`, `lengths`, `criteria`, `optima`, `g2k`, `qk`.
-- `runs`: one dict per run. Required: `crsec_type`, `floor`. Optional: every key of `DEFAULTS`, plus `mat_names`, `color`, `label`. Missing keys come from `DEFAULTS`.
+Copy the file and only edit Part 1.
 
-**Part 2 – Fixed definitions and program code (not changed for normal use)**
-- Imports, `database_name`, `results_folder`, `Requirements()`.
-- `FLOORS` (massiv, Schuettung, Vollholz, Hohlkasten) + `FLOOR_H_CORRECTION` (Hohlkasten: insulation `h_ins` lies within the box), `MATERIALS` (rc / wd).
-- Allowed values and combinations: `SYSTEMS`, `BASETYPES`, `ALGS`, `CRITERIA`, `OPTIMA`, `ALLOWED_FLOORS`.
-- Checks (`check_run`, `check_database`, `prepare_runs`), overview table, floor cache, row builder for the combined table.
-- Optimization loop, Excel export, plot (only with `PLOT = True`).
+## 2. What you set (Part 1)
+- `CHECK_ONLY`: `True` → only check the runs and print the overview, no optimization.
+- `DEFAULTS`: values every run uses unless it sets its own: `system`, `basetype` (epd / kbob), `alg`, `max_iter`, `lengths`, `criteria`, `optima`, `g2k`, `qk`.
+- `runs`: list of dicts, one per run. Required: `crsec_type`, `floor`. Optional: any key from `DEFAULTS`, plus `mat_names` and `label`.
 
-## 3. Checks before the start
-If any check fails, the script stops with a list of all errors and nothing is optimized.
-- Per run: unknown keys, allowed values, `lengths` (≥ 2 positive values, ascending), `max_iter` (positive int), loads ≥ 0, valid matplotlib color.
-- Combinations: floor must fit the section (`ALLOWED_FLOORS`: rc_rec → massiv/Schuettung, rc_rib → Schuettung/massiv, wd_rec → Vollholz, wd_rib → Hohlkasten); wd_rib + `FIRE` (fire not checked); wd_rec + several `optima` (ignored → repeated datasets).
-- Between runs: identical effective settings (wd ignores `alg`, wd_rec ignores `optima`), duplicate labels.
-- Database: all main materials, rebar (rc) / boards (wd_rib) and floor products exist for the chosen `basetype`.
+## 3. What the code does, step by step
 
-Tested 2026-10-18: all crsec_type × system × basetype combinations and all crsec_type × floor combinations run technically. The combination rules exclude meaningless results, not crashes.
+**Step 1 – Complete the runs** (`prepare_runs`)
+Each run is merged with `DEFAULTS` (run values win). Missing values are filled in:
+- `mat_names` from `MATERIALS`, chosen by the prefix of `crsec_type` (rc → ready-mixed concrete, wd → glulam + solid timber).
+- `label` built from crsec_type, system, floor, basetype, plus any setting that differs from `DEFAULTS`.
 
-During the optimization, an unexpected error in one run is printed, the run is marked `failed`, and the batch continues.
+**Step 2 – Check everything before optimizing**
+If any check fails, the script prints all errors and stops. Nothing gets optimized.
+- *Single run* (`check_run`): no unknown keys; values come from the allowed lists; `lengths` has ≥ 2 positive values in ascending order; `max_iter` is a positive int; loads ≥ 0.
+- *Meaningful combinations*: floor fits the section (`ALLOWED_FLOORS`); no `FIRE` for wd_rib (fire is not checked there); only one `optima` for wd_rec (it ignores optima, so more would just repeat datasets).
+- *Between runs*: no two runs with identical effective settings (wd ignores `alg`, wd_rec ignores `optima`), no duplicate labels.
+- *Database* (`check_database`): for each `basetype` there are products for the main materials, the secondary materials (rebar B500B for rc, plywood boards for wd_rib) and every floor layer.
 
-## 4. Output (in `Results/` relative to the working directory)
-- `<YYMMDD_HHMM>_batch.xlsx`:
-  - sheet `members`: one row per optimized member (incl. infeasible spans with `feasible = False`); run settings (`basetype`, `alg`, `criterion`, loads, …), span, materials + prod_id + GWP, heights, CO₂ (structure, floor, total), MEd/VEd, `plot_label`.
-  - sheet `runs`: settings and status (ok/failed) of every run.
-- `<YYMMDD_HHMM>_batch.png` (only with `PLOT = True`), legend with one entry per run.
-- Raw files per run as before: `Members_{crsec_type}{_simple|_cont|_2span}_{floor}_{basetype}.xlsx`. If two runs would get the same name, both get a suffix `_runNN`.
+If two runs would write the same raw Excel name, both get the suffix `_runNN`. The overview table of all runs is printed.
 
-## 5. Changes in `Workflow/opt_and_plot.py` (`plot_dataset`)
-New optional kwargs, defaults keep the old behaviour (the older input scripts work unchanged):
-- `results`: list, one entry per optimized member is appended (member, length, criterion, optimum, t3).
-- `color`: overrides the line color chosen from section type / system / floor.
-- `file_tag`: suffix of the raw Excel file name.
-- `plot`: `False` → nothing is drawn; results, `data_max` and Excel are still created.
+**Step 3 – Build the floor structures** (`get_floor`)
+Each floor in `FLOORS` (massiv, Schuettung, Vollholz, Hohlkasten) is read from the database **once** as a `FloorStruc` and then cached. For Hohlkasten, the insulation height `h_ins` lies inside the box, so it is subtracted from `h_Floor`.
 
-## 6. How to use
-- Run from inside `Workflow/` with `.venv/bin/python 261009_Template_Examples.py` (databases are opened by relative path).
-- First set `CHECK_ONLY = True` to see the overview table, then `False` to run.
+**Step 4 – Optimize each run** (`opt_and_plot.plot_dataset(...)`)
+For every run:
+1. Pick all database products of the chosen materials and `basetype`.
+2. Build one initial cross-section per product. For rc this is done twice, with the lowest-GWP and highest-GWP rebar; for wd_rib it is done with the lowest- and highest-GWP board.
+3. For every section × criterion × optimum × length: build the static system and a `Member1D` with the loads, then optimize the section (`struct_optimization`, or `struct_optimization_RCrib_cont` for rc_rib on Continuous 1D). wd_rib is optimized once per fixed `t3` case.
+4. If no section is feasible (e.g. the span is too long for wd_rec), the member is kept as `feasible = False`.
 
-## 7. Issues to know about
-- **Colors:** runs that differ only in `alg`, `max_iter` or loads get the same default color → set `color` per run.
-- **Shading of the bands looks almost opaque:** `plot_dataset` draws the band again for every member (pre-existing).
-- **`rc_rib` GWP is wrong for rib spacings `b ≠ 1 m`** (unit error in `RibbedConcrete`), see `SUMMARY_KBOB_EPD.md`, Section 6.1.
-- **Verification plot crashes for `wd_rib`** (`NameError` in `plot_wd_rib_with_dimensions`) if the commented `plot_section` loop is activated, see `SUMMARY_KBOB_EPD.md`, Section 6.2.
-- **`alg` only affects concrete sections**; `Continuous 1D` + `rc_rib` uses `struct_optimization_RCrib_cont.py`.
-- **`wd_rib` runs twice per product** (`t3` in `T_KANDIDATEN_WDRIB`), intended.
-- **KBOB has only one rebar (B500B)** → fewer datasets than EPD, intended.
-- **`Results/Members_to_single_db.py`** (old merge step) still works on the raw files but skips wood and has no `basetype` column; the combined batch Excel replaces it for new runs.
-- **2D slabs are not covered** (`slab_2d_optimization.py` / `plot_datasets_2D.py`).
+An unexpected error inside a run is printed, the run is marked `failed`, and the batch continues with the next run.
 
-## 8. Possible next steps
-- Move Part 2 into a module (e.g. `Workflow/batch_runner.py`) so the template is only the settings (~60 lines).
-- Skip runs whose results already exist (resume), parallel runs, fixed seeds for reproducible TPE results.
+**Step 5 – Collect and save the results** (`member_row`, `RESULT_FILES`, `SECTION_COLUMNS`)
+Each optimized member becomes one row. The results are written into **one Excel per material group**, with **one sheet per cross-section type** (only the types that ran), followed by the sheet `runs`:
+
+| file | sheets |
+|---|---|
+| `<YYMMDD_HHMM>_batch_concrete.xlsx` | `rc_rec`, `rc_rib`, `runs` |
+| `<YYMMDD_HHMM>_batch_wood.xlsx` | `wd_rec`, `wd_rib`, `runs` |
+
+Columns of a sheet, in blocks (order of the supervisor's table; units in brackets; forces in kN, loads in kN/m², CO₂ per m² of floor). Header colors: **green** = configuration / selected data, **yellow** = results, **red** = key results `MEd_n`, `MEd_p`, `VEd`, `co2_struct` (`KEY_COLUMNS`, overrides the block color).
+
+| block | color | all types | rc_rec | rc_rib | wd_rec | wd_rib |
+|---|---|---|---|---|---|---|
+| identification | – | `member_id`, `criterion`, `optimum` | | | | |
+| data source | green | `basetype`, `use` | | | | |
+| design configuration | green | `plot_label`, `label`, `run_nr`, `dataset`, `crsec_type`, `system`, `g2k`, `qk`, `feasible` | `alg` | `alg` | | |
+| geometry | – | `l_tot`, `h_struct`, `b` | | `b_w`, `h_f` | | `b_w`, `h_rib`, `t2`, `t3` (`h_struct` = h_rib + t2 + t3, `b` = rib spacing) |
+| material selection | green | name + `_prod_id` + `_GWP` | `concrete`, `rebar` | `concrete`, `rebar` | `timber` | `timber`, `board` |
+| structural results | yellow | `MEd_n`, `MEd_p`, `VEd` | `rebar_content [kg/m3]` | `rebar_content` | | |
+| co2 structure | yellow | `co2_struct` | `co2_concrete`, `co2_rebar` | `co2_concrete`, `co2_rebar` | | `co2_rib`, `co2_board` |
+| floor build-up | – | `floor`, `h_floor`, `g_floor`, `co2_floor`, `co2_floor_per_year` | | | | |
+| final indicators | yellow | `h_tot`, `g_struct`, `g_tot` (dead loads), `co2_tot` | | | | |
+
+`member_id` = `<run in the batch>-<member in the run>`, both counted from 0: the first run gives `00-000`, `00-001`, …, the second `01-000`, … (`run_nr` = run index + 1). `use` (Nutzung, default `"Wohnen"`) is only a label; `qk` has to fit it.
+Infeasible spans (`feasible = False`) only have identification, settings, span and materials.
+A new material needs one entry in `RESULT_FILES`; a new cross-section type one function in `SECTION_COLUMNS`.
+
+## 4. Output (`Workflow/Results/`)
+- One `<YYMMDD_HHMM>_batch_<group>.xlsx` per material group (see above); sheet `runs` holds the settings and status (ok / failed) of the group's runs.
+- Raw files per run (written by `plot_dataset`): `Members_{crsec_type}{_simple|_cont|_2span}_{floor}_{basetype}[_runNN].xlsx`.
+
+## 5. How to use
+1. Run from inside `Workflow/`: `.venv/bin/python 261009_Template_Examples.py` (databases are opened by relative path).
+2. Set `CHECK_ONLY = True` first to see the overview, then set it to `False` and run.
+
+## 6. Good to know
+- `alg` only affects concrete sections.
+- wd_rib runs twice per product (two `t3` cases); this is intended.
+- KBOB has only one rebar (B500B), so it gives fewer datasets than EPD; this is intended.
+- **rc_rib GWP is wrong for rib spacings `b ≠ 1 m`** (unit error in `RibbedConcrete`), see `SUMMARY_KBOB_EPD.md` §6.1.
+- 2D slabs are not covered (`slab_2d_optimization.py`).
+
+## 7. Possible next steps
+- Plot script that reads the `_batch_<group>.xlsx` files (group by `plot_label` / `label`).
+- Move Part 2 into a module (e.g. `Workflow/batch_runner.py`) so that the template only holds the settings.
+- Resume (skip runs that already have results), parallel runs, and fixed seeds so TPE results can be reproduced.

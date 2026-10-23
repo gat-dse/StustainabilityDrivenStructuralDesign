@@ -70,12 +70,9 @@ def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
                  g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin",
-                 basetype="epd", results=None, color=None, file_tag="", plot=True):
+                 basetype="epd", results=None, file_tag=""):
     # results: optional list; one dict per optimized member (incl. infeasible spans with member=None) is appended
-    # color: optional line color, overrides the color chosen from section type / system / floor
     # file_tag: optional suffix of the Excel file name (avoids overwriting when runs share the same name)
-    # plot: False -> nothing is drawn (results, data_max and Excel are still created)
-    line_color = color  # 'color' is reused as loop variable in the plot section
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1) #if idx_verfctn isnt specified, pick a random
@@ -292,11 +289,12 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
 
     # PLOT DATASET TO FIGURE
-    if plot:
-        plt.rcParams.update({
-            'font.family': 'Times New Roman'
-        })
-        plt.figure(1)
+    plt.rcParams.update({
+        'font.family': 'Times New Roman'
+    })
+
+
+    plt.figure(1)
     data_max = [0, 0, 0, 0]
     vrfctn_members = [[], []]
     for i, members in enumerate(member_list):
@@ -342,9 +340,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         else:
             color = "k"
 
-        if line_color is not None:
-            color = line_color
-
         # set linestyle
         if cri == "ULS":
             linestyle = "--"  # line style for ULS
@@ -368,9 +363,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             label += f", t3={t3_val}"
         # plot data
         for idx, data in enumerate(plotdata):
-            data_max[idx] = max(data_max[idx], max(data))
-            if not plot:
-                continue
             plt.subplot(2, 2, idx + 1)
             # prepare area
             coords = list(zip(lengths_filtered, values_max[idx])) + list(zip(lengths_filtered[::-1], values_min[idx][::-1]))
@@ -382,6 +374,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             plt.fill(x, y, alpha=0.05, facecolor=color, edgecolor = color, linewidth = 1.5)
             # plot lines
             #plt.plot(lengths_filtered, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
+            data_max[idx] = max(data_max[idx], max(data))
             # # plot points of verification into graph
             # ver_x, ver_y = lengths_filtered[idx_vrfctn], data[idx_vrfctn]
             # plt.plot(ver_x, ver_y, 'o', color='black', markersize=2)

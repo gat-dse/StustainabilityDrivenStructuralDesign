@@ -4,8 +4,8 @@
 # HOW TO USE: copy this file and only adjust PART 1 (DEFAULTS and RUNS).
 # Before the first optimization starts, all runs are checked (allowed values, allowed combinations, products in the
 # database). If anything is wrong, the script stops with a list of all errors and nothing is optimized.
-# All runs are written into one combined Excel (Results/<timestamp>_batch.xlsx) and, with PLOT = True, one figure
-# (Results/<timestamp>_batch.png).
+# The results are written into one Excel per material group (Results/<timestamp>_batch_concrete.xlsx,
+# ..._batch_wood.xlsx, see RESULT_FILES), one sheet per cross-section type. Plotting is done separately.
 
 
 # ======================================================================================================================
@@ -15,9 +15,6 @@
 # True: only check the runs and print the overview table, no optimization
 CHECK_ONLY = False
 
-# True: draw the figure of all runs, save it as .png and show it; False: only the Excel results
-PLOT = True
-
 #-----------------------------------------------------------------------------------------------------------------------
 # DEFAULTS: used for every key a run does not set itself
 DEFAULTS = {
@@ -25,31 +22,30 @@ DEFAULTS = {
     "basetype": "epd",          # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
     "alg": "TPE",               # rc sections: "basinhoppin" or "TPE" (wd_rec / wd_rib use their own algorithm)
     "max_iter": 50,             # max. number of iterations per optimization. Higher value leads to better results
-    "lengths": [4, 6, 8, 10, 12],  # system lengths [m] (datapoints on x-axis of plot), at least 2 values
+    "lengths": [4, 6, 8, 10, 12],  # system lengths [m], at least 2 values
     "criteria": ["ENV"],        # "ULS", "SLS1" (deflections), "SLS2" (vibrations), "FIRE", "ENV" (all together)
     "optima": ["GWP"],          # "GWP" (min. GWP), "h" (min. height); several possible; wd_rec ignores this
     "g2k": 0.75e3,              # n.t. Einbauten [N/m2]
     "qk": 2e3,                  # Nutzlast [N/m2]
+    "use": "Wohnen",            # building use (Nutzung), only a label in the results; qk must fit it
 }
 
 #-----------------------------------------------------------------------------------------------------------------------
-# RUNS: one entry = one dataset in the plot and in the combined Excel. Comment out entries that are not needed.
+# RUNS: one entry = one dataset in the Excel of its material group. Comment out entries that are not needed.
 # required: "crsec_type" and "floor"
 #   crsec_type   floor (allowed combinations, see ALLOWED_FLOORS in part 2)
 #   "rc_rec"     "massiv", "Schuettung"
 #   "rc_rib"     "Schuettung", "massiv"
 #   "wd_rec"     "Vollholz"
 #   "wd_rib"     "Hohlkasten"
-# optional: every key of DEFAULTS, plus "mat_names" (list), "color" (plot color), "label" (legend / Excel)
+# optional: every key of DEFAULTS, plus "mat_names" (list), "label" (Excel)
 runs = [
-    {"crsec_type": "rc_rec", "floor": "massiv", "system": "Simple Beam", "basetype": "epd"},
-    # {"crsec_type": "rc_rec", "floor": "massiv", "system": "Simple Beam", "basetype": "kbob", "color": "blue"},
+    {"crsec_type": "rc_rec", "floor": "massiv", "max_iter": 10},
+    {"crsec_type": "rc_rib", "floor": "Schuettung", "max_iter": 10},
+    {"crsec_type": "wd_rec", "floor": "Vollholz", "max_iter": 10},
+    {"crsec_type": "wd_rib", "floor": "Hohlkasten", "max_iter": 10},
     # {"crsec_type": "rc_rec", "floor": "massiv", "system": "Continuous 1D"},
-    # {"crsec_type": "rc_rib", "floor": "Schuettung", "system": "Simple Beam"},
     # {"crsec_type": "rc_rib", "floor": "Schuettung", "system": "Continuous 1D"},
-    # {"crsec_type": "wd_rec", "floor": "Vollholz", "system": "Simple Beam"},
-    # {"crsec_type": "wd_rib", "floor": "Hohlkasten", "system": "Simple Beam"},
-    # {"crsec_type": "rc_rec", "floor": "massiv", "alg": "basinhoppin", "color": "red"},
 ]
 
 
@@ -62,15 +58,13 @@ runs = [
 # IMPORT
 import struct_analysis  # file with code for structural analysis
 import opt_and_plot  # file with code for optimization and plotting results in a standardized way
-import matplotlib.pyplot as plt
-from matplotlib.colors import is_color_like
-from matplotlib.lines import Line2D
 import pandas as pd
 import sqlite3
 import os
 import time
 import traceback
 from datetime import datetime
+from openpyxl.styles import PatternFill
 
 database_name = "database_261009.db"
 results_folder = "Results"
@@ -80,7 +74,7 @@ req = struct_analysis.Requirements()
 
 #-----------------------------------------------------------------------------------------------------------------------
 # FLOOR STRUCTURES (non load bearing layers: [product name, thickness or False for default, False])
-# The name is used in the Excel file name, the plot colors and the combined result table.
+# The name is used in the Excel file name and the result tables.
 h_ins = 0.18
 FLOORS = {
     # solid reinforced concrete cross-section
@@ -128,7 +122,7 @@ ALLOWED_FLOORS = {
     "wd_rec": ["Vollholz"],
     "wd_rib": ["Hohlkasten"],
 }
-ALLOWED_KEYS = set(DEFAULTS) | {"crsec_type", "floor", "mat_names", "color", "label"}
+ALLOWED_KEYS = set(DEFAULTS) | {"crsec_type", "floor", "mat_names", "label"}
 
 
 def is_number(x):
@@ -165,6 +159,8 @@ def check_run(i, entry, run):
         values = run[key]
         if not (isinstance(values, list) and values and set(values) <= set(allowed) and len(set(values)) == len(values)):
             err.append(f"{key} must be a non-empty list of different values from {allowed}, got {values!r}")
+    if not (isinstance(run["use"], str) and run["use"]):
+        err.append(f"use must be a non-empty text, got {run['use']!r}")
     for key in ("g2k", "qk"):
         if not (is_number(run[key]) and run[key] >= 0):
             err.append(f"{key} must be a number >= 0, got {run[key]!r}")
@@ -175,8 +171,6 @@ def check_run(i, entry, run):
         err.append("wd_rec ignores optima (always smallest feasible h) -> use only one entry, otherwise datasets repeat")
     if "mat_names" in entry and not (isinstance(entry["mat_names"], list) and entry["mat_names"]):
         err.append(f"mat_names must be a non-empty list, got {entry['mat_names']!r}")
-    if "color" in entry and not is_color_like(entry["color"]):
-        err.append(f"color {entry['color']!r} is not a matplotlib color")
     return err
 
 
@@ -238,7 +232,7 @@ def prepare_runs(runs):
         run["nr"] = i
         run.setdefault("mat_names", MATERIALS[run["crsec_type"][:2]])
         # default label: main keys + every other setting that differs from DEFAULTS
-        extra = [f"{k}={entry[k]}" for k in ("alg", "max_iter", "lengths", "criteria", "optima", "g2k", "qk")
+        extra = [f"{k}={entry[k]}" for k in ("alg", "max_iter", "lengths", "criteria", "optima", "g2k", "qk", "use")
                  if k in entry and entry[k] != DEFAULTS[k]]
         run.setdefault("label", ", ".join([run["crsec_type"], run["system"], run["floor"], run["basetype"]] + extra))
         batch.append(run)
@@ -267,7 +261,7 @@ def prepare_runs(runs):
 
 def runs_table(batch):
     cols = ["nr", "label", "crsec_type", "system", "floor", "basetype", "alg", "max_iter", "lengths", "criteria",
-            "optima", "g2k", "qk", "mat_names", "file_tag"]
+            "optima", "g2k", "qk", "use", "mat_names", "file_tag"]
     return pd.DataFrame([{c: (str(r[c]) if isinstance(r[c], list) else r[c]) for c in cols} for r in batch])
 
 
@@ -285,38 +279,124 @@ def get_floor(name):
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-# COMBINED RESULT TABLE: one row per optimized member
-def member_row(entry, run):
+# RESULT TABLES: one Excel per material group (RESULT_FILES), one sheet per cross-section type (SECTION_COLUMNS)
+# Column blocks of a sheet: identification | settings | geometry | internal forces | materials | CO2 | loads
+# A new material needs an entry in RESULT_FILES; a new cross-section type a function in SECTION_COLUMNS.
+RESULT_FILES = {"rc": "concrete", "wd": "wood"}  # prefix of crsec_type -> file suffix
+
+
+def material_columns(role, mat):
+    return {role: getattr(mat, "mech_prop", None), f"{role}_prod_id": getattr(mat, "prod_id", None),
+            f"{role}_GWP [kgCO2eq/kg]": getattr(mat, "GWP", None)}
+
+
+# each function returns (geometry, materials, co2) of one section; geometry and co2 only for feasible members
+def rc_rec_columns(sec, feasible):
+    mats = {**material_columns("concrete", sec.concrete_type), **material_columns("rebar", sec.rebar_type)}
+    if not feasible:
+        return {}, mats, {}
+    geo = {"h_struct [m]": sec.h, "b [m]": sec.b, "rebar_content [kg/m3]": sec.Bew_Gehalt}
+    co2 = {"co2_concrete [kgCO2eq/m2]": sec.co2_concrete / sec.b, "co2_rebar [kgCO2eq/m2]": sec.co2_rebar / sec.b,
+           "co2_struct [kgCO2eq/m2]": sec.co2 / sec.b}
+    return geo, mats, co2
+
+
+def rc_rib_columns(sec, feasible):  # co2 of RibbedConcrete is already per m2
+    mats = {**material_columns("concrete", sec.concrete_type), **material_columns("rebar", sec.rebar_type)}
+    if not feasible:
+        return {}, mats, {}
+    geo = {"h_struct [m]": sec.h, "b [m]": sec.b, "b_w [m]": sec.b_w, "h_f [m]": sec.h_f,
+           "rebar_content [kg/m3]": sec.Bew_Gehalt}
+    co2 = {"co2_concrete [kgCO2eq/m2]": sec.co2_concrete, "co2_rebar [kgCO2eq/m2]": sec.co2_rebar,
+           "co2_struct [kgCO2eq/m2]": sec.co2}
+    return geo, mats, co2
+
+
+def wd_rec_columns(sec, feasible):
+    mats = material_columns("timber", sec.wood_type)
+    if not feasible:
+        return {}, mats, {}
+    return {"h_struct [m]": sec.h, "b [m]": sec.b}, mats, {"co2_struct [kgCO2eq/m2]": sec.co2 / sec.b}
+
+
+def wd_rib_columns(sec, feasible):  # h = rib height only; boards t2 (bottom) and t3 (top) are added
+    mats = {**material_columns("timber", sec.wood_type_1), **material_columns("board", sec.wood_type_2)}
+    if not feasible:
+        return {}, mats, {}
+    co2_rib = sec.bw * sec.h * sec.wood_type_1.GWP * sec.wood_type_1.density / sec.b
+    geo = {"h_struct [m]": sec.h + sec.t2 + sec.t3, "b [m]": sec.b, "b_w [m]": sec.bw, "h_rib [m]": sec.h,
+           "t2 [m]": sec.t2, "t3 [m]": sec.t3}
+    co2 = {"co2_rib [kgCO2eq/m2]": co2_rib, "co2_board [kgCO2eq/m2]": sec.co2 - co2_rib,
+           "co2_struct [kgCO2eq/m2]": sec.co2}
+    return geo, mats, co2
+
+
+SECTION_COLUMNS = {"rc_rec": rc_rec_columns, "rc_rib": rc_rib_columns,
+                   "wd_rec": wd_rec_columns, "wd_rib": wd_rib_columns}
+
+
+# header colors of the column blocks: green = configuration / selected data, yellow = results,
+# red = key results (single columns, override the color of their block)
+GREEN, YELLOW, RED = "C6EFCE", "FFEB9C", "FFC7CE"
+BLOCK_COLORS = {"data source": GREEN, "design configuration": GREEN, "material selection": GREEN,
+                "structural results": YELLOW, "co2 structure": YELLOW, "final indicators": YELLOW}
+KEY_COLUMNS = ["MEd_n [kNm]", "MEd_p [kNm]", "VEd [kN]", "co2_struct [kgCO2eq/m2]"]
+COLUMN_BLOCK = {}  # column name -> block, filled by member_row
+
+
+def member_row(entry, run, k):
+    # one row per member, built block by block (order of the blocks = order of the columns)
     mem = entry["member"]
     sec = mem.section if mem is not None else entry["section_0"]
-    if hasattr(sec, "concrete_type"):
-        mat_1, mat_2 = sec.concrete_type, sec.rebar_type
-    elif hasattr(sec, "wood_type_1"):  # wd_rib: rib timber + board
-        mat_1, mat_2 = sec.wood_type_1, getattr(sec, "wood_type_2", None)
-    else:
-        mat_1, mat_2 = getattr(sec, "wood_type", None), None
-    row = {
-        "run_nr": run["nr"], "label": run["label"],
-        "plot_label": f"{run['system']}_{run['crsec_type']}_{run['floor']}_{run['basetype']}",
-        "crsec_type": run["crsec_type"], "system": run["system"], "floor": run["floor"],
-        "basetype": run["basetype"], "alg": run["alg"], "max_iter": run["max_iter"],
-        "criterion": entry["criterion"], "optimum": entry["optimum"], "t3": entry["t3"],
-        "g2k [N/m2]": run["g2k"], "qk [N/m2]": run["qk"], "dataset": entry["dataset"],
-        "l_tot [m]": entry["length"], "feasible": mem is not None,
-        "mat_1": getattr(mat_1, "mech_prop", None), "prod_id_1": getattr(mat_1, "prod_id", None),
-        "GWP_1 [kgCO2eq/kg]": getattr(mat_1, "GWP", None),
-        "mat_2": getattr(mat_2, "mech_prop", None), "prod_id_2": getattr(mat_2, "prod_id", None),
-        "GWP_2 [kgCO2eq/kg]": getattr(mat_2, "GWP", None),
+    geo, mats, co2 = SECTION_COLUMNS[run["crsec_type"]](sec, mem is not None)
+    rebar = {k: geo.pop(k) for k in ["rebar_content [kg/m3]"] if k in geo}  # belongs to the structural results
+    blocks = {
+        # member_id = <run in the batch>-<member in the run>, both counted from 0 (first member: 00-000)
+        "identification": {"member_id": f"{run['nr'] - 1:02d}-{k:03d}", "criterion": entry["criterion"],
+                           "optimum": entry["optimum"]},
+        "data source": {"basetype": run["basetype"], "use": run["use"]},
+        "design configuration": {
+            "plot_label": f"{run['system']}_{run['crsec_type']}_{run['floor']}_{run['basetype']}",
+            "label": run["label"], "run_nr": run["nr"], "dataset": entry["dataset"],
+            "crsec_type": run["crsec_type"], "system": run["system"],
+            **({"alg": run["alg"]} if run["crsec_type"][:2] == "rc" else {}),
+            "g2k [kN/m2]": run["g2k"] / 1e3, "qk [kN/m2]": run["qk"] / 1e3, "feasible": mem is not None},
+        "geometry": {"l_tot [m]": entry["length"], **geo},
+        "material selection": mats,
     }
     if mem is not None:
-        row.update({
-            "h_struct [m]": mem.section.h, "b [m]": mem.section.b,
-            "h_floor [m]": mem.floorstruc.h_Floor, "h_tot [m]": mem.section.h + mem.floorstruc.h_Floor,
-            "co2_struct [kgCO2eq/m2]": mem.section.co2, "co2_floor [kgCO2eq/m2]": mem.floorstruc.co2_Floor,
-            "co2_tot [kgCO2eq/m2]": mem.section.co2 + mem.floorstruc.co2_Floor,
-            "MEd_n [kNm]": mem.mEd_n / 1e3, "MEd_p [kNm]": mem.mEd_p / 1e3, "VEd [kN]": mem.vEd / 1e3,
-        })
+        fl = mem.floorstruc
+        g_struct = sec.g0k / sec.b / 1e3
+        blocks["structural results"] = {
+            **rebar,
+            "MEd_n [kNm]": mem.mEd_n / 1e3, "MEd_p [kNm]": mem.mEd_p / 1e3, "VEd [kN]": mem.vEd / 1e3}
+        blocks["co2 structure"] = co2
+        blocks["floor build-up"] = {
+            "floor": run["floor"], "h_floor [m]": fl.h_Floor, "g_floor [kN/m2]": fl.gk_area / 1e3,
+            "co2_floor [kgCO2eq/m2]": fl.co2_Floor, "co2_floor_per_year [kgCO2eq/m2a]": fl.co2_a_Floor}
+        blocks["final indicators"] = {
+            "h_tot [m]": geo["h_struct [m]"] + fl.h_Floor, "g_struct [kN/m2]": g_struct,
+            "g_tot [kN/m2]": g_struct + fl.gk_area / 1e3,
+            "co2_tot [kgCO2eq/m2]": co2["co2_struct [kgCO2eq/m2]"] + fl.co2_Floor}
+    else:
+        blocks["floor build-up"] = {"floor": run["floor"]}
+    row = {}
+    for block, cols in blocks.items():
+        COLUMN_BLOCK.update(dict.fromkeys(cols, block))
+        row.update(cols)
     return row
+
+
+def write_sheet(writer, name, df):
+    # writes one result sheet: colored headers per block, frozen header row and member_id, readable widths
+    df.to_excel(writer, sheet_name=name, index=False)
+    ws = writer.sheets[name]
+    for cell in ws[1]:
+        color = RED if cell.value in KEY_COLUMNS else BLOCK_COLORS.get(COLUMN_BLOCK.get(cell.value))
+        if color:
+            cell.fill = PatternFill("solid", fgColor=color)
+        ws.column_dimensions[cell.column_letter].width = max(10, len(str(cell.value)) + 2)
+    ws.freeze_panes = "B2"
 
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -331,15 +411,8 @@ if CHECK_ONLY:
 
 #-----------------------------------------------------------------------------------------------------------------------
 # OPTIMIZATION
-def max_of_arrays(existing_data, new_data):
-    return [max(a, b) for a, b in zip(existing_data, new_data)]
-
-
-data_max = [0, 0, 0, 0]
-vrfctn_members = []
 rows = []
 failed = []
-legend_handles = []
 
 # Start der Optimierung
 start = time.time()
@@ -347,15 +420,14 @@ start = time.time()
 for run in batch:
     print(f"\n=== Run {run['nr']}: {run['label']} ===")
     results = []
-    n_lines = len(plt.figure(1).axes[0].lines) if PLOT and plt.figure(1).axes else 0
     # safety net for unexpected errors during the optimization: the run is reported and the batch continues
     try:
-        # retrieve data from database, find optimal cross-sections and plot results
-        data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(
+        # retrieve data from database and find optimal cross-sections
+        opt_and_plot.plot_dataset(
             run["lengths"], database_name, run["criteria"], run["optima"], get_floor(run["floor"]), req,
             run["crsec_type"], run["mat_names"], run["g2k"], run["qk"], run["max_iter"], len(run["lengths"]) - 1,
             system=run["system"], alg=run["alg"], basetype=run["basetype"],
-            results=results, color=run.get("color"), file_tag=run["file_tag"], plot=PLOT)
+            results=results, file_tag=run["file_tag"])
     except Exception as e:
         traceback.print_exc()
         failed.append((run["nr"], run["label"], repr(e)))
@@ -363,12 +435,7 @@ for run in batch:
     if not results:
         failed.append((run["nr"], run["label"], "no products found (check mat_names / basetype)"))
         continue
-    data_max = max_of_arrays(data_max, data_max_new)
-    vrfctn_members.append(vrfctn_members_new)
-    rows += [member_row(entry, run) for entry in results]
-    # legend entry with the color plot_dataset used for this run
-    if PLOT and plt.figure(1).axes and len(plt.figure(1).axes[0].lines) > n_lines:
-        legend_handles.append(Line2D([0], [0], color=plt.figure(1).axes[0].lines[-1].get_color(), label=run["label"]))
+    rows += [member_row(entry, run, k) for k, entry in enumerate(results)]
 
 # Ende der Optimierung
 dauer = time.time() - start
@@ -379,48 +446,22 @@ for nr, label, err in failed:
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-# SAVE COMBINED EXCEL (sheet "members": one row per member, sheet "runs": settings of all runs)
+# SAVE ONE EXCEL PER MATERIAL GROUP: one sheet per cross-section type (order of SECTION_COLUMNS), last sheet "runs"
 timestamp = datetime.now().strftime("%y%m%d_%H%M")
 os.makedirs(results_folder, exist_ok=True)
-if rows:
-    excel_path = os.path.join(results_folder, f"{timestamp}_batch.xlsx")
-    df_runs["status"] = ["failed" if r["nr"] in [f[0] for f in failed] else "ok" for r in batch]
+df_runs["status"] = ["failed" if r["nr"] in [f[0] for f in failed] else "ok" for r in batch]
+for prefix, suffix in RESULT_FILES.items():
+    group_runs = df_runs[df_runs["crsec_type"].str[:2] == prefix]
+    if group_runs.empty:
+        continue
+    excel_path = os.path.join(results_folder, f"{timestamp}_batch_{suffix}.xlsx")
     with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-        pd.DataFrame(rows).to_excel(writer, sheet_name="members", index=False)
-        df_runs.to_excel(writer, sheet_name="runs", index=False)
-    print(f"Combined results saved: {excel_path}")
-
-
-#-----------------------------------------------------------------------------------------------------------------------
-# PLOT (only with PLOT = True)
-if PLOT:
-    # DEFINE LABELS OF PLOTS
-    plotted_data = [["h$_{struct}$", "[m]"], ["h$_{tot}$", "[m]"], ["GWP$_{struct}$", "[kg-CO$_2$-eq]"], ["GWP$_{tot}$", "[kg-CO$_2$-eq]"]]
-    all_lengths = [l for run in batch for l in run["lengths"]]
-
-    # ADD LABELS, LEGEND, AXIS LIMITS AND GRID TO THE PLOTS
-    plt.figure(1)
-    for idx, info in enumerate(plotted_data):
-        plt.subplot(2, 2, idx + 1)
-        plt.xlabel('l [m]', fontsize=12)
-        plt.ylabel(info[0] + " " + info[1], fontsize=12)
-        if idx % 2 == 0:
-            plt.axis((min(all_lengths), max(all_lengths), 0, max(data_max[idx], data_max[idx+1])))
-        else:
-            plt.axis((min(all_lengths), max(all_lengths), 0, max(data_max[idx], data_max[idx-1])))
-        plt.grid()
-    if legend_handles:
-        plt.figure(1).legend(handles=legend_handles, loc="lower center", ncol=2, fontsize=8)
-        plt.subplots_adjust(bottom=0.14 + 0.04 * ((len(legend_handles) + 1) // 2), hspace=0.35, wspace=0.35)
-
-    # # plot cross-section of members for verification
-    # for mem_group in vrfctn_members:
-    #     for i, mem in enumerate(mem_group[0]):
-    #         opt_and_plot.plot_section(mem.section)
-    #         plt.title(f'#{mem_group[1][i]}')
-
-    # SAVE AND SHOW FIGURE
-    if rows:
-        plt.figure(1).savefig(os.path.join(results_folder, f"{timestamp}_batch.png"), dpi=200)
-    plt.show()
-
+        for crsec in [c for c in SECTION_COLUMNS if c[:2] == prefix]:
+            sheet_rows = [r for r in rows if r["crsec_type"] == crsec]
+            if not sheet_rows:
+                continue
+            # column order of the longest row (feasible member); infeasible rows only miss the result columns
+            columns = max((list(r) for r in sheet_rows), key=len)
+            write_sheet(writer, crsec, pd.DataFrame(sheet_rows, columns=columns))
+        group_runs.to_excel(writer, sheet_name="runs", index=False)
+    print(f"Results saved: {excel_path}")
