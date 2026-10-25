@@ -34,10 +34,12 @@ DEFAULTS = {
 }
 
 #-----------------------------------------------------------------------------------------------------------------------
-# RUNS: Comment out entries that are not needed.
-#   crsec_types: "rc_rec, rc_rib, wd_rec, wd_rib"
-#   floor: "massiv, schuettung, Vollholz, Hohlkasten"
-#   not every combination is allowed (see ALLOWED_FLOORS in part 2)!
+# RUNS: Set the parameters you want to use
+# crsec_type | floor 
+# "rc_rec"   | "massiv", "Schuettung"
+# "rc_rib"   | "Schuettung", "massiv"
+# "wd_rec"   | "Vollholz"
+# "wd_rib"   | "Hohlkasten"
 RUNS = [
     {"crsec_type": "rc_rec", "floor": "massiv", "max_iter": 10},
     {"crsec_type": "rc_rib", "floor": "Schuettung", "max_iter": 10},
@@ -125,7 +127,7 @@ ALLOWED_KEYS = set(DEFAULTS) | {"crsec_type", "floor", "mat_names", "label"}
 
 
 def is_number(x):
-    return isinstance(x, (int, float)) and not isinstance(x, bool)
+    return isinstance(x, (int, float)) and not isinstance(x, bool) # returns true for int & float
 
 
 def check_run(i, entry, run):
@@ -176,14 +178,14 @@ def check_run(i, entry, run):
 
 
 def check_database(batch):
-    # returns error messages for products the runs need but the database does not contain
+    # adds error messages into the error vector if there are products the runs need but the database does not contain
     err = []
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
     checked = set()
     for run in batch:
         base, crsec = run["basetype"], run["crsec_type"]
-        # main materials (same query as plot_dataset)
+        # CHECK MAIN MATERIALS (same query as plot_dataset)
         for mat_name in run["mat_names"]:
             if (mat_name, base) in checked:
                 continue
@@ -192,7 +194,7 @@ def check_database(batch):
                            " AND \"MATERIAL\" LIKE " + mat_name + opt_and_plot.source_filter(base))
             if cursor.fetchone()[0] == 0:
                 err.append(f"run {run['nr']}: no product for material {mat_name} with basetype {base!r}")
-        # secondary materials: rebar for rc, boards for wd_rib (same queries as plot_dataset)
+        # CHECK SECONDARY MATERIALS: rebar for rc, boards for wd_rib (same queries as plot_dataset)
         extra = {"rc": ("Steel_reinforcing_bar", "B500B"), "wd_rib": ("%3_and_5_plywood%", None)}
         key = crsec[:2] if crsec[:2] == "rc" else crsec
         if key in extra and (key, base) not in checked:
@@ -212,7 +214,8 @@ def check_database(batch):
 
 
 def effective_key(run):
-    # settings that really change the result (wd ignores alg, wd_rec ignores optima)
+    # fingerprint of all settings that change the result; equal keys = duplicate runs
+    # ignored settings are set to None/False: alg for wd, optima for wd_rec, mean_gwp for kbob
     return (run["crsec_type"], run["system"], run["floor"], run["basetype"], run["max_iter"], tuple(run["lengths"]),
             tuple(run["criteria"]), tuple(run["mat_names"]), run["g2k"], run["qk"],
             run["mean_gwp"] and run["basetype"] == "epd",
@@ -239,7 +242,7 @@ def prepare_runs(runs):
         run.setdefault("label", ", ".join([run["crsec_type"], run["system"], run["floor"], run["basetype"]] + extra))
         batch.append(run)
 
-    # combinations between runs
+    # Compare every run with every other run
     for a_idx, a in enumerate(batch):
         for b in batch[a_idx + 1:]:
             if effective_key(a) == effective_key(b):
@@ -247,13 +250,17 @@ def prepare_runs(runs):
             if a["label"] == b["label"]:
                 errors.append(f"runs {a['nr']} and {b['nr']} have the same label {a['label']!r}")
 
-    if not errors:
+    #check database only if there are no errors yet in the error list
+    if not errors: 
         errors += check_database(batch)
+    
+    # STOPS BEFORE STARTING THE RUNS IF THERE ARE ANY ERRORS
     if errors:
         print("\nINVALID RUNS - nothing was optimized:\n  " + "\n  ".join(errors))
         raise SystemExit(1)
 
-    # runs with the same Excel file name in plot_dataset get a suffix, so they do not overwrite each other
+    # file_tag: suffix for the Members_*.xlsx file that plot_dataset writes per run.
+    # that file name only contains crsec_type, system, floor, basetype -> runs sharing these get "_run01", "_run02"... so they do not overwrite each other
     name_key = lambda r: (r["crsec_type"], r["system"], r["floor"], r["basetype"])
     for run in batch:
         same_name = sum(name_key(r) == name_key(run) for r in batch)
@@ -280,19 +287,22 @@ def get_floor(name):
     return _floor_cache[name]
 
 
+
+
 #-----------------------------------------------------------------------------------------------------------------------
 # RESULT TABLES: one Excel per material group (RESULT_FILES), one sheet per cross-section type (SECTION_COLUMNS)
 # Column blocks of a sheet: identification | settings | geometry | internal forces | materials | CO2 | loads
 # A new material needs an entry in RESULT_FILES; a new cross-section type a function in SECTION_COLUMNS.
 RESULT_FILES = {"rc": "concrete", "wd": "wood"}  # prefix of crsec_type -> file suffix
 
-
 def material_columns(role, mat):
     return {role: getattr(mat, "mech_prop", None), f"{role}_prod_id": getattr(mat, "prod_id", None),
             f"{role}_GWP [kgCO2eq/kg]": getattr(mat, "GWP", None)}
-
-
-# each function returns (geometry, materials, co2) of one section; geometry and co2 only for feasible members
+   
+   
+           
+# one function per section type: fills the 3 column blocks geometry, materials, co2
+# if no valid section was found, only materials is filled
 def rc_rec_columns(sec, feasible):
     mats = {**material_columns("concrete", sec.concrete_type), **material_columns("rebar", sec.rebar_type)}
     if not feasible:
@@ -301,7 +311,6 @@ def rc_rec_columns(sec, feasible):
     co2 = {"co2_concrete [kgCO2eq/m2]": sec.co2_concrete / sec.b, "co2_rebar [kgCO2eq/m2]": sec.co2_rebar / sec.b,
            "co2_struct [kgCO2eq/m2]": sec.co2 / sec.b}
     return geo, mats, co2
-
 
 def rc_rib_columns(sec, feasible):  # co2 of RibbedConcrete is already per m2
     mats = {**material_columns("concrete", sec.concrete_type), **material_columns("rebar", sec.rebar_type)}
@@ -313,13 +322,11 @@ def rc_rib_columns(sec, feasible):  # co2 of RibbedConcrete is already per m2
            "co2_struct [kgCO2eq/m2]": sec.co2}
     return geo, mats, co2
 
-
 def wd_rec_columns(sec, feasible):
     mats = material_columns("timber", sec.wood_type)
     if not feasible:
         return {}, mats, {}
     return {"h_struct [m]": sec.h, "b [m]": sec.b}, mats, {"co2_struct [kgCO2eq/m2]": sec.co2 / sec.b}
-
 
 def wd_rib_columns(sec, feasible):  # h = rib height only; boards t2 (bottom) and t3 (top) are added
     mats = {**material_columns("timber", sec.wood_type_1), **material_columns("board", sec.wood_type_2)}
@@ -332,12 +339,12 @@ def wd_rib_columns(sec, feasible):  # h = rib height only; boards t2 (bottom) an
            "co2_struct [kgCO2eq/m2]": sec.co2}
     return geo, mats, co2
 
-
 SECTION_COLUMNS = {"rc_rec": rc_rec_columns, "rc_rib": rc_rib_columns,
                    "wd_rec": wd_rec_columns, "wd_rib": wd_rib_columns}
 
 
-# header colors of the column blocks: green = configuration / selected data, yellow = results,
+
+# colors of the columns in excel: green = configuration / selected data, yellow = results,
 # red = key results (single columns, override the color of their block)
 GREEN, YELLOW, RED = "C6EFCE", "FFEB9C", "FFC7CE"
 BLOCK_COLORS = {"data source": GREEN, "design configuration": GREEN, "material selection": GREEN,
@@ -423,7 +430,7 @@ def keep_worse_t3(results):
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-# CHECK RUNS (stops here if anything is wrong)
+# CHECK RUNS (shows only the runs and stops here if anything is wrong)
 batch = prepare_runs(RUNS)
 df_runs = runs_table(batch)
 print(f"{len(batch)} run(s), all checks passed:")
