@@ -4,7 +4,8 @@ import numpy as np
 import statistics
 
 # create or open database sustainability
-connection = sqlite3.connect('../alt/database_251030.db')
+### KBOB: new DB name (script is specific to the archived 251030 DB)
+connection = sqlite3.connect('../250326-260121_databases/database_251030.db')
 # create cursor object
 cursor = connection.cursor()
 #------------------------------------------------------------------------------------------------------------------------

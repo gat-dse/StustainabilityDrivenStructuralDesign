@@ -8,20 +8,21 @@ import opt_and_plot  # file with code for plotting results in a standardized way
 import matplotlib.pyplot as plt
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4, 5]
+lengths = [4, 6, 8, 10, 12]
 
 # Index of verified length (cross-sections of that length will be plotted)
-idx_vrc = 1
+idx_vrc = 4
 
 # max. number of iterations per optimization. Higher value leads to better results
-max_iter = 80
+max_iter = 150
 
 #  define content of plot
 criteria = ["ENV"]  # envelop, all criteria should be fulfilled (ULS, SLS1, SLS2, Fire)
 optima = ["GWP"]  # optimizing cross-sections for minimal GWP
 
 # define database
-database_name = "database_260811.db"
+database_name = "database_261009.db"
+basetype = "epd"  # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
 # database_name = "dummy_sustainability.db"  # define database name
 # create_dummy_database.create_database(database_name)  # create database
 
@@ -37,11 +38,6 @@ bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False,
                        ["'Unterlagsboden Zement, 85 mm'", False, False],
                        ["'Glaswolle'", 0.03, False],["'Kies gebrochen'", 0.06, False]]
 bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name)
-
-bodenaufbau_vollholzdecke = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False, False],
-                                 ["'Unterlagsboden Zement, 85 mm'", False, False], ["'Glaswolle'", 0.03, False],
-                                 ["'Kies gebrochen'", 0.12, False]]
-bodenaufbau_wd_solid = struct_analysis.FloorStruc(bodenaufbau_vollholzdecke, database_name)
 
 # define loads on member
 g2k = 0.75e3  # n.t. Einbauten
@@ -69,34 +65,24 @@ mat_names = ["'ready_mixed_concrete'"]
 """
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima, bodenaufbau_rc,
                                                               req, "rc_rec", mat_names, g2k, qk, max_iter,
-                                                              idx_vrc, system="Continuous 1D")
+                                                              idx_vrc, system="Continuous 1D", basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 """
-"""
-# retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
-data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
-                                                              bodenaufbau_rc_rib, req, "rc_rec", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc)
-data_max = max_of_arrays(data_max, data_max_new)
-vrfctn_members.append(vrfctn_members_new)
-
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
                                                               bodenaufbau_rc_rib, req, "rc_rib", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc, system="Continuous 1D")
+                                                              g2k, qk, max_iter, idx_vrc, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 """
-
-mat_names = [ "'Solid_structural_timber'"]
 # retrieve data from database, find optimal cross-sections and plot results for ribbed cross-section
 data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_name, criteria, optima,
-                                                              bodenaufbau_wd_solid, req, "wd_rec", mat_names,
-                                                              g2k, qk, max_iter, idx_vrc)
+                                                              bodenaufbau_rc_rib, req, "rc_rib", mat_names,
+                                                              g2k, qk, max_iter, idx_vrc, system="Continuous 1D", basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-
+"""
 # DEFINE LABELS OF PLOTS
 plotted_data = [["h$_{struct}$", "[m]"], ["h$_{tot}$", "[m]"], ["GWP$_{struct}$", "[kg-CO$_2$-eq]"], ["GWP$_{tot}$", "[kg-CO$_2$-eq]"]]
 
@@ -110,7 +96,7 @@ for idx, info in enumerate(plotted_data):
     else:
         plt.axis((min(lengths), max(lengths), 0, max(data_max[idx], data_max[idx-1])))
     plt.grid()
-
+"""
  # # plot cross-section of members for verification
 for mem_group in vrfctn_members:
      for i, mem in enumerate(mem_group[0]):
@@ -118,7 +104,7 @@ for mem_group in vrfctn_members:
          opt_and_plot.plot_section(section)
          # Show the plot
          plt.title(f'#{mem_group[1][i]}')
-
+"""
 # SHOW FIGURE
 plt.show()
 Test=1

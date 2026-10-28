@@ -3,5 +3,7 @@ __pycache__
 .env
 .venv
 .db
+.claude
 .xlsx
 *.xlsx
+.DS_Store

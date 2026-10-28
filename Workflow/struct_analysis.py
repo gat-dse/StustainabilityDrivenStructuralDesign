@@ -24,12 +24,18 @@
 # - Bodenaufbauschicht
 # - Bodenaufbau
 # - Rechteckquerschnitte
-# - Anforderungen
+# - Anforderungen (Durchbiegung usw.)
 
 import sqlite3  # import modul for SQLite
 import numpy as np
 from scipy.optimize import minimize
 import math
+
+def per_kg(v):
+    # transform a per-tonne value from the database to per kg; empty values (e.g. UBP/GE of EPD rows) give NaN
+    if v is None or v == '':
+        return math.nan
+    return float(v) / 1e3
 
 #DEFINITONS OF MATERIAL PROPERTIES--------------------------------------------------------------------------------------
 #-----------------------------------------------------------------------------------------------------------------------
@@ -45,17 +51,20 @@ class Wood:
         cursor.execute(inquiry)
         result = cursor.fetchall()
         self.fmk, self.fvd, self.Emmean, self.weight, self.burn_rate, self.creep_coef = result[0]
-        # get GWP properties from database
+        
+        # get GWP, UBP, GE properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE MECH_PROP=" + mech_prop
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE MECH_PROP=" + mech_prop
         else:
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE PRO_ID=" + prod_id
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE PRO_ID=" + prod_id
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        # self.prod_id, self.density, self.GWP, self.cost, self.cost2 = result[0]
-        self.prod_id, density, GWP, self.cost = result[0]
+        self.prod_id, density, GWP, self.cost, ubp, ge = result[0]
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
+        self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
+        self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
+
         self.density = float(density)
         self.cost = 0
         self.cost2 = 0
@@ -87,24 +96,23 @@ class ReadyMixedConcrete:
         else:
             self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
         #self.fck, self.fctm, self.Ecm, self.weight, self.creep_coef = result[0]
-        # get GWP properties from database
+        
+        
+        # get GWP, UBP, GE properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
-            # inquiry = ("""
-            #         SELECT PRO_ID, density, Total_GWP, cost, cost2 FROM products WHERE "material [string]" LIKE """ + mech_prop
-            #            )
-            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE MECH_PROP LIKE """
+            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE MECH_PROP LIKE """
                        + mech_prop)
         else:
-            # inquiry = ("""SELECT PRO_ID, density, Total_GWP, cost, cost2 FROM products WHERE PRO_ID LIKE """ + prod_id
-            #            )
-            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE PRO_ID LIKE """
+            inquiry = ("""SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE PRO_ID LIKE """
                        + prod_id)
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        # self.prod_id, self.density, self.GWP, self.cost, self.cost2 = result[0]
-        self.prod_id, density, GWP, self.cost = result[0]
+        self.prod_id, density, GWP, self.cost, ubp, ge = result[0]
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
+        self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
+        self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
+
         self.density = float(density)
         self.cost = 0
         self.cost2 = 0
@@ -130,17 +138,21 @@ class SteelReinforcingBar:
         cursor.execute(inquiry)
         result = cursor.fetchall()
         self.fsk, self.Es = result[0]
-        # get GWP properties from database
+        
+        
+        # get GWP, UBP, GE properties from database
         if prod_id == "undef":  # no specific product is defined, chose first product entry with required mechanical
             # properties in database
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE MECH_PROP=" + mech_prop
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE MECH_PROP=" + mech_prop
         else:
-            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost FROM products WHERE PRO_ID=" + prod_id
+            inquiry = "SELECT PRO_ID, DENSITY, Total_GWP, Cost, Total_UBP, Graue_Energie FROM products WHERE PRO_ID=" + prod_id
         cursor.execute(inquiry)
         result = cursor.fetchall()
-        #self.prod_id, density, self.GWP, self.cost = result[0]
-        self.prod_id, density, GWP, self.cost = result[0]
+        self.prod_id, density, GWP, self.cost, ubp, ge = result[0]
         self.GWP = GWP/1e3  # transform unit from [kg-Co2-eq/t] to [kg-Co2-eq/kg]
+        self.UBP = per_kg(ubp)  # transform unit from [UBP/t] to [UBP/kg]
+        self.graue_energie = per_kg(ge)  # transform unit from [kWh oil-eq/t] to [kWh oil-eq/kg]
+
         self.density = float(density)
         self.cost = 0
         self.fsd = self.get_design_values()
@@ -232,6 +244,10 @@ class RectangularWood(SupStrucRectangular, Section):
         self.g0k_b = self.g0k / self.b  # dead weight of cross section [N/m]
         self.ei1 = self.wood_type.Emmean * self.iy  # elastic stiffness [Nm^2]
         self.co2 = self.a_brutt * self.wood_type.GWP * self.wood_type.density  # [kg_CO2_eq/m]
+       
+        self.ubp = self.a_brutt * self.wood_type.UBP * self.wood_type.density  # [UBP/m]
+        self.graue_energie = self.a_brutt * self.wood_type.graue_energie * self.wood_type.density  # [kWh oil-eq/m]
+
         self.cost = self.a_brutt * self.wood_type.cost # [CHF] #TODO: Not implemented yet!
         self.ei_b = ei_b  # stiffness perpendicular to direction of span [Nm^2]
         self.xi = xi  # damping factor, preset value see: HBT, Page 47 (higher value for some buildups possible)
@@ -340,6 +356,14 @@ class RectangularConcrete(SupStrucRectangular):
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete)
+   
+        self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density  # [UBP/m]
+        self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density  # [UBP/m]
+        self.ubp = self.ubp_rebar + self.ubp_concrete
+        self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density  # [kWh oil-eq/m]
+        self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density  # [kWh oil-eq/m]
+        self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
+
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
@@ -545,6 +569,14 @@ class FlatSlab2D(SupStrucRectangular):
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density  # [kg_CO2_eq/m]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete)
+
+        self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density  # [UBP/m]
+        self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density  # [UBP/m]
+        self.ubp = self.ubp_rebar + self.ubp_concrete
+        self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density  # [kWh oil-eq/m]
+        self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density  # [kWh oil-eq/m]
+        self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
+
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1
@@ -857,6 +889,16 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.co2_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.GWP * self.concrete_type.density /self.b # [kg_CO2_eq/m2]
         self.ei1 = self.concrete_type.Ecm * self.iy  # elastic stiffness concrete (uncracked behaviour) [Nm^2]
         self.co2 = (self.co2_rebar + self.co2_concrete) #[kgCO2_eq/m2]
+        
+
+        # same formula as GWP (incl. the known unit error for rib spacing b != 1 m) -> fix all three together later
+        self.ubp_rebar = a_s_tot * self.rebar_type.UBP * self.rebar_type.density/self.b  # [UBP/m2]
+        self.ubp_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.UBP * self.concrete_type.density /self.b  # [UBP/m2]
+        self.ubp = self.ubp_rebar + self.ubp_concrete
+        self.graue_energie_rebar = a_s_tot * self.rebar_type.graue_energie * self.rebar_type.density/self.b  # [kWh oil-eq/m2]
+        self.graue_energie_concrete = (self.a_brutt - a_s_tot) * self.concrete_type.graue_energie * self.concrete_type.density /self.b  # [kWh oil-eq/m2]
+        self.graue_energie = self.graue_energie_rebar + self.graue_energie_concrete
+
         self.cost = (a_s_tot * self.rebar_type.cost + (self.a_brutt - a_s_tot) * self.concrete_type.cost
                      + self.concrete_type.cost2)
         self.ei_b = self.ei1  #!!!!!!!ANPASSEN AUF PB  --- stimmt doch so als ungerissene Steifigkeit?
@@ -1066,14 +1108,15 @@ class SupStrucRibWood(Section):
         self.b = b  # spacing between ribs [m]
         self.t2 = t2  # slab height bottom flange [m]
         self.t3 = t3  # slab height top flange [m]
-        self.bc_ef = self.calc_bef('comp') + bw  # Effective width top flange compression [m]
-        self.bt_ef = self.calc_bef('tens') + bw  # Effective width bottom flange tension [m]
+        self.bc_ef = self.calc_bef('comp') + bw  # Effective width top flange compression [m] -> b3
+        self.bt_ef = self.calc_bef('tens') + bw  # Effective width bottom flange tension [m] -> b2
         self.a_brutt = self.calc_area() #Bruttoquerschnittsfläche [m2] (QS zwischen zwei Rippen, Abstand a)
         self.n = n
         self.n_inf = n_inf
-        self.z_s = self.calc_center_of_gravity()
+        self.z_s = self.calc_center_of_gravity(self.n)
+        self.z_s_inf = self.calc_center_of_gravity(self.n_inf)
         self.iy, self.iy_inf = self.calc_moment_of_inertia()
-        self.w = self.calc_weight #Eigenlast QS pro Laufmeter [N/m']
+        self.w = self.calc_weight() #Eigenlast QS pro Laufmeter [N/m']
 
     def calc_area(self):
         # in: width bw (Stegbreite) and b (Stegabstand) [m], height h and h_f[m]
@@ -1096,14 +1139,16 @@ class SupStrucRibWood(Section):
             b_ef = min(b_ef_schub, self.b - self.bw)
             return b_ef
 
-    def calc_center_of_gravity(self):
-        # in: Geometry effective width bw, h, t2, b_ef_t, t3, b_ef_c
-        # out: center of gravity z_s [m]
+    def calc_center_of_gravity(self, n):
+        # in: Geometry effective width bw, h, t2, b_ef_t, t3, b_ef_c including Wertigkeit n
+        # out: center of gravity z_s [m], z=0: Oberkante obere Beplankung
         z_s1 = self.t3 + self.h/2
         z_s2 = self.t3 + self.h + self.t2/2
         z_s3 = self.t3/2
-        z_s = ((self.bw * self.h *z_s1 + self.bt_ef * self.t2 * z_s2 + self.bc_ef * self.t3 * z_s3) /
-               (self.bw * self.h + self.bt_ef * self.t2 + self.bc_ef * self.t3))
+        a1 = n[0]*self.bw*self.h
+        a2 = n[1]*self.bt_ef * self.t2
+        a3 = n[2]*self.bc_ef * self.t3
+        z_s = ((a1 *z_s1 + a2 * z_s2 + a3 * z_s3) / (a1 + a2 + a3))
         return z_s
 
     def calc_moment_of_inertia(self):
@@ -1115,19 +1160,19 @@ class SupStrucRibWood(Section):
         z_s2 = self.t3 + self.h + self.t2/2
         z_s3 = self.t3/2
 
-        i_1 = self.n[0] * self.bw * self.h ** 3 / 12
-        as_1 = self.n[0] * self.bw * self.h * abs(self.z_s - z_s1) ** 2
-        i_2 = self.n[1] * self.bt_ef * self.t2 ** 3 / 12
-        as_2 = self.n[1] * self.bt_ef * self.t2 * abs(self.z_s - z_s2) ** 2
-        i_3 = self.n[2] * self.bc_ef * self.t3 ** 3 / 12
-        as_3 = self.n[2] * self.bc_ef * self.t3 * abs(self.z_s - z_s3) ** 2
+        i_1 = self.n[0] * self.bw * self.h ** 3 / 12                           #Iys(QS1)
+        as_1 = self.n[0] * self.bw * self.h * abs(self.z_s - z_s1) ** 2        #Steiner Anteil (QS1)
+        i_2 = self.n[1] * self.bt_ef * self.t2 ** 3 / 12                       #Iys(QS2)
+        as_2 = self.n[1] * self.bt_ef * self.t2 * abs(self.z_s - z_s2) ** 2    #Steiner Anteil (QS2)
+        i_3 = self.n[2] * self.bc_ef * self.t3 ** 3 / 12                       #Iys(QS3)
+        as_3 = self.n[2] * self.bc_ef * self.t3 * abs(self.z_s - z_s3) ** 2    #Steiner Anteil (QS3)
         iy = i_1 + as_1 + i_2 + as_2 + i_3 + as_3
         i_1_inf = self.n_inf[0] * self.bw * self.h ** 3 / 12
-        as_1_inf = self.n_inf[0] * self.bw * self.h * abs(self.z_s - z_s1) ** 2
+        as_1_inf = self.n_inf[0] * self.bw * self.h * abs(self.z_s_inf - z_s1) ** 2
         i_2_inf = self.n_inf[1] * self.bt_ef * self.t2 ** 3 / 12
-        as_2_inf = self.n_inf[1] * self.bt_ef * self.t2 * abs(self.z_s - z_s2) ** 2
+        as_2_inf = self.n_inf[1] * self.bt_ef * self.t2 * abs(self.z_s_inf - z_s2) ** 2
         i_3_inf = self.n_inf[2] * self.bc_ef * self.t3 ** 3 / 12
-        as_3_inf = self.n_inf[2] * self.bc_ef * self.t3 * abs(self.z_s - z_s3) ** 2
+        as_3_inf = self.n_inf[2] * self.bc_ef * self.t3 * abs(self.z_s_inf - z_s3) ** 2
         iy_inf = i_1_inf + as_1_inf + i_2_inf + as_2_inf + i_3_inf + as_3_inf
         return iy, iy_inf
 
@@ -1146,9 +1191,14 @@ class RibWood(SupStrucRibWood):
     def __init__(self, wood_type_1, wood_type_2, wood_type_3, l0, bw, h, b, t2, t3, phi_1=0.6, phi_2=0.6, phi_3=0.6,
                  xi=0.03, ei_b=0.0):  # create a rectangular timber object
         section_type = "wd_rib"
-        self.wood_type_1 = wood_type_1
-        self.wood_type_2 = wood_type_2
-        self.wood_type_3 = wood_type_3
+        self.wood_type_1 = wood_type_1 #Steg mit Mech_Prop aus Datenbank
+
+        self.wood_type_2 = wood_type_2  # Beplankung unten (unter Zug), t2 = 0.027 (wird nicht varriert)
+        self.dsp_2 = self.dsp_props_tension()  # DSP-Bemessungswerte aus HBT (ersetzen Werte aus mech_prop Datenbank)
+
+        self.wood_type_3 = wood_type_3  # Beplankung oben (unter Druck), t3 = [0.027, 0.04] -> jeweils beide Optionen werden gerechnet für Optimierung
+        self.dsp_3 = self.dsp_props_compression(t3)  # DSP-Bemessungswerte aus HBT(ersetzen Werte aus mech_prop Datenbank)
+
 
         self.phi_1 = phi_1
         self.phi_2 = phi_2
@@ -1160,12 +1210,13 @@ class RibWood(SupStrucRibWood):
         n, n_inf = self.calc_n()
         super().__init__(section_type, bw, h, b, t2, t3, n, n_inf)
 
-        mu1_rand_u, mu1_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = self.calc_mu()
-        print(f"mu1_rand_u, muq_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = {mu1_rand_u/1000:.2f}, {mu1_rand_o/1000:.2f}, {mu2_rand_u/1000:.2f}, {mu2_rand_o/1000:.2f}, {mu3_rand_u/1000:.2f}, {mu3_rand_o/1000:.2f}")
-        mu_el = max(mu1_rand_u, mu1_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o)
-        self.mu_max, self.mu_min = [mu_el, -mu_el]
+        self.mu1_rand_u, self.mu1_rand_o, self.mu2_rand_u, self.mu2_rand_o, self.mu3_rand_u, self.mu3_rand_o = self.calc_mu()
+        #print(f"mu1_rand_u, muq_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = {mu1_rand_u/1000:.2f}, {mu1_rand_o/1000:.2f}, {mu2_rand_u/1000:.2f}, {mu2_rand_o/1000:.2f}, {mu3_rand_u/1000:.2f}, {mu3_rand_o/1000:.2f}")
+        mu_el = min(self.mu1_rand_u, self.mu1_rand_o, self.mu2_rand_u, self.mu2_rand_o, self.mu3_rand_u, self.mu3_rand_o)
+        self.mu_max, self.mu_min = [mu_el, 0]
         vu_el = self.calc_vu()
         self.vu_p, self.vu_n = vu_el, vu_el
+        self.vu_1_mitte, self.vu_2_fuge, self.vu_3_fuge = self.calc_vu_detail()
 
         self.qs_class_n, self.qs_class_p = [3, 3]  # Required cross-section class: 1:=PP, 2:EP, 3:EE
         self.g0k = self.calc_weight(wood_type_1.weight) # Eigenlast QS pro Laufmeter [N/m]
@@ -1173,29 +1224,44 @@ class RibWood(SupStrucRibWood):
         self.ei1 = self.wood_type_1.Emmean * self.iy  # elastic stiffness [Nm^2], Zeitpunkt t = 0
 
         self.co2 = (self.bw * self.h * self.wood_type_1.GWP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.GWP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.GWP * self.wood_type_3.density # [kg_CO2_eq/m2]
+
+        self.ubp = (self.bw * self.h * self.wood_type_1.UBP * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.UBP * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.UBP * self.wood_type_3.density  # [UBP/m2]
+        self.graue_energie = (self.bw * self.h * self.wood_type_1.graue_energie * self.wood_type_1.density) / self.b + 1 * self.t2 * self.wood_type_2.graue_energie * self.wood_type_2.density + 1 * self.t3 * self.wood_type_3.graue_energie * self.wood_type_3.density  # [kWh oil-eq/m2]
+        
         self.cost = self.bw * self.h / self.b * self.wood_type_1.cost + 1 * self.t2 * self.wood_type_2.cost + 1 * self.t3  * self.wood_type_3.cost #[CHF/m2]
         self.ei_b = ei_b  # stiffness perpendicular to direction of span
         self.xi = xi  # damping factor, preset value for builddup with "Schwimmendem Estrich" see: HBT, Page 47
 
+    @staticmethod
+    def dsp_props_tension():
+        # DSP-Festigkeitswerte für Beplankung unten (Zuggurt) gemäss HBT, für t > 20 bis 30 mm
+        return dict(Emmean=8200000000,  # Plattenbeanspruchung parallel: Em,0,mean = 8200 N/mm2
+                    fvd=1000000,  # Schubfestigkeit DSP mit fvd = 1.0 N/mm2
+                    fmd=5500000)  # Scheibenbeanspruchung parallel: ft0d = 5.5 N/mm2 (Beplankung unter Zug)
+
+    @staticmethod
+    def dsp_props_compression(t3):
+        # DSP-Festigkeitswerte für Beplankung oben (Druckgurt) gemäss HBT, abhängig von Plattendicke t3
+        if 0.03 < t3 <= 0.042: #Wert aus HBT für t > 30 bis 42mm
+            return dict(Emmean=7600000000,  # Plattenbeanspruchung parallel: Em,0,mean = 7600 N/mm2 (Beplankung unter Druck)
+                        fvd=750000,  # Rollschubfestigkeit DSP mit fr0d = 0.75 N/mm2
+                        fmd=6200000)  # Scheibenbeanspruchung parallel: fc0d = 6.2 N/mm2 (Beplankung unter Druck)
+        else: #Wert aus HBT für t >20 bis 30mm
+            return dict(Emmean=8200000000,  #Plattenbeanspruchung parallel: Em,0,mean = 8200 N/mm2 (Beplankung unter Druck)
+                        fvd=1000000,  # Rollschubfestigkeit DSP mit fr0d = 1.0 N/mm2 (aus HBT für DSP mit t >20 bis 30 mm)
+                        fmd=9800000)  # Scheibenbeanspruchung parallel: fc0d = 9.8 N/mm2 (Beplankung unter Druck
+
     def calc_n(self):
-        ft0d = 8.5 #C24
-        fc0d = 12.4 #C24
-        E0mean = 11000 #C24 #fpr mehrlagige Massivholzplatte wir auf mech_prop von "C24" verwiesen
-
         #Die Beplankung wird durch Biegedruck bzw. Biegezug parallel zur Faserrichtung der Decklagen beanpsrucht.
-        #Deshalb wird der mittlere E-Modul für Zug- und Druckbeanspruchung der mehrlagigen Massivholzplatte SWP/2 nach Herstellerangaben eingesetzt.
-        #Vorgehen gemäss Lignum (2022), HBT - Bemessungsbeispiele zur Norm SIA265 (Besp. 4.1, Bemessung Hohlkastenträger)
-        factor = 2/3 #Dreischichtplatte 9/9/9 oder 10/10/10, ACHTUNG: Faserrichtung Decklage parallel zu Stegrichtung!
-
         n1 = self.wood_type_1.Emmean / self.wood_type_1.Emmean          # Wertigkeit Rippe
-        n2 = self.wood_type_2.Emmean*factor / self.wood_type_1.Emmean  # Wertigkeit Beplankung unten
-        n3 = self.wood_type_3.Emmean*factor / self.wood_type_1.Emmean  # Wertigkeit Beplankung oben
+        n2 = self.dsp_2['Emmean'] / self.wood_type_1.Emmean  # Wertigkeit Beplankung unten
+        n3 = self.dsp_3['Emmean'] / self.wood_type_1.Emmean  # Wertigkeit Beplankung oben
         n = [n1, n2, n3]
         n1_inf = (self.wood_type_1.Emmean / (1 + self.phi_1)) / (
                 self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Rippe t=inf
-        n2_inf = (self.wood_type_2.Emmean*factor / (1 + self.phi_2)) / (
+        n2_inf = (self.dsp_2['Emmean'] / (1 + self.phi_2)) / (
                 self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Beplankung unten t=inf
-        n3_inf = (self.wood_type_3.Emmean*factor / (1 + self.phi_3)) / (
+        n3_inf = (self.dsp_3['Emmean'] / (1 + self.phi_3)) / (
                 self.wood_type_1.Emmean / (1 + self.phi_1))  # Wertigkeit Beplankung oben t=inf
         n_inf = [n1_inf, n2_inf, n3_inf]
         return n, n_inf
@@ -1204,27 +1270,26 @@ class RibWood(SupStrucRibWood):
         #Nachweise nach SIA 5.3.5 Tafelelemente (Biegeelemente)-----#TODO PRÜFEN
 
         fy1 = self.wood_type_1.fmd
-        #print("fy1= ", fy1)
-        fy2 = 8600000  #self.wood_type_2.fcd      #Festigkeiten für 3S Platten reduzieren
-        fy3 = 5900000  #self.wood_type_3.ftd      #Festigkeiten für 3S Platten reduzieren
+        fy2 = self.dsp_2['fmd']
+        fy3 = self.dsp_3['fmd']
 
-        #Biegewiderstand Steg (Rand oben und unten)
+        #Biegewiderstand Steg (1) (Rand oben und unten)
         mu1_rand_o = min(self.mu_unsigned(fy1, self.iy, (self.z_s - self.t3), self.n[0]),  # z = zs -t3
-                       self.mu_unsigned(fy1, self.iy_inf, (self.z_s - self.t3), self.n_inf[0]))
+                       self.mu_unsigned(fy1, self.iy_inf, (self.z_s_inf - self.t3), self.n_inf[0]))
         mu1_rand_u = min(self.mu_unsigned(fy1, self.iy, (self.h + self.t3 - self.z_s), self.n[0]),  # z = h + t3 -zs
-                       self.mu_unsigned(fy1, self.iy_inf,(self.h + self.t3 - self.z_s), self.n_inf[0]))
+                       self.mu_unsigned(fy1, self.iy_inf,(self.h + self.t3 - self.z_s_inf), self.n_inf[0]))
 
-        # Biegewidersatnd Flanch unten (Rand oben und unten)
+        # Biegewidersatnd Flanch unten (2) (Rand oben und unten)
         mu2_rand_o = min(self.mu_unsigned(fy2, self.iy, (self.t3 + self.h - self.z_s ), self.n[1]),  # z = t3 + h - zs
-                         self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h - self.z_s ), self.n_inf[1]))
+                         self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h - self.z_s_inf ), self.n_inf[1]))
         mu2_rand_u = min(self.mu_unsigned(fy2, self.iy, (self.t3 + self.h + self.t2- self.z_s ), self.n[1]),  # z = t3 + h + t2 - zs
-                         self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h + self.t2- self.z_s ), self.n_inf[1]))
+                         self.mu_unsigned(fy2, self.iy_inf, (self.t3 + self.h + self.t2- self.z_s_inf ), self.n_inf[1]))
 
-        # Biegewiderstand Flanch oben (Rand oben und unten)
+        # Biegewiderstand Flanch oben (3) (Rand oben und unten)
         mu3_rand_o = min(self.mu_unsigned(fy3, self.iy, self.z_s, self.n[2]),  # z = zs
-                         self.mu_unsigned(fy3, self.iy_inf, self.z_s, self.n_inf[2]))
+                         self.mu_unsigned(fy3, self.iy_inf, self.z_s_inf, self.n_inf[2]))
         mu3_rand_u = min(self.mu_unsigned(fy3, self.iy, (self.z_s - self.t3), self.n[2]),  # z = zs -t3
-                         self.mu_unsigned(fy3, self.iy_inf, (self.z_s - self.t3), self.n_inf[2]))
+                         self.mu_unsigned(fy3, self.iy_inf, (self.z_s_inf - self.t3), self.n_inf[2]))
         return mu1_rand_u, mu1_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o
 
     @staticmethod
@@ -1232,30 +1297,27 @@ class RibWood(SupStrucRibWood):
         mu = fy * iy / z / n
         return mu
 
-    def calc_vu(self): #Querkraftwiderstand
+    def calc_vu(self): #Querkraftwiderstand vereinfacht nur mit Widerstand Steg
         #Steg
         ty1 = self.wood_type_1.fvd
         vu_1 = ty1 * self.bw * self.h / 1.5  #Widerstand Steg (nur Rippe angesetzt)
         return vu_1
 
-    # FEHLT: Rollschubnachweis!!
-
-    def calc_vu_detail(self): #Querkraftwiderstand im Detail #TODO: check if calc correct and values for fvd in material_prop
-        # Statisches Moment in Stegmitte
-        Sy1 = self.n[0] * (self.z_s - self.t3 - self.h/2) * self.h / 2 * self.bw + self.n[2] * (self.z_s - self.t3 / 2) * self.t3 * self.bc_ef
-        # Statisches Moment für den Schnitt Steg-Beplankung oben
+    def calc_vu_detail(self): #Querkraftwiderstand im Detail inkl. Schubnachweis in Fuge
+        # Statisches Moment in Fuge Steg-Beplankung oben (3)
         Sy3 = self.n[2] * (self.z_s - self.t3 / 2) * self.t3 * self.bc_ef
-        # Statisches Moment für den Schnitt Steg-Beplankung unten
-        Sy2 = self.n[2] * (self.z_s - self.t3 / 2) * self.t3 * self.bc_ef + self.n[0] * (self.t3 + self.h - self.z_s) * self.h * self.bw
+        # Statisches Moment in der Schwerachse (zs), HBT: tmax
+        Sy1 = Sy3 + self.n[0] * (self.z_s - self.t3)**2 / 2 * self.bw
+        # Statisches Moment  in Fuge Steg-Beplankung unten (2)
+        Sy2 = self.n[1] * (self.t3 + self.h + self.t2/2 - self.z_s) * self.t2 * self.bt_ef
 
         ty1 = self.wood_type_1.fvd
-        vu_1_mitte = ty1 * self.bw * self.iy / Sy1  #Widerstand in Stegmitte
+        vu_1_mitte = ty1 * self.bw * self.iy / Sy1  #Widerstand in der Schwerachse
+        ty2 = self.dsp_2['fvd']
+        vu_2_fuge = ty2 * self.bw * self.iy / Sy2  # Widerstand in Beplankung unten (2) bei der Fuge Steg-Beplankung
 
-        ty2 = self.wood_type_2.fvd
-        vu_2_fuge = ty2 * self.bw * self.iy / Sy2  # Widerstand in Beplankung unten bei der Fuge Steg-Beplankung
-
-        ty3 = self.wood_type_3.fvd
-        vu_3_fuge = ty3 * self.bw * self.iy / Sy3  #Widerstand in Beplankung oben bei der Fuge Steg-Beplankung
+        ty3 = self.dsp_3['fvd']
+        vu_3_fuge = ty3 * self.bw * self.iy / Sy3  #Widerstand in Beplankung oben (3) bei der Fuge Steg-Beplankung
 
         return vu_1_mitte, vu_2_fuge, vu_3_fuge
 
@@ -1458,7 +1520,8 @@ class Member1D:
         self.g0k_b  = self.section.g0k_b #[kN/m2]
         self.g1k = self.floorstruc.gk_area #[kN/m2]
         self.g2k = g2k #[kN/m2]
-        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m'] #TODO für Wood_rib prüfen, obn self.section.b nicht falsch (weil Stegbreite anstatt rippenabstand)
+        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m']
+        self.qk_area = qk #[kN/m2] Nutzlast pro Flächeneineheit (Eingabewert)
         self.qk = qk * self.section.b #[kN/m']
         self.psi = [psi0, psi1, psi2]
         self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m']
