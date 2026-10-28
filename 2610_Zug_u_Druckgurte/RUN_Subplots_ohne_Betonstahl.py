@@ -3,7 +3,8 @@ Zug- und Druckgurte aller Materialien – Darstellung wie Vorlage:
   a) Zuggurt   b) Druckgurt   (getrennte Subplots)   c) Querschnitte
 
 Variante OHNE Betonstahl (nackt): wie RUN_Subplots.py, Materialien in EXCLUDE werden weggelassen.
-Berechnung, Materialien und CO2-Werte stammen aus RUN.py (Median + 10%/90%-Fraktile).
+Berechnung, Materialien und CO2-Werte stammen aus RUN.py (Median + 10%/90%-Fraktile),
+CO2-Werte inkl. mittlere Transportdistanz (RUN.e_tr).
 Beim Druckgurt sind Verkürzung u und Druckkraft N positiv aufgetragen.
 """
 
@@ -21,6 +22,14 @@ HERE = Path(__file__).resolve().parent
 
 EXCLUDE = ("s",)        # nicht dargestellte Materialien (s = Betonstahl nackt)
 
+# Bewehrungsgehalt Stahlbeton-Zuggurt nur in diesem Script (RUN.py: RHO_T = 10 %)
+RHO_T = 0.08
+base.RHO_T = RHO_T                      # wirkt auf N_rc_tc und die Querschnitte (c)
+for _m in base.MATERIALS:
+    if _m["key"] == "rc":
+        _m["name_t"] = f"Stahlbeton\nC30/37, $\\rho_s$={RHO_T:.0%}"
+        _m["name"] = f"Stahlbeton C30/37\n$\\rho_s$={RHO_T:.0%} (Zug), {base.RHO_C:.1%} (Druck)"
+
 # 'Beton' als eigenes Wort -> 'Stahlbeton' (nicht in 'Betonstahl' oder 'Stahlbeton')
 _BETON = re.compile(r"(?<![A-Za-zÄÖÜäöü])Beton(?![a-zäöü])")
 
@@ -31,17 +40,17 @@ def stahlbeton(text):
 
 # Beschriftungen je Subplot: key -> (u auf Medianlinie [mm], Textposition (u, N) [mm, MN], Krümmung)
 NOTES_TENSION = {
-    "t24": (0.6, (0.45, 20.5), 0.25),
-    "t":   (0.9, (1.45, 22.0), 0.2),
-    "a":   (2.8, (2.45, 18.0), -0.2),
+    "t24": (0.45, (0.4, 10.5), 0.25),
+    "t":   (0.85, (1.15, 12.0), 0.2),
+    "a":   (2.8, (2.45, 11.0), -0.2),
     "s":   (3.3, (3.55, 18.0), 0.2),
     "rc":  (3.6, (3.45, 1.4), -0.2),
     "pc":  (2.3, (1.85, 1.75), 0.2),
 }
 NOTES_COMPRESSION = {
-    "t24": (0.9, (0.5, 24.0), -0.2),
-    "t":   (1.25, (1.8, 23.5), 0.15),
-    "rc":  (2.8, (2.15, 20.3), 0.1),
+    "t24": (0.95, (0.4, 13.5), -0.2),
+    "t":   (1.25, (1.1, 16.3), 0.15),
+    "rc":  (2.8, (2.1, 17.3), 0.1),
     "cc":  (3.0, (3.45, 17.6), 0.2),
     "s":   (2.9, (2.95, 1.4), -0.15),
     "a":   (1.8, (2.0, 1.4), 0.15),
@@ -99,7 +108,13 @@ def _panel(ax, sign, notes, uu, u_max):
         base._end_arrows(ax, ends, u_max, +1, min_gap=1.2)
 
 
-def plot(u_max=4, n=2001, y_max=27.5, fname="last_verformung_subplots_ohne_betonstahl.png"):
+def plot(*args, values=None, **kw):
+    """Plot mit CO2-Werten inkl. Transport (RUN.e_tr); andere Werte über `values`."""
+    with base.emissions(base.e_tr if values is None else values):
+        return _plot(*args, **kw)
+
+
+def _plot(u_max=4, n=2001, y_max=20.0, fname="last_verformung_subplots_ohne_betonstahl.png"):
     uu = np.linspace(0, u_max, n) * mm
 
     fig = plt.figure(figsize=(18, 14))
@@ -114,10 +129,21 @@ def plot(u_max=4, n=2001, y_max=27.5, fname="last_verformung_subplots_ohne_beton
     _style_axis(axt, u_max, y_max, "$N_{Rd}$ [MN]", "Zuggurt")
     _style_axis(axd, u_max, y_max, "$N_{Rd}^{-}$ [MN]", "Druckgurt")
 
-    handles = [Line2D([], [], color="k", lw=2.8, label="Median $e$"),
-               Line2D([], [], color="k", lw=1.1, ls=(0, (3, 2)), label="10%- / 90%-Fraktil $e$")]
-    axt.legend(handles=handles, loc="upper right", bbox_to_anchor=(1.0, 0.93), frameon=False,
-               fontsize=12.5, title="Budget: 100 kgCO$_2$ pro m Gurtlänge", title_fontsize=12.5)
+    handles = [Line2D([], [], color="k", lw=2.8, label="Median"),
+               Line2D([], [], color="k", lw=1.1, ls=(0, (3, 2)), label="10%- / 90%-Fraktil")]
+    leg = axt.legend(handles=handles, loc="upper right", bbox_to_anchor=(1.07, 0.92),
+                     frameon=True, fancybox=False, fontsize=12.5, title_fontsize=12.5,
+                     title="Budget: 100 kgCO$_2$ pro Gurtlänge\n"
+                           "inkl. mittlere Transportdistanz, gerechnet nach KBOB [5]",
+                     borderpad=0.7, handlelength=2.6)
+    leg._legend_box.align = "left"
+    frame = leg.get_frame()
+    frame.set_linestyle((0, (1, 2)))    # punktiert
+    frame.set_edgecolor("k")
+    frame.set_linewidth(1.2)
+    frame.set_facecolor("white")
+    frame.set_alpha(1.0)
+    leg.set_zorder(10)
 
     # Querschnitte aus RUN.py, Bezeichnungen 'Beton' -> 'Stahlbeton'
     _sections(axc)
