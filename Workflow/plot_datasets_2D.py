@@ -1,5 +1,7 @@
 import struct_analysis  # file with code for structural analysis
+import struct_optimization  # verifications of the optimized members
 import struct_optimization_2D  # file with code for structural optimization
+import opt_and_plot  # shared product selection and mean materials
 import sqlite3  # import modul for SQLite
 import random
 import numpy as np
@@ -24,38 +26,16 @@ def source_filter(basetype):
     raise ValueError(f"basetype must be 'epd' or 'kbob', got {basetype}")
 
 
-# copy of get_low_high_prod_ids from opt_and_plot.py (comments there)
-def get_low_high_prod_ids(cursor, material, mech_prop, basetype):
-    # returns unique prod_id strings of the products with lowest and highest GWP of a material
-    # (only one entry if min == max, e.g. a single KBOB product)
-    mech_cond = "MECH_PROP = ?" if mech_prop is not None else "MECH_PROP IS NOT NULL"
-    # ORDER BY GWP: first row = lowest, last row = highest (old: no ORDER BY -> low/high swapped, ties gave >2 rows)
-    inquiry = ("""
-            SELECT PRO_ID FROM products
-            WHERE "MATERIAL" LIKE ?
-              AND DENSITY IS NOT NULL
-              AND """ + mech_cond + source_filter(basetype) + """
-            ORDER BY CAST(Total_GWP AS REAL), PRO_ID
-            """
-    )
-    params = [material] if mech_prop is None else [material, mech_prop]
-    cursor.execute(inquiry, params)
-    result = [row[0] for row in cursor.fetchall()]
-    if not result:  # clear message (old: IndexError)
-        raise ValueError(f"no product found for material {material}, mech_prop {mech_prop}, basetype {basetype}")
-    prod_ids = []
-    for prod_id in (result[0], result[-1]):  # lowest and highest GWP
-        prod_id_str = "'" + str(prod_id) + "'"
-        if prod_id_str not in prod_ids:  # skip the duplicate if min == max (old: KBOB computed twice)
-            prod_ids.append(prod_id_str)
-    prod_ids.sort(key=lambda x: int(x.strip("'")))  # PRO_ID order, same section order as the old query
-    return prod_ids
-
-
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(length_x,length_y, support, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
-                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, basetype="epd"):
+                 g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, basetype="epd", alg="basinhoppin", results=None,
+                 file_tag="", mean_gwp=False, min_max_only=True):
+    # alg: "basinhoppin" or "TPE" (see struct_optimization_2D)
+    # results: optional list; one dict per optimized member (incl. infeasible spans with member=None) is appended
+    # file_tag: optional suffix of the Excel file name (avoids overwriting when runs share the same name)
+    # mean_gwp: True -> additional "mean sections" (EPD only), see opt_and_plot.get_mean_materials
+    # min_max_only: True -> only products with MIN_MAX = 1; False -> all products, same selection as 1D
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(length_x)-1)
@@ -66,25 +46,27 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     to_plot = []
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
-    # search rebar B500B with lowest and highest emissions once (old: once per concrete)
-    if crsec_type == "rc_rec":
-        rebar_prod_ids = get_low_high_prod_ids(cursor, 'Steel_reinforcing_bar', 'B500B', basetype)
+    selection = """
+                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
+                AND MECH_PROP NOT LIKE '%GL30%'
+                AND  MIN_MAX = 1""" if min_max_only else ""
     for mat_name in mat_names:
         inquiry = ("""
                 SELECT PRO_ID FROM products
                 WHERE DENSITY IS NOT NULL
-                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
-                AND MECH_PROP IS NOT NULL
-                AND MECH_PROP NOT LIKE '%GL30%'
-                AND  MIN_MAX = 1
+                AND MECH_PROP IS NOT NULL""" + selection + """
                 AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
         )
         # inquiry = ("SELECT PRO_ID FROM products WHERE"
         #            " material=" + mat_name)
         cursor.execute(inquiry)
-        result = cursor.fetchall()
-        for i, prod_id in enumerate(result):
-            prod_id_str = "'" + str(prod_id[0]) + "'"
+        products = [("'" + str(row[0]) + "'", None) for row in cursor.fetchall()]  # (prod_id string, mean material or None)
+        # mean sections: one per strength class of this material
+        if mean_gwp and basetype == "epd":
+            products += [(mean["prod_id"], mean)
+                         for mean in opt_and_plot.get_mean_materials(cursor, mat_name.strip("'"), None, basetype)]
+        for prod_id_str, mean in products:
+            is_mean = mean is not None
             inquiry = ("""
                                 SELECT MECH_PROP FROM products
                                 WHERE  PRO_ID LIKE """ + prod_id_str
@@ -93,13 +75,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
             #            " PRO_ID=" + prod_id_str)
             cursor.execute(inquiry)
             result = cursor.fetchall()
-            mech_prop = "'" + result[0][0] + "'"
-            if mech_prop in ["'GL24'", "'GL24h/c'"]:
-                mech_prop = "'GL24h'"
-            if mech_prop in ["'GL28h/c'", "'GL28'"]:
-                mech_prop = "'GL28h'"
-            if mech_prop in ["'GL32h/c'", "'GL32'"]:
-                mech_prop = "'GL32h'"
+            mech_prop = f"'{opt_and_plot.strip_and_complete_mech_prop(result[0][0])}'"
 
             if crsec_type == "wd_rec":
                 # create a Wood material object
@@ -108,24 +84,28 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 # create initial wooden rectangular cross-section
                 section_0 = struct_analysis.RectangularWood(timber, 1.0, 0.1, xi=0.02)
                 # add section to content-definition of plot-line
-                line_i = [section_0, floorstruc]
+                line_i = [section_0, floorstruc, is_mean]
                 to_plot.append(line_i)
 
             elif crsec_type == "rc_rec":
                 # create a Concrete material object
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
+                opt_and_plot.apply_mean_material(concrete, mean)
                 # one section per unique rebar (lowest / highest GWP), no duplicate if only one exists
+                # (mean section: the mean rebar)
                 # To see the old version, run git show 36ba32b:Workflow/plot_datasets_2D.py (around lines 72–122).
-                for rebar_prod_id in rebar_prod_ids:
+                for rebar_prod_id, rebar_mean in opt_and_plot.get_secondary_products(
+                        cursor, 'Steel_reinforcing_bar', 'B500B', basetype, is_mean):
                     # create a rebar material object with mech prop B500B and low rsp high emission values
                     rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
+                    opt_and_plot.apply_mean_material(rebar, rebar_mean)
                     # create initial cross-section
                     section_0 = struct_analysis.FlatSlab2D(concrete, rebar, 1.0, 0.20,
                                                            0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                            0, 0.15, 0,2.0,0.02,0.0, 0.15)
                     # add section to content-definition of plot-line
-                    to_plot.append([section_0, floorstruc])
+                    to_plot.append([section_0, floorstruc, is_mean])
 
             elif crsec_type == "rc_rib":
                 # create a Concrete material object
@@ -173,8 +153,8 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                                                             0.15,
                                                             0.01, 0.15, 0.018, 3, 0.01, 0.15, 2)
                 # add sections to content-definition of plot-line
-                line_i0 = [section_00, floorstruc]
-                line_i1 = [section_01, floorstruc]
+                line_i0 = [section_00, floorstruc, is_mean]
+                line_i1 = [section_01, floorstruc, is_mean]
                 to_plot.extend([line_i0, line_i1])
 
 
@@ -191,9 +171,22 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 for j, (lx, ly) in enumerate(zip(length_x, length_y)):
                     sys = struct_analysis.Slab(lx, ly, sup)
                     member0 = struct_analysis.Member2D(i[0], sys, i[1], requirements, g2k, qk)
-                    opt_section = struct_optimization_2D.get_optimized_section(member0, criterion, optimum, max_iter)
-                    opt_member = struct_analysis.Member2D(opt_section, sys, i[1], requirements, g2k, qk)
-                    members.append(opt_member)
+                    opt_section = struct_optimization_2D.get_optimized_section(member0, criterion, optimum, max_iter,
+                                                                               alg=alg)
+                    # Handle infeasible solutions: stays None so that members[j] still belongs to span j
+                    if opt_section is None:
+                        print(f"Warning: no feasible {crsec_type} section for span {lx} x {ly} m -> no section in output")
+                        opt_member = None
+                        failed = ["no section"]
+                    else:
+                        opt_member = struct_analysis.Member2D(opt_section, sys, i[1], requirements, g2k, qk)
+                        failed = struct_optimization.failed_checks(opt_member)
+                    # section that fails a verification: only in results (feasible = False), not in plots / Members_*.xlsx
+                    members.append(None if failed else opt_member)
+                    if results is not None:
+                        results.append({"member": opt_member, "section_0": i[0], "length": lx, "criterion": criterion,
+                                        "optimum": optimum, "dataset": len(member_list), "mean_section": i[2],
+                                        "failed_checks": failed})
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
                     material_lg = i[0].concrete_type.mech_prop + " + " + i[0].rebar_type.mech_prop
@@ -206,28 +199,20 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 legend.append([i[0].section_type, material_lg, criterion, optimum])
 
     # CREATE DATA OF ENVELOPE AREA OF DATASET
-    # create data of envelope area for subplot 1: structural height
-    h = [[mem.section.h for mem in sublist] for sublist in member_list]
-    h_min = [min(values) for values in zip(*h)]
-    h_max = [max(values) for values in zip(*h)]
-
-    # create data of envelope area for subplot 2: total height
-    h_tot = [[mem.section.h+mem.floorstruc.h_Floor for mem in sublist] for sublist in member_list]
-    h_tot_min = [min(values) for values in zip(*h_tot)]
-    h_tot_max = [max(values) for values in zip(*h_tot)]
-
-    # create data of envelope area data subplot 3: co2 of structure
-    co2 = [[mem.section.co2 for mem in sublist] for sublist in member_list]
-    co2_min = [min(values) for values in zip(*co2)]
-    co2_max = [max(values) for values in zip(*co2)]
-
-    # create data of envelope area for subplot 4: total co2
-    co2_tot = [[mem.section.co2+mem.floorstruc.co2_Floor for mem in sublist] for sublist in member_list]
-    co2_tot_min = [min(values) for values in zip(*co2_tot)]
-    co2_tot_max = [max(values) for values in zip(*co2_tot)]
-
-    values_min = [h_min, h_tot_min, co2_min, co2_tot_min]
-    values_max = [h_max, h_tot_max, co2_max, co2_tot_max]
+    # Envelopes per span over the feasible members only; spans without any feasible member are left out (as in 1D)
+    # subplot 1: structural height, subplot 2: total height, subplot 3: co2 of structure, subplot 4: total co2
+    members_per_length = [[mem for mem in col if mem is not None] for col in zip(*member_list)]
+    idx_feasible = [j for j, mems in enumerate(members_per_length) if mems]
+    lengths_filtered = [length_x[j] for j in idx_feasible]
+    value_getters = [lambda mem: mem.section.h,
+                     lambda mem: mem.section.h + mem.floorstruc.h_Floor,
+                     lambda mem: mem.section.co2,
+                     lambda mem: mem.section.co2 + mem.floorstruc.co2_Floor]
+    values_min, values_max = [], []
+    for get_value in value_getters:
+        per_length = [[get_value(mem) for mem in members_per_length[j]] for j in idx_feasible]
+        values_min.append([min(values) for values in per_length])
+        values_max.append([max(values) for values in per_length])
 
     # PLOT DATASET TO FIGURE
     plt.figure(1)
@@ -235,7 +220,11 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     vrfctn_members = [[], []]
     for i, members in enumerate(member_list):
         plotdata = [[], [], [], []]
+        x_data = []  # spans of this dataset with a feasible member
         for j, mem in enumerate(members):
+            if mem is None:  # no feasible section for span j
+                continue
+            x_data.append(length_x[j])
             plotdata[0].append(mem.section.h)
             plotdata[1].append(mem.section.h + mem.floorstruc.h_Floor)
             plotdata[2].append(mem.section.co2)
@@ -282,17 +271,19 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
         # plot data
         for idx, data in enumerate(plotdata):
             plt.subplot(2, 2, idx + 1)
-            # prepare area
-            coords = list(zip(length_x, values_max[idx])) + list(zip(length_x[::-1], values_min[idx][::-1]))
-            # create a polygon from the coordinates
-            polygon = Polygon(coords)
-            # extract the x and y coordinates for plotting
-            x, y = polygon.exterior.xy
-            # plot area
-            plt.fill(x, y, alpha=0.05, facecolor=color)
+            # plot area (needs at least 2 feasible spans)
+            if len(lengths_filtered) >= 2:
+                # prepare area
+                coords = (list(zip(lengths_filtered, values_max[idx]))
+                          + list(zip(lengths_filtered[::-1], values_min[idx][::-1])))
+                # create a polygon from the coordinates
+                polygon = Polygon(coords)
+                # extract the x and y coordinates for plotting
+                x, y = polygon.exterior.xy
+                plt.fill(x, y, alpha=0.05, facecolor=color)
             # plot lines
-            plt.plot(length_x, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
-            data_max[idx] = max(data_max[idx], max(data))
+            plt.plot(x_data, data, color=color, linestyle=linestyle, linewidth=linewidth, label=label, alpha=0.2)
+            data_max[idx] = max([data_max[idx]] + data)
             # # plot points of verification into graph
             # ver_x, ver_y = lengths[idx_vrfctn], data[idx_vrfctn]
             # plt.plot(ver_x, ver_y, 'o', color='black', markersize=2)
@@ -306,13 +297,14 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
             member
             for pair in member_list
             for member in pair
+            if member is not None
     ]
     if crsec_type == "rc_rec" and sup == "LL-eingespannt":
-        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_eingespannt_{basetype}.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_eingespannt_{basetype}{file_tag}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "LL-frei":
-        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_frei_{basetype}.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_frei_{basetype}{file_tag}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "PL-eingespannt":
-        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_PL_eingespannt_{basetype}.xlsx", folder="Results")
+        class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_PL_eingespannt_{basetype}{file_tag}.xlsx", folder="Results")
     else:
         print("cross-section type is not defined inside function plot_dataset() for Excel-generation")
 
@@ -580,7 +572,7 @@ def plot_section_dataset(database_name, crsec_type, mat_names, ax, gwp_budget=50
                        " PRO_ID=" + prod_id_str)
             cursor.execute(inquiry)
             result = cursor.fetchall()
-            mech_prop = "'" + result[0][0] + "'"
+            mech_prop = f"'{opt_and_plot.strip_and_complete_mech_prop(result[0][0])}'"
             if crsec_type == "wd_rec":
                 # create a Wood material object
                 timber = struct_analysis.Wood(mech_prop, database_name, prod_id_str)

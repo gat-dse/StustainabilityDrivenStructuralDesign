@@ -29,8 +29,9 @@ Run scripts from inside `Workflow/`, because the databases are opened by relativ
      ```
    - Copy the new `database_261009.db` to `Workflow/`. The scripts only read the copy in `Workflow/`.
 3. **Choose an input script** in `Workflow/`:
-   - `261009_Template_Examples.py`: 1D members (simple beam / continuous / two span), concrete and timber. Recommended starting point. Copy it and switch datasets on or off in the `runs` list.
-   - `slab_2d_optimization.py`: 2D slabs (`rc_rec` only). Needs at least two slab sizes in `length_x` / `length_y`.
+   - `261030_Template_Examples_1D.py`: 1D members (simple beam / continuous / two span), concrete and timber. Recommended starting point. Copy it and switch datasets on or off in the `RUNS` list.
+   - `261030_Template_Examples_2D.py`: 2D square concrete slabs (`rc_rec` only), same structure as the 1D template.
+   - `slab_2d_optimization.py`: older 2D script (`rc_rec` only). Needs at least two slab sizes in `length_x` / `length_y`.
    - Older 1D scripts: `260513_simple_span_1d_Concrete.py`, `260730_Anwendung_Timber.py`, `PB_Einfeld.py`, `TestAlgorithm.py`.
 4. **Adjust the settings** at the top of the script:
    - `basetype = "epd"` (product EPDs) or `"kbob"` (generic KBOB v9.0 values).
@@ -39,7 +40,7 @@ Run scripts from inside `Workflow/`, because the databases are opened by relativ
 5. **Run the script** from inside `Workflow/`:
    ```bash
    cd Workflow
-   ../.venv/bin/python 261009_Template_Examples.py
+   ../.venv/bin/python 261030_Template_Examples_1D.py
    ```
 6. **Check the results:**
    - Plots open in a matplotlib window.

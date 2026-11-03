@@ -786,6 +786,22 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
 
 
 # inner function for optimizing reinforced concrete section
+def rib_b_w_required(c_nom, di_x_w, n_x_w, di_pb_bw, n_lagen):
+    # required rib width for the current longitudinal bars (di_x_w, n_x_w) and stirrups (di_pb_bw)
+    b_w_min_c = (2 * c_nom +  # 2 * Überdeckung
+                         0.032 * (n_x_w - 1) +  # (n-1) * Grösstkorn zwischen Längsstäben
+                         2 * di_pb_bw +  # 2 * AKTUELLER Bügeldurchmesser
+                         di_x_w * n_x_w  # n * AKTUELLER Längsstabdurchmesser
+                         + 0.01)  # Reserve 10 mm
+    b_w_min_c2 = (2 * c_nom +  # 2 * Überdeckung
+                  0.032 * (math.ceil(
+                n_x_w / 2) - 1)  # (n/2-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
+                  + 2 * di_pb_bw  # 2 * Bügeldurchmesser
+                  + di_x_w * math.ceil(n_x_w / 2)  # n/2 * Durchmesser
+                  )
+    return max(0.15, b_w_min_c2 if n_lagen == 2 and n_x_w > 1 else b_w_min_c)
+
+
 def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
 
@@ -821,33 +837,12 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
     #TODO Penalty für bw hier integrieren
 
-    # --- NEU: DYNAMISCHE BERECHNUNG DER ERFORDERLICHEN RIPPENBREITE ---
-    # Nutzt die aktuell gewählten Durchmesser (di_x_w und di_pb_bw) dieser Iteration
-    b_w_min_c = (2 * c_nom +  # 2 * Überdeckung
-                         0.032 * (n_x_w - 1) +  # (n-1) * Grösstkorn zwischen Längsstäben
-                         2 * di_pb_bw +  # 2 * AKTUELLER Bügeldurchmesser
-                         di_x_w * n_x_w  # n * AKTUELLER Längsstabdurchmesser
-                         + 0.01)  # Reserve 10 mm
-    b_w_min_c2 = (2 * c_nom +  # 2 * Überdeckung
-                  0.032 * (math.ceil(
-                n_x_w / 2) - 1)  # (n/2-1) * Grösstkorn zwischen Bew.-Stäben in Längsrichtung
-                  + 2 * di_pb_bw  # 2 * Bügeldurchmesser
-                  + di_x_w * math.ceil(n_x_w / 2)  # n/2 * Durchmesser
-                  )
-
-    if n_lagen == 1:
-        b_w_min_c_aktuell = b_w_min_c
-    elif n_lagen == 2 and n_x_w == 1:
-        b_w_min_c_aktuell = b_w_min_c
+    if n_lagen == 2 and n_x_w == 1:
         n_lagen = 1
-    elif n_lagen == 2:
-        b_w_min_c_aktuell = b_w_min_c2
-
 
     #TODO Flanschbreiten check mit 2 Lagen hier einfügen
 
-    b_w_erforderlich = max(0.15, b_w_min_c_aktuell)
-
+    b_w_erforderlich = rib_b_w_required(c_nom, di_x_w, n_x_w, di_pb_bw, n_lagen)
 
     # Wenn b_w zu klein ist, wird ein Geometrie-Strafwert generiert
     penalty_bw = max(b_w_erforderlich - b_w, 0)
@@ -1108,7 +1103,6 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
 
 
 #NEU: Optimierung mit TPE
-
 # Handelsübliche Abmessungen (kategorial) für opt_wd_rib
 T_KANDIDATEN_WDRIB = [0.027, 0.04]  # Beplankungsstärken t2 (unten) / t3 (oben)
 T2_FIX_WDRIB = 0.027 #Stärke Beplankung unten t2 fix (keine Optimierungsvariable)
@@ -1290,6 +1284,58 @@ def wd_rib_rqs(var, add_arg):
         print("criterion " + criterion + " is not defined")
         print("criterion has to be 'ULS', 'SLS1', 'SLS2', 'FIRE' or 'ENV'")
     return to_minimize
+
+# ----------------------------------------------------------------------------------------------------------------------
+# VERIFICATIONS OF AN OPTIMIZED MEMBER
+# ----------------------------------------------------------------------------------------------------------------------
+def failed_checks(member):
+    # returns the names of all verifications the member does not fulfill ([] -> all fulfilled), whatever criterion it
+    # was optimized for. 1D and 2D. Same rules as the objective functions, so only the active verifications count:
+    # SLS2 only for wood (switched off for concrete), FIRE not for wd_rib (switched off in wd_rib_rqs)
+    section = member.section
+    section_type = section.section_type
+    failed = []
+
+    member.calc_qk_zul_gzt()
+    if member.qk > member.qk_zul_gzt:
+        failed.append("ULS")
+
+    # deflections: wood uncracked, rc_rib always cracked, rc_rec uncracked only if field and support are uncracked
+    if section_type == "rc_rec":
+        cracked = not (member.mkd_p < section.mr_p and abs(member.mkd_n) < abs(section.mr_n))
+    else:
+        cracked = section_type == "rc_rib"
+    if cracked:
+        d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
+                      member.w_app_ger - member.w_app_adm]
+    else:
+        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
+                      member.w_app - member.w_app_adm]
+    if max(d1, d2, d3) > 0:
+        failed.append("SLS1")
+
+    if section_type in ("wd_rec", "wd_rib"):
+        pen_a = member.a_ed - member.requirements.a_cd
+        pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1
+        pen_v = member.ve_ed - member.ve_cd
+        if member.f1 < member.requirements.f1:
+            pen_sls2 = max(pen_a, pen_w, pen_v)
+        else:
+            pen_sls2 = max(pen_w, pen_v)
+        if pen_sls2 > 0:
+            failed.append("SLS2")
+
+    if section_type != "wd_rib":
+        member.get_fire_resistance()
+        if member.requirements.t_fire > member.fire_resistance:
+            failed.append("FIRE")
+
+    if section_type == "rc_rib":
+        di_x_w, n_x_w, n_lagen = section.bw_r
+        if section.b_w < rib_b_w_required(section.c_nom, di_x_w, n_x_w, section.bw_bg_r[0], n_lagen):
+            failed.append("b_w")
+    return failed
+
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
