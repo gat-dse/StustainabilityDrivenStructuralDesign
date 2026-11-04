@@ -3,6 +3,7 @@ import struct_analysis
 from scipy.optimize import basinhopping, Bounds  # import Minimierungsfunktion aus dem SyiPy-Paket
 from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy-Paket
 import numpy as np
+import optuna
 
 class RandomDisplacementBounds(object):
     # random displacement with bounds for basinhopping optimization
@@ -21,13 +22,16 @@ class RandomDisplacementBounds(object):
 
         return xnew
 
+# available rebar diameters for TPE (same list as struct_optimization.opt_rc_rec)
+BEWEHRUNG_D = [0.006, 0.008, 0.010, 0.012, 0.014, 0.016, 0.018, 0.020, 0.022, 0.026, 0.030, 0.034, 0.040]
+
 # OPTIMIZATION OF CROSS-SECTIONS FOR DEFINED MEMBERS
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 #OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 #.......................................................................................................................
-def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
+def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16, alg="basinhoppin"):
     # definition of initial values for variables, which are going to be optimized
     h0 = m.section.h  # start value for height corresponds to 1/20 of system length
     di_xu0 = m.section.bw[0][0]  # start value for rebar diameter 40 mm
@@ -68,6 +72,9 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     co, st = m.section.concrete_type, m.section.rebar_type
     add_arg = [m.system, co, st, b, s_xu, s_xo, s_yu, s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk]
 
+    if alg == "TPE":
+        return opt_rc_rec_tpe(m, bounds, add_arg, to_opt, max_iter)
+
     # optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
     bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
     opt = basinhopping(rc_rqs2d, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
@@ -75,6 +82,45 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.16):
     h, di_xu, di_xo, di_yu, di_yo = opt.x
     optimized_section = struct_analysis.FlatSlab2D(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo, di_bw, s_bw, n_bw,
                                                             phi, c_nom, xi, jnt_srch)
+    return optimized_section
+
+# optimization with TPE algorithm (Optuna): h in steps of 1 cm, the 4 diameters from BEWEHRUNG_D, spacings stay fixed
+def opt_rc_rec_tpe(m, bounds, add_arg, to_opt, max_iter):
+    bh = bounds[0]
+    layers = ["di_xu", "di_xo", "di_yu", "di_yo"]
+    kandidaten = {name: [d for d in BEWEHRUNG_D if bnd[0] <= d <= bnd[1]] for name, bnd in zip(layers, bounds[1:])}
+    if not all(kandidaten.values()):  # no available diameter fulfills the minimum reinforcement
+        return None
+
+    def objective(trial):
+        h = trial.suggest_float("h", bh[0], bh[1], step=0.01)
+        var = [h] + [trial.suggest_categorical(name, kandidaten[name]) for name in layers]
+        try:
+            return rc_rqs2d(var, add_arg)
+        except Exception:
+            return 1e20
+
+    study = optuna.create_study(direction="minimize", sampler=optuna.samplers.TPESampler(seed=42))
+
+    # start point: h = L/25 (as 1D), diameters closest to the initial cross-section
+    n_steps = round((min(max(m.li_max / 25, bh[0]), bh[1]) - bh[0]) / 0.01)
+    start = {"h": bh[0] + n_steps * 0.01}
+    for name, layer in zip(layers, m.section.bw):
+        start[name] = min(kandidaten[name], key=lambda d: abs(d - layer[0]))
+    study.enqueue_trial(start)
+
+    study.optimize(objective, n_trials=max_iter)
+
+    h = study.best_params["h"]
+    var = [h] + [study.best_params[name] for name in layers]
+
+    if study.best_value >= 1e20:  # every candidate crashed
+        return None
+    co, st, b = add_arg[1:4]
+    s_xu, s_xo, s_yu, s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch = add_arg[4:15]
+    di_xu, di_xo, di_yu, di_yo = var[1:]
+    optimized_section = struct_analysis.FlatSlab2D(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo, s_yo,
+                                                   di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch)
     return optimized_section
 
 # inner function for optimizing reinforced concrete section for criteria ULS or SLS1 in terms of GWP or height
@@ -174,11 +220,12 @@ def rc_rqs2d(var, add_arg):
 
 #-----------------------------------------------------------------------------------------------------------------------
 # function for returning optimal section for defined QS-type, system, requirements, loads, criterion and type of optimum
-def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.16):
+def get_optimized_section(member, criterion, to_opt, max_iter, h_min=0.16, alg="basinhoppin"):
     if member.section.section_type == "rc_rec":
         # available to_opt arguments: "GWP", "h"
         # available criterion arguments: "ULS", "SLS1", "SLS2"
-        return opt_rc_rec(member, to_opt, criterion, max_iter, h_min)
+        # available alg arguments: "basinhoppin", "TPE" (the result is verified by struct_optimization.failed_checks)
+        return opt_rc_rec(member, to_opt, criterion, max_iter, h_min, alg)
     else:
         print("There is no optimization for the section type " + member.section.section_type + " available!")
         return member.section

@@ -1,11 +1,11 @@
-# TEMPLATE for running examples: 1D members (simple beam / continuous / two span) in reinforced concrete and wood
+# TEMPLATE for running examples (2D slabs: 261030_Template_Examples_2D.py): 1D members (simple beam / continuous / two span) in reinforced concrete and wood
 # with different cross-sections and settings.
 #
 # HOW TO USE: copy this file and only adjust PART 1 (DEFAULTS and RUNS).
 # Before the first optimization starts, all runs are checked (allowed values, allowed combinations, products in the
 # database). If anything is wrong, the script stops with a list of all errors and nothing is optimized.
-# The results are written into one Excel per material group (Results/<timestamp>_batch_concrete.xlsx,
-# ..._batch_wood.xlsx, see RESULT_FILES), one sheet per cross-section type. Plotting is done separately.
+# The results are written into one Excel (Results/<timestamp>_batch_1D.xlsx): one sheet per run (00, 01, ...) and the
+# sheet "runs". Plotting is done separately.
 
 
 # ======================================================================================================================
@@ -28,9 +28,13 @@ DEFAULTS = {
     "g2k": 0.75e3,              # n.t. Einbauten [N/m2]
     "qk": 2e3,                  # Nutzlast [N/m2]
     "use": "Wohnen",            # building use (Nutzung), only a label in the results; qk must fit it
-    "mean_gwp": True,           # True: one additional "mean section" per run: concrete rsp. timber (all mat_names
-                                # together), rebar and board are the real products closest to the mean GWP;
-                                # wd_rib: worse of the two t3 cases; only for basetype "epd", ignored for "kbob"
+    "min_max_only": False,       # True: only products with MIN_MAX = 1 in the database (lowest and highest GWP of
+                                # each strength class); False: all products. Rebar, boards and mean sections
+                                # are not affected; only for basetype "epd", ignored for "kbob"
+    "mean_gwp": True,           # True: additional "mean sections": one per strength class of the materials of the
+                                # run, with the mean GWP and mean density of all products of that class; rebar
+                                # (B500B) and board (C24) are means as well; wd_rib: both t3 cases are kept;
+                                # only for basetype "epd", ignored for "kbob"
 }
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -160,6 +164,8 @@ def check_run(i, entry, run):
         values = run[key]
         if not (isinstance(values, list) and values and set(values) <= set(allowed) and len(set(values)) == len(values)):
             err.append(f"{key} must be a non-empty list of different values from {allowed}, got {values!r}")
+    if not isinstance(run["min_max_only"], bool):
+        err.append(f"min_max_only must be True or False, got {run['min_max_only']!r}")
     if not isinstance(run["mean_gwp"], bool):
         err.append(f"mean_gwp must be True or False, got {run['mean_gwp']!r}")
     if not (isinstance(run["use"], str) and run["use"]):
@@ -186,21 +192,28 @@ def check_database(batch):
     for run in batch:
         base, crsec = run["basetype"], run["crsec_type"]
         # CHECK MAIN MATERIALS (same query as plot_dataset)
+        min_max_only = run["min_max_only"] and base == "epd"
         for mat_name in run["mat_names"]:
-            if (mat_name, base) in checked:
+            if (mat_name, base, min_max_only) in checked:
                 continue
-            checked.add((mat_name, base))
+            checked.add((mat_name, base, min_max_only))
             cursor.execute("SELECT COUNT(*) FROM products WHERE DENSITY IS NOT NULL AND MECH_PROP IS NOT NULL"
-                           " AND \"MATERIAL\" LIKE " + mat_name + opt_and_plot.source_filter(base))
+                           " AND \"MATERIAL\" LIKE " + mat_name + opt_and_plot.source_filter(base)
+                           + opt_and_plot.min_max_filter(min_max_only))
             if cursor.fetchone()[0] == 0:
-                err.append(f"run {run['nr']}: no product for material {mat_name} with basetype {base!r}")
+                err.append(f"run {run['nr']}: no product for material {mat_name} with basetype {base!r}, "
+                           f"min_max_only={min_max_only}")
         # CHECK SECONDARY MATERIALS: rebar for rc, boards for wd_rib (same queries as plot_dataset)
         extra = {"rc": ("Steel_reinforcing_bar", "B500B"), "wd_rib": ("%3_and_5_plywood%", None)}
+        mean_extra = {"rc": ("Steel_reinforcing_bar", "B500B"), "wd_rib": ("%3_and_5_plywood%", "C24")}
         key = crsec[:2] if crsec[:2] == "rc" else crsec
-        if key in extra and (key, base) not in checked:
-            checked.add((key, base))
+        use_mean = run["mean_gwp"] and base == "epd"
+        if key in extra and (key, base, use_mean) not in checked:
+            checked.add((key, base, use_mean))
             try:
                 opt_and_plot.get_low_high_prod_ids(cursor, *extra[key], base)
+                if use_mean:
+                    opt_and_plot.get_mean_materials(cursor, *mean_extra[key], base)
             except ValueError as e:
                 err.append(f"run {run['nr']}: {e}")
     connection.close()
@@ -215,10 +228,10 @@ def check_database(batch):
 
 def effective_key(run):
     # fingerprint of all settings that change the result; equal keys = duplicate runs
-    # ignored settings are set to None/False: alg for wd, optima for wd_rec, mean_gwp for kbob
+    # ignored settings are set to None/False: alg for wd, optima for wd_rec, min_max_only and mean_gwp for kbob
     return (run["crsec_type"], run["system"], run["floor"], run["basetype"], run["max_iter"], tuple(run["lengths"]),
             tuple(run["criteria"]), tuple(run["mat_names"]), run["g2k"], run["qk"],
-            run["mean_gwp"] and run["basetype"] == "epd",
+            run["min_max_only"] and run["basetype"] == "epd", run["mean_gwp"] and run["basetype"] == "epd",
             None if run["crsec_type"][:2] == "wd" else run["alg"],
             None if run["crsec_type"] == "wd_rec" else tuple(run["optima"]))
 
@@ -228,7 +241,7 @@ def prepare_runs(runs):
     if not runs:
         raise SystemExit("No runs defined -> activate at least one entry in RUNS.")
     batch, errors = [], []
-    for i, entry in enumerate(runs, start=1):
+    for i, entry in enumerate(runs):  # runs are counted from 0
         run = {**DEFAULTS, **entry}
         run_errors = check_run(i, entry, run)
         errors += [f"run {i}: {e}" for e in run_errors]
@@ -237,7 +250,8 @@ def prepare_runs(runs):
         run["nr"] = i
         run.setdefault("mat_names", MATERIALS[run["crsec_type"][:2]])
         # default label: main keys + every other setting that differs from DEFAULTS
-        extra = [f"{k}={entry[k]}" for k in ("alg", "max_iter", "lengths", "criteria", "optima", "g2k", "qk", "use", "mean_gwp")
+        extra = [f"{k}={entry[k]}" for k in ("alg", "max_iter", "lengths", "criteria", "optima", "g2k", "qk", "use", "min_max_only",
+                                  "mean_gwp")
                  if k in entry and entry[k] != DEFAULTS[k]]
         run.setdefault("label", ", ".join([run["crsec_type"], run["system"], run["floor"], run["basetype"]] + extra))
         batch.append(run)
@@ -270,7 +284,7 @@ def prepare_runs(runs):
 
 def runs_table(batch):
     cols = ["nr", "label", "crsec_type", "system", "floor", "basetype", "alg", "max_iter", "lengths", "criteria",
-            "optima", "g2k", "qk", "use", "mean_gwp", "mat_names", "file_tag"]
+            "optima", "g2k", "qk", "use", "min_max_only", "mean_gwp", "mat_names", "file_tag"]
     return pd.DataFrame([{c: (str(r[c]) if isinstance(r[c], list) else r[c]) for c in cols} for r in batch])
 
 
@@ -290,10 +304,9 @@ def get_floor(name):
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-# RESULT TABLES: one Excel per material group (RESULT_FILES), one sheet per cross-section type (SECTION_COLUMNS)
+# RESULT TABLES: one Excel with one sheet per run
 # Column blocks of a sheet: identification | settings | geometry | internal forces | materials | CO2 | loads
-# A new material needs an entry in RESULT_FILES; a new cross-section type a function in SECTION_COLUMNS.
-RESULT_FILES = {"rc": "concrete", "wd": "wood"}  # prefix of crsec_type -> file suffix
+# A new cross-section type needs a function in SECTION_COLUMNS.
 
 def material_columns(role, mat):
     return {role: getattr(mat, "mech_prop", None), f"{role}_prod_id": getattr(mat, "prod_id", None),
@@ -361,7 +374,7 @@ def member_row(entry, run, k):
     rebar = {k: geo.pop(k) for k in ["rebar_content [kg/m3]"] if k in geo}  # belongs to the structural results
     blocks = {
         # member_id = <run in the batch>-<member in the run>, both counted from 0 (first member: 00-000)
-        "identification": {"member_id": f"{run['nr'] - 1:02d}-{k:03d}", "criterion": entry["criterion"],
+        "identification": {"member_id": f"{run['nr']:02d}-{k:03d}", "criterion": entry["criterion"],
                            "optimum": entry["optimum"]},
         "data source": {"basetype": run["basetype"], "use": run["use"]},
         "design configuration": {
@@ -369,7 +382,8 @@ def member_row(entry, run, k):
             "label": run["label"], "run_nr": run["nr"], "dataset": entry["dataset"],
             "crsec_type": run["crsec_type"], "system": run["system"],
             **({"alg": run["alg"]} if run["crsec_type"][:2] == "rc" else {}),
-            "g2k [kN/m2]": run["g2k"] / 1e3, "qk [kN/m2]": run["qk"] / 1e3, "feasible": mem is not None},
+            "g2k [kN/m2]": run["g2k"] / 1e3, "qk [kN/m2]": run["qk"] / 1e3, "feasible": not entry["failed_checks"],
+            "failed_checks": ", ".join(entry["failed_checks"])},
         "geometry": {"l_tot [m]": entry["length"], **geo},
         "material selection": {"mean_section": entry["mean_section"], **mats},
     }
@@ -408,27 +422,6 @@ def write_sheet(writer, name, df):
     ws.freeze_panes = "B2"
 
 
-def keep_worse_t3(results):
-    # mean section of wd_rib: of the two fixed t3 cases only the worse one per span, criterion and optimum is kept
-    # (conservative: higher GWP rsp. higher section; infeasible if one of the two cases is infeasible)
-    def worse(a, b):
-        if a["member"] is None or b["member"] is None:
-            return a if a["member"] is None else b
-        sec_a, sec_b = a["member"].section, b["member"].section
-        if a["optimum"] == "GWP":
-            return a if sec_a.co2 >= sec_b.co2 else b
-        return a if sec_a.h + sec_a.t2 + sec_a.t3 >= sec_b.h + sec_b.t2 + sec_b.t3 else b
-
-    kept, worst = [], {}
-    for entry in results:
-        if not (entry["mean_section"] and entry["t3"] is not None):
-            kept.append(entry)
-            continue
-        key = (entry["criterion"], entry["optimum"], entry["length"])
-        worst[key] = worse(worst[key], entry) if key in worst else entry
-    return kept + list(worst.values())
-
-
 #-----------------------------------------------------------------------------------------------------------------------
 # CHECK RUNS (shows only the runs and stops here if anything is wrong)
 batch = prepare_runs(RUNS)
@@ -457,7 +450,8 @@ for run in batch:
             run["lengths"], database_name, run["criteria"], run["optima"], get_floor(run["floor"]), req,
             run["crsec_type"], run["mat_names"], run["g2k"], run["qk"], run["max_iter"], len(run["lengths"]) - 1,
             system=run["system"], alg=run["alg"], basetype=run["basetype"],
-            results=results, file_tag=run["file_tag"], mean_gwp=run["mean_gwp"])
+            results=results, file_tag=run["file_tag"], mean_gwp=run["mean_gwp"],
+            min_max_only=run["min_max_only"] and run["basetype"] == "epd")
     except Exception as e:
         traceback.print_exc()
         failed.append((run["nr"], run["label"], repr(e)))
@@ -465,7 +459,7 @@ for run in batch:
     if not results:
         failed.append((run["nr"], run["label"], "no products found (check mat_names / basetype)"))
         continue
-    rows += [member_row(entry, run, k) for k, entry in enumerate(keep_worse_t3(results))]
+    rows += [member_row(entry, run, k) for k, entry in enumerate(results)]
 
 # Ende der Optimierung
 dauer = time.time() - start
@@ -476,22 +470,18 @@ for nr, label, err in failed:
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-# SAVE ONE EXCEL PER MATERIAL GROUP: one sheet per cross-section type (order of SECTION_COLUMNS), last sheet "runs"
+# SAVE ONE EXCEL: one sheet per run (00, 01, ...), last sheet "runs"; a failed run has no sheet, see status in "runs"
 timestamp = datetime.now().strftime("%y%m%d_%H%M")
 os.makedirs(results_folder, exist_ok=True)
 df_runs["status"] = ["failed" if r["nr"] in [f[0] for f in failed] else "ok" for r in batch]
-for prefix, suffix in RESULT_FILES.items():
-    group_runs = df_runs[df_runs["crsec_type"].str[:2] == prefix]
-    if group_runs.empty:
-        continue
-    excel_path = os.path.join(results_folder, f"{timestamp}_batch_{suffix}.xlsx")
-    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-        for crsec in [c for c in SECTION_COLUMNS if c[:2] == prefix]:
-            sheet_rows = [r for r in rows if r["crsec_type"] == crsec]
-            if not sheet_rows:
-                continue
-            # column order of the longest row (feasible member); infeasible rows only miss the result columns
-            columns = max((list(r) for r in sheet_rows), key=len)
-            write_sheet(writer, crsec, pd.DataFrame(sheet_rows, columns=columns))
-        group_runs.to_excel(writer, sheet_name="runs", index=False)
-    print(f"Results saved: {excel_path}")
+excel_path = os.path.join(results_folder, f"{timestamp}_batch_1D.xlsx")
+with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+    for run in batch:
+        sheet_rows = [r for r in rows if r["run_nr"] == run["nr"]]
+        if not sheet_rows:
+            continue
+        # column order of the longest row (feasible member); infeasible rows only miss the result columns
+        columns = max((list(r) for r in sheet_rows), key=len)
+        write_sheet(writer, f"{run['nr']:02d}", pd.DataFrame(sheet_rows, columns=columns))
+    df_runs.to_excel(writer, sheet_name="runs", index=False)
+print(f"Results saved: {excel_path}")
