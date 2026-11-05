@@ -890,7 +890,42 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
     return to_minimize
 
 
-##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
+#OPTIMIZATION OF WOOD CROSS-SECTIONS-------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------------------------------------------------
+# OPTIMIZATION OF RECTANGULAR TIMBER CROSS-SECTIONS
+# .......................................................................................................................
+
+available_h = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28] #verfügbare Deckenstärke für Brettstapeldecken gemäss Herstellerdaten
+
+# Nachweise, die je Optimierungskriterium erfüllt sein müssen (None = alle aus failed_checks)
+CHECKS_PER_CRITERION = {
+    "ULS": {"ULS"},
+    "SLS1": {"SLS1"},
+    "SLS2": {"SLS2"},
+    "FIRE": {"FIRE"},
+    "ENV": None,
+}
+
+def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter=None, alg=None):
+    # Massivholzdecke: alle handelsüblichen Höhen aufsteigend prüfen und die erste (= kleinste) zurückgeben,
+    # die alle für 'criterion' relevanten Nachweise erfüllt. Da co2 ~ h (b fix), ist das auch das GWP-Optimum.
+    # max_iter und alg werden nicht benötigt (nur für einheitliche Signatur).
+    m = member
+    relevant = CHECKS_PER_CRITERION.get(criterion)
+
+    for h in sorted(x for x in available_h if x <= h_max):
+        section = struct_analysis.RectangularWood(m.section.wood_type, m.section.b, h, m.section.phi)
+        test_member = struct_analysis.Member1D(section, m.system, m.floorstruc, m.requirements, m.g2k, m.qk_area)
+
+        failed = failed_checks(test_member)
+        if relevant is not None:
+            failed = [f for f in failed if f in relevant]
+        if not failed:
+            return section
+
+    return None  # keine verfügbare Höhe erfüllt die Nachweise -> Aufrufer meldet "no feasible section"
+
 '''
 #OPTIMIERUNG mit Powell (alt)
 
