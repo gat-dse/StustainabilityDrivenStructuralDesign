@@ -407,7 +407,7 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
     member.calc_qk_zul_gzt()  # calculate admissible live load
 
     # define penalty1, if ULS is not fulfilled
-    penalty1 = max(member.qk - member.qk_zul_gzt, 0)
+    penalty1 = 1e3 * max(member.qk - member.qk_zul_gzt, 0)
 
     # define penalty2, if SLS1 (deflections) are not fulfilled
     # 1. Fall: Reine Kragarme oder Bauteile mit reinem negativen Moment ("oben")
