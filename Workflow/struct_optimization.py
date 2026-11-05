@@ -45,6 +45,8 @@ bodenaufbau_rcdecke_slim = [["'Parkett 2-Schicht werkversiegelt, 11 mm'", False,
 bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, database_name, name="Schuettung")
 
 
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 # OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 # .......................................................................................................................
@@ -56,7 +58,8 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
     # =========================================================================
     # FALL 1: DURCHLAUFTRÄGER (Zweistufige sequentielle Optimierung).
     # Zuerst wird QS im Feld optimiert (h, di_xu). bh und bdi_xi -> bounds
-    # Dann wird mit fixem h die Bewehrung über der Stütze optimiert
+    # Dann wird mit fixem h die Bewehrung über der Stütze optimiert (di_xo)
+    # Stababstände s_xu, s_xo sind fix (aus dem Ausgangsquerschnitt)
     # =========================================================================
     if min(m.system.alpha_m) < 0 and abs(min(m.system.alpha_m)) > max(m.system.alpha_m):
 
@@ -84,7 +87,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         # Fixe Werte aus dem Querschnitt auslesen
         b = m.section.b
-        s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]
+        s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]  # Stababstände fix
         di_yu, s_yu = m.section.bw[2][0], m.section.bw[2][1]
         di_yo, s_yo = m.section.bw[3][0], m.section.bw[3][1]
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
@@ -107,12 +110,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
             0.016, 0.018, 0.020, 0.022,
             0.026, 0.030, 0.034, 0.040
         ]
-        ABSTAENDE = [
-            0.040, 0.050, 0.075, 0.083, 0.091,
-            0.100, 0.111, 0.120, 0.125,
-            0.143, 0.150, 0.167,
-            0.200, 0.250, 0.300
-        ]
 
         di_xu_kandidaten = [
             d for d in BEWEHRUNG_D
@@ -126,20 +123,15 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
                 bounds_stufe1[0][0],
                 bounds_stufe1[0][1],
                 step=0.01
-            ) #chooses float
+            )  # chooses float
 
             di_xu = trial.suggest_categorical(
                 "di_xu",
                 di_xu_kandidaten
-            ) #chooses candidates from specified list
-
-            s_xu = trial.suggest_categorical(
-                "s_xu",
-                ABSTAENDE
-            ) #chooses candidates from specified list
+            )  # chooses candidates from specified list
 
             try:
-                return rc_rqs([h, di_xu, s_xu], add_arg_stufe1, alg)
+                return rc_rqs([h, di_xu], add_arg_stufe1, alg)
             except Exception:
                 return 1e20
 
@@ -155,7 +147,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
         study1.enqueue_trial({
             "h": round(h0 / 0.01) * 0.01,
             "di_xu": min(di_xu_kandidaten, key=lambda d: abs(d - di_xu0)),
-            "s_xu": s_xu
         })
 
         study1.optimize(
@@ -165,7 +156,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         h_opt = study1.best_params["h"]
         di_xu_opt = study1.best_params["di_xu"]
-        s_xu_opt = study1.best_params["s_xu"]
 
         # --- STUFE 2: Höhe h_opt und di_xu_opt fixieren -> Stützenbewehrung (di_xo) ermitteln ---
         optimise_stufe2 = "stuetze_fix_h"
@@ -176,7 +166,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         add_arg_stufe2 = [
             m.system, co, st, b,
-            s_xu_opt, s_xo,
+            s_xu, s_xo,
             di_yu, s_yu,
             di_yo, s_yo,
             m.floorstruc,
@@ -199,13 +189,8 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
                 di_xo_kandidaten
             )
 
-            s_xo = trial.suggest_categorical(
-                "s_xo",
-                ABSTAENDE
-            )
-
             try:
-                return rc_rqs([di_xo, s_xo], add_arg_stufe2, alg)
+                return rc_rqs([di_xo], add_arg_stufe2, alg)
             except Exception:
                 return 1e20
 
@@ -223,7 +208,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
                 di_xo_kandidaten,
                 key=lambda d: abs(d - di_xo_schätzwert)
             ),
-            "s_xo": s_xo
         })
 
         study2.optimize(
@@ -231,20 +215,10 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
             n_trials=max_iter
         )
 
-        #Ergebnisse auslesen:
-        di_xo_opt = study2.best_params["di_xo"]
-        s_xo_opt = study2.best_params["s_xo"]
-
-        # Resultate stabil zusammenführen
+        # Resultate zusammenführen (s_xu, s_xo bleiben fix)
         h = h_opt
         di_xu = di_xu_opt
-        s_xu = s_xu_opt
-
-        di_xo = di_xo_opt
-        s_xo = s_xo_opt
-
-
-
+        di_xo = study2.best_params["di_xo"]
 
     # =========================================================================
     # FALL 2: SIMPLE BEAM / EINFELDTRÄGER
@@ -271,7 +245,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         # Fixe Werte aus dem Querschnitt auslesen
         b = m.section.b
-        s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]
+        s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]  # Stababstände fix
         di_yu, s_yu = m.section.bw[2][0], m.section.bw[2][1]
         di_yo, s_yo = m.section.bw[3][0], m.section.bw[3][1]
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
@@ -295,13 +269,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
             0.026, 0.030, 0.034, 0.040
         ]
 
-        ABSTAENDE = [
-            0.040, 0.050, 0.075, 0.083, 0.091,
-            0.100, 0.111, 0.120, 0.125,
-            0.143, 0.150, 0.167,
-            0.200, 0.250, 0.300
-        ]
-
         di_xu_kandidaten = [
             d for d in BEWEHRUNG_D
             if bounds[1][0] <= d <= bounds[1][1]
@@ -321,13 +288,8 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
                 di_xu_kandidaten
             )
 
-            s_xu = trial.suggest_categorical(
-                "s_xu",
-                ABSTAENDE
-            )
-
             try:
-                return rc_rqs([h, di_xu, s_xu], add_arg, alg)
+                return rc_rqs([h, di_xu], add_arg, alg)
             except Exception:
                 return 1e20
 
@@ -339,7 +301,6 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
         study.enqueue_trial({
             "h": round(h0 / 0.01) * 0.01,
             "di_xu": min(di_xu_kandidaten, key=lambda d: abs(d - di_xu0)),
-            "s_xu": s_xu
         })
 
         study.optimize(
@@ -349,15 +310,11 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         h = study.best_params["h"]
         di_xu = study.best_params["di_xu"]
-        s_xu = study.best_params["s_xu"]
-
-
 
     # Generierung des optimierten End-Querschnitts
     optimized_section = struct_analysis.RectangularConcrete(co, st, b, h, di_xu, s_xu, di_xo, s_xo, di_yu, s_yu, di_yo,
                                                             s_yo, di_bw, s_bw, n_bw, phi, c_nom, xi, jnt_srch)
     return optimized_section
-
 
 
 # inner function for optimizing reinforced concrete section
@@ -367,17 +324,17 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
 
     if optimise == "feld":
 
-        # Stufe 1:
-        # h, di_xu und s_xu variabel
-        h, di_xu, s_xu = var
-
-        di_xo = add_arg[5]
-        s_xo = add_arg[6]
+        # Stufe 1 (Durchlaufträger): h, di_xu variabel; s_xu, s_xo fix
+        h, di_xu = var
 
         system = add_arg[0]
         concrete = add_arg[1]
         reinfsteel = add_arg[2]
         b = add_arg[3]
+
+        s_xu = add_arg[4]
+        di_xo = add_arg[5]
+        s_xo = add_arg[6]
 
         di_yu, s_yu = add_arg[7:9]
         di_yo, s_yo = add_arg[9:11]
@@ -391,9 +348,8 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
 
     elif optimise == "stuetze_fix_h":
 
-        # Stufe 2:
-        # di_xo und s_xo variabel
-        di_xo, s_xo = var
+        # Stufe 2 (Durchlaufträger): nur di_xo variabel; h, di_xu, s_xu, s_xo fix
+        di_xo = var[0]
 
         system = add_arg[0]
         concrete = add_arg[1]
@@ -401,6 +357,7 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
         b = add_arg[3]
 
         s_xu = add_arg[4]
+        s_xo = add_arg[5]
 
         di_yu, s_yu = add_arg[6:8]
         di_yo, s_yo = add_arg[8:10]
@@ -417,15 +374,15 @@ def rc_rqs(var, add_arg, alg="basinhoppin"):
 
     elif optimise == "unten":
 
-        # Einfeldträger:
-        # h, di_xu und s_xu variabel
-        h, di_xu, s_xu = var
+        # Einfeldträger: h, di_xu variabel; s_xu, di_xo, s_xo fix
+        h, di_xu = var
 
         system = add_arg[0]
         concrete = add_arg[1]
         reinfsteel = add_arg[2]
         b = add_arg[3]
 
+        s_xu = add_arg[4]
         di_xo = add_arg[5]
         s_xo = add_arg[6]
 

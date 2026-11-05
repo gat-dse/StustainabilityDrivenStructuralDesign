@@ -296,7 +296,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                     member_list.append(members)
                     if i[0].section_type[0:2] == "rc":
                         material_lg = i[0].concrete_type.mech_prop + " + " + i[0].rebar_type.mech_prop
-                    elif i[0].section_type == "wd":
+                    elif i[0].section_type == "wd_rec":
                         material_lg = i[0].wood_type.mech_prop
                     elif i[0].section_type == "wd_rib":
                         material_lg = i[0].wood_type_1.mech_prop
