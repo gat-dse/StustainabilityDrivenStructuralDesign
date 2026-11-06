@@ -29,7 +29,7 @@ DEFAULTS = {
     "g2k": 0.75e3,              # n.t. Einbauten [N/m2]
     "qk": 2e3,                  # Nutzlast [N/m2]
     "use": "Wohnen",            # building use (Nutzung), only a label in the results; qk must fit it
-    "min_max_only": False,       # True: only products with MIN_MAX = 1 in the database (lowest and highest GWP of
+    "min_max_only": True,       # True: only products with MIN_MAX = 1 in the database (lowest and highest GWP of
                                 # each strength class); False: all products. Rebar, boards and mean sections
                                 # are not affected; only for basetype "epd", ignored for "kbob"
     "mean_gwp": True,           # True: additional "mean sections": one per strength class of concrete, with the mean

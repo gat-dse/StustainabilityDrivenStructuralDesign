@@ -117,17 +117,96 @@ def get_secondary_products(cursor, material, mech_prop, basetype, is_mean):
     return [(prod_id, None) for prod_id in get_low_high_prod_ids(cursor, material, mech_prop, basetype)]
 
 
+# MATERIAL VARIANTS (1D): every section belongs to one variant, the results compete only within their variant
+#   "minmin": lowest GWP main material + lowest GWP rebar / board        (min_max_only = True)
+#   "maxmax": highest GWP main material + highest GWP rebar / board      (min_max_only = True)
+#   "all":    every main material x every rebar / board                  (min_max_only = False)
+#   "mean":   mean main material + mean rebar / board, one per class     (mean_gwp = True)
+#   "kbob":   KBOB products (one generic product per material), min_max_only and mean_gwp are ignored
+# strength class with only 1 product: no "minmin" / "maxmax" (that product would compete as best AND worst case),
+# it is only used as "mean" (the mean of one product = the product)
+VARIANTS = ["minmin", "mean", "maxmax", "all", "kbob"]
+
+
+def get_min_max_ids(cursor, material, basetype):
+    # returns the PRO_IDs of a material marked with MIN_MAX = 1 in the database
+    cursor.execute('SELECT PRO_ID FROM products WHERE "MATERIAL" LIKE ? AND MIN_MAX = 1' + source_filter(basetype),
+                   [material])
+    return {row[0] for row in cursor.fetchall()}
+
+
+def pick_min_max(rows, flagged_ids, label):
+    # returns (lowest, highest) GWP row of one strength class; rows are sorted by GWP (see get_products_by_gwp)
+    # uses the products marked with MIN_MAX = 1; fewer than 2 marked -> lowest and highest of all products
+    flagged = [row for row in rows if row[0] in flagged_ids]
+    if len(flagged) < 2:
+        print(f"Warning: {label}: {len(flagged)} product(s) with MIN_MAX = 1 -> lowest / highest GWP of all "
+              f"{len(rows)} products used")
+        flagged = rows
+    return flagged[0], flagged[-1]
+
+
+def group_by_class(rows):
+    # {strength class: rows}; same grouping as get_mean_materials (e.g. GL24 and GL24c -> GL24c), rows stay sorted
+    groups = {}
+    for row in rows:
+        groups.setdefault(strip_and_complete_mech_prop(row[2]), []).append(row)
+    return groups
+
+
+def get_main_selection(cursor, material, basetype, min_max_only, mean_gwp):
+    # returns [(prod_id string, mean material or None, variant)] of the main material (concrete / timber)
+    # material: name without quotes (LIKE pattern for column MATERIAL)
+    quote = lambda prod_id: "'" + str(prod_id) + "'"
+    rows = get_products_by_gwp(cursor, material, None, basetype)
+    if basetype == "kbob":
+        return [(quote(row[0]), None, "kbob") for row in rows]
+    flagged_ids = get_min_max_ids(cursor, material, basetype) if min_max_only else set()
+    means = {mean["mech_prop"]: mean for mean in get_mean_materials(cursor, material, None, basetype)}
+    selection = []
+    for mech_prop, class_rows in sorted(group_by_class(rows).items()):
+        if min_max_only:
+            if len(class_rows) >= 2:
+                low, high = pick_min_max(class_rows, flagged_ids, f"{material} {mech_prop}")
+                selection += [(quote(low[0]), None, "minmin"), (quote(high[0]), None, "maxmax")]
+            elif not mean_gwp:
+                print(f"Note: {material} {mech_prop} has only 1 product -> only used as mean section, "
+                      f"mean_gwp = False -> not optimized")
+        else:
+            selection += [(quote(row[0]), None, "all") for row in class_rows]
+        if mean_gwp:
+            mean = means[mech_prop]
+            selection.append((mean["prod_id"], mean, "mean"))
+    return selection
+
+
+def get_secondary_selection(cursor, material, mech_prop, basetype, variant):
+    # returns [(prod_id string, mean material or None)] of rebar rsp. board that belongs to a variant of the main
+    # material: minmin -> lowest GWP, maxmax -> highest GWP, all -> every product, mean -> the mean material,
+    # kbob -> lowest and highest GWP (as before)
+    if variant == "kbob":
+        return get_secondary_products(cursor, material, mech_prop, basetype, False)
+    if variant == "mean":
+        return get_secondary_products(cursor, material, mech_prop, basetype, True)
+    rows = get_products_by_gwp(cursor, material, mech_prop, basetype)
+    if variant == "all":
+        return [("'" + str(row[0]) + "'", None) for row in rows]
+    low, high = pick_min_max(rows, get_min_max_ids(cursor, material, basetype), f"{material} {mech_prop}")
+    return [("'" + str((low if variant == "minmin" else high)[0]) + "'", None)]
+
+
 # PLOT DATASETS OF MEMBERS WITH DEFINED CROSS_SECTIONS AND VARIED MATERIALS
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
                  g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, system = "Simple Beam", alg="basinhoppin",
-                 basetype="epd", results=None, file_tag="", mean_gwp=False, min_max_only=False):
+                 basetype="epd", results=None, file_tag="", mean_gwp=False, min_max_only=False, members_excel=True):
     # results: optional list; one dict per optimized member (incl. infeasible spans with member=None) is appended
     # file_tag: optional suffix of the Excel file name (avoids overwriting when runs share the same name)
     # mean_gwp: True -> additional "mean sections" (EPD only): one per strength class of the main materials, rebar
     #           rsp. board are mean materials as well, see get_mean_materials (KBOB: one product per material, no mean)
-    # min_max_only: True -> only main products with MIN_MAX = 1; False -> all products (rebar, board and mean sections
-    # are not affected)
+    # min_max_only: True -> per strength class only "minmin" (lowest GWP main material + lowest GWP rebar / board)
+    #               and "maxmax" (highest + highest), see VARIANTS; False -> every main product x every rebar / board
+    # members_excel: False -> no Members_*.xlsx (the templates write their own result file)
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(lengths)-1) #if idx_verfctn isnt specified, pick a random
@@ -138,24 +217,14 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     to_plot = []
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
-    products = []  # (prod_id string, mean material or None): every product of all materials of the run
+    # (prod_id string, mean material or None, variant): every main product of all materials of the run
+    products = []
     for mat_name in mat_names:
-        # Wählt alle EPDs von einem Material -> "mat-name" (z.B. ready mixed concrete)
-        inquiry = ("""
-                SELECT PRO_ID FROM products
-                WHERE DENSITY IS NOT NULL                
-                AND MECH_PROP IS NOT NULL
-                AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype) + min_max_filter(min_max_only)
-        )
-        # inquiry = ("SELECT PRO_ID FROM products WHERE"
-        #            " material=" + mat_name)
-        cursor.execute(inquiry)
-        products += [("'" + str(row[0]) + "'", None) for row in cursor.fetchall()]
-        # mean sections: one per strength class of this material
-        if mean_gwp and basetype == "epd":
-            products += [(mean["prod_id"], mean)
-                         for mean in get_mean_materials(cursor, mat_name.strip("'"), None, basetype)]
-    for prod_id_str, mean in products:
+        products += get_main_selection(cursor, mat_name.strip("'"), basetype, min_max_only,
+                                       mean_gwp and basetype == "epd")
+    # board of wd_rib: EPD -> C24 (the strength every board is calculated with), KBOB -> any (KBOB has no C24 board)
+    board_mech_prop = "C24" if basetype == "epd" else None
+    for prod_id_str, mean, variant in products:
         is_mean = mean is not None
         inquiry = ("""
                 SELECT MECH_PROP FROM products
@@ -176,7 +245,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             # create initial wooden rectangular cross-section
             section_0 = struct_analysis.RectangularWood(timber, 1.0, 0.1, xi=0.02)
             # add section to content-definition of plot-line
-            line_i = [section_0, floorstruc, is_mean]
+            line_i = [section_0, floorstruc, is_mean, variant]
             to_plot.append(line_i)
 
         elif crsec_type == "rc_rec":
@@ -186,8 +255,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             apply_mean_material(concrete, mean)
             # search database for rebar material of type B500B with lowest and highest emissions
             # (mean section: the mean rebar)
-            for rebar_prod_id, rebar_mean in get_secondary_products(cursor, 'Steel_reinforcing_bar', 'B500B',
-                                                                    basetype, is_mean):
+            for rebar_prod_id, rebar_mean in get_secondary_selection(cursor, 'Steel_reinforcing_bar', 'B500B',
+                                                                     basetype, variant):
                 # create a rebar material object with mech prop B500B and low rsp high emission values
                 rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
                 apply_mean_material(rebar, rebar_mean)
@@ -196,7 +265,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                                                                 0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                                 0, 0.15, 2)
                 # add section to content-definition of plot-line
-                to_plot.append([section_0, floorstruc, is_mean])
+                to_plot.append([section_0, floorstruc, is_mean, variant])
 
         elif crsec_type == "rc_rib":
             # create a Concrete material object
@@ -205,15 +274,15 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
             apply_mean_material(concrete, mean)
             # search database for rebar material of type B500B with lowest and highes emissions
             # (mean section: the mean rebar)
-            for rebar_prod_id, rebar_mean in get_secondary_products(cursor, 'Steel_reinforcing_bar', 'B500B',
-                                                                    basetype, is_mean):
+            for rebar_prod_id, rebar_mean in get_secondary_selection(cursor, 'Steel_reinforcing_bar', 'B500B',
+                                                                     basetype, variant):
                 # create a rebar material object with mech prop B500B and low rsp high emission values
                 rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
                 apply_mean_material(rebar, rebar_mean)
                 # create initial cross-section
                 section_0 = struct_analysis.RibbedConcrete(concrete, rebar, 4, 1.0, 0.15, 0.3, 0.18, 0.008, 0.15, 0.008, 0.15, 0.018, 5, 0.008, 0.15, 2, 1, 2.0, 0.02, 0.03, 0.15)
                 # add section to content-definition of plot-line
-                to_plot.append([section_0, floorstruc, is_mean])
+                to_plot.append([section_0, floorstruc, is_mean, variant])
 
         elif crsec_type == "wd_rib":
             # create a Wood material object
@@ -223,8 +292,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
 
             # search database for timber board material (CLT) with lowest and highest emissions
             # (mean section: the mean of the C24 boards, the strength every board is calculated with)
-            for clt_prod_id, clt_mean in get_secondary_products(cursor, '%3_and_5_plywood%',
-                                                                'C24' if is_mean else None, basetype, is_mean):
+            for clt_prod_id, clt_mean in get_secondary_selection(cursor, '%3_and_5_plywood%',
+                                                                 board_mech_prop, basetype, variant):
                 # create a timber material object in timber board (CLT, C24) with low rsp high emission values
                 clt = struct_analysis.Wood("'C24'", database_name, prod_id=clt_prod_id)
                 clt.get_design_values()
@@ -233,7 +302,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                 section_0 = struct_analysis.RibWood(timber1, clt, clt, 4, 0.12, 0.22, 0.625,
                                                     0.027, 0.027)
                 # add section to content-definition of plot-line
-                to_plot.append([section_0, floorstruc, is_mean])
+                to_plot.append([section_0, floorstruc, is_mean, variant])
 
         else:
             print("cross-section type is not defined inside function plot_dataset()")
@@ -292,7 +361,7 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
                             results.append({"member": opt_member, "section_0": section0, "length": length,
                                             "criterion": criterion, "optimum": optimum,
                                             "t3": fixed_params.get("t3"), "dataset": len(member_list),
-                                            "mean_section": i[2], "failed_checks": failed})
+                                            "mean_section": i[2], "variant": i[3], "failed_checks": failed})
                     member_list.append(members)
                     if i[0].section_type[0:2] == "rc":
                         material_lg = i[0].concrete_type.mech_prop + " + " + i[0].rebar_type.mech_prop
@@ -493,7 +562,8 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
     # 3. Weiche für Export-Klasse und Ordner anhand des Präfixes ('wd' vs. alle anderen)
     # Use members_to_excel2 and folder 'Results' for all cross-section types (including wood 'wd')
     filename = f"Members_{crsec_type}{system_suffix}{floor_name_clean}_{basetype}{file_tag}.xlsx"
-    class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
+    if members_excel:
+        class_to_excel_2.members_to_excel2(members_1d, filename, folder="Results")
 
 
 
