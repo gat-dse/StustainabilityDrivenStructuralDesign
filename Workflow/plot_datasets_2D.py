@@ -30,12 +30,15 @@ def source_filter(basetype):
 # ----------------------------------------------------------------------------------------------------------------------
 def plot_dataset(length_x,length_y, support, database_name, criteria, optima, floorstruc, requirements, crsec_type, mat_names,
                  g2k=0.75, qk=2.0, max_iter=100, idx_vrfctn=-1, basetype="epd", alg="basinhoppin", results=None,
-                 file_tag="", mean_gwp=False, min_max_only=True):
+                 file_tag="", mean_gwp=False, min_max_only=True, members_excel=True):
     # alg: "basinhoppin" or "TPE" (see struct_optimization_2D)
     # results: optional list; one dict per optimized member (incl. infeasible spans with member=None) is appended
     # file_tag: optional suffix of the Excel file name (avoids overwriting when runs share the same name)
-    # mean_gwp: True -> additional "mean sections" (EPD only), see opt_and_plot.get_mean_materials
-    # min_max_only: True -> only products with MIN_MAX = 1; False -> all products, same selection as 1D
+    # mean_gwp: True -> additional "mean sections" (variant "mean", EPD only), see opt_and_plot.get_mean_materials
+    # min_max_only: True -> per strength class only "minmin" (lowest GWP concrete + lowest GWP rebar) and "maxmax"
+    #               (highest + highest); False -> every concrete x every rebar; same selection as 1D,
+    #               see opt_and_plot.VARIANTS
+    # members_excel: False -> no Members_2D_*.xlsx (the template writes its own result file)
 
     if idx_vrfctn == -1:
         idx_vrfctn = random.randint(0, len(length_x)-1)
@@ -46,26 +49,12 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
     to_plot = []
     connection = sqlite3.connect(database_name)
     cursor = connection.cursor()
-    selection = """
-                AND ("Copy for strength" IS NULL OR "Copy for strength" LIKE '%a%')
-                AND MECH_PROP NOT LIKE '%GL30%'
-                AND  MIN_MAX = 1""" if min_max_only else ""
+    # product selection as in 1D (opt_and_plot.get_main_selection): (prod_id string, mean material or None, variant)
+    # To see the old version, run git show a3fc314:Workflow/plot_datasets_2D.py (around lines 49-68).
     for mat_name in mat_names:
-        inquiry = ("""
-                SELECT PRO_ID FROM products
-                WHERE DENSITY IS NOT NULL
-                AND MECH_PROP IS NOT NULL""" + selection + """
-                AND "MATERIAL" LIKE """ + mat_name + source_filter(basetype)
-        )
-        # inquiry = ("SELECT PRO_ID FROM products WHERE"
-        #            " material=" + mat_name)
-        cursor.execute(inquiry)
-        products = [("'" + str(row[0]) + "'", None) for row in cursor.fetchall()]  # (prod_id string, mean material or None)
-        # mean sections: one per strength class of this material
-        if mean_gwp and basetype == "epd":
-            products += [(mean["prod_id"], mean)
-                         for mean in opt_and_plot.get_mean_materials(cursor, mat_name.strip("'"), None, basetype)]
-        for prod_id_str, mean in products:
+        products = opt_and_plot.get_main_selection(cursor, mat_name.strip("'"), basetype, min_max_only,
+                                                   mean_gwp and basetype == "epd")
+        for prod_id_str, mean, variant in products:
             is_mean = mean is not None
             inquiry = ("""
                                 SELECT MECH_PROP FROM products
@@ -84,7 +73,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 # create initial wooden rectangular cross-section
                 section_0 = struct_analysis.RectangularWood(timber, 1.0, 0.1, xi=0.02)
                 # add section to content-definition of plot-line
-                line_i = [section_0, floorstruc, is_mean]
+                line_i = [section_0, floorstruc, is_mean, variant]
                 to_plot.append(line_i)
 
             elif crsec_type == "rc_rec":
@@ -92,11 +81,11 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                 concrete = struct_analysis.ReadyMixedConcrete(mech_prop, database_name, prod_id=prod_id_str)
                 concrete.get_design_values()
                 opt_and_plot.apply_mean_material(concrete, mean)
-                # one section per unique rebar (lowest / highest GWP), no duplicate if only one exists
-                # (mean section: the mean rebar)
+                # rebar of the same variant: minmin -> lowest GWP, maxmax -> highest GWP, all -> every rebar,
+                # mean -> the mean rebar, kbob -> lowest and highest GWP (see opt_and_plot.get_secondary_selection)
                 # To see the old version, run git show 36ba32b:Workflow/plot_datasets_2D.py (around lines 72–122).
-                for rebar_prod_id, rebar_mean in opt_and_plot.get_secondary_products(
-                        cursor, 'Steel_reinforcing_bar', 'B500B', basetype, is_mean):
+                for rebar_prod_id, rebar_mean in opt_and_plot.get_secondary_selection(
+                        cursor, 'Steel_reinforcing_bar', 'B500B', basetype, variant):
                     # create a rebar material object with mech prop B500B and low rsp high emission values
                     rebar = struct_analysis.SteelReinforcingBar("'B500B'", database_name, prod_id=rebar_prod_id)
                     opt_and_plot.apply_mean_material(rebar, rebar_mean)
@@ -105,7 +94,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                                                            0.014, 0.15, 0.008, 0.15, 0.008, 0.15, 0.008, 0.15,
                                                            0, 0.15, 0,2.0,0.02,0.0, 0.15)
                     # add section to content-definition of plot-line
-                    to_plot.append([section_0, floorstruc, is_mean])
+                    to_plot.append([section_0, floorstruc, is_mean, variant])
 
             elif crsec_type == "rc_rib":
                 # create a Concrete material object
@@ -153,8 +142,8 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                                                             0.15,
                                                             0.01, 0.15, 0.018, 3, 0.01, 0.15, 2)
                 # add sections to content-definition of plot-line
-                line_i0 = [section_00, floorstruc, is_mean]
-                line_i1 = [section_01, floorstruc, is_mean]
+                line_i0 = [section_00, floorstruc, is_mean, variant]
+                line_i1 = [section_01, floorstruc, is_mean, variant]
                 to_plot.extend([line_i0, line_i1])
 
 
@@ -186,7 +175,7 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
                     if results is not None:
                         results.append({"member": opt_member, "section_0": i[0], "length": lx, "criterion": criterion,
                                         "optimum": optimum, "dataset": len(member_list), "mean_section": i[2],
-                                        "failed_checks": failed})
+                                        "variant": i[3], "failed_checks": failed})
                 member_list.append(members)
                 if i[0].section_type[0:2] == "rc":
                     material_lg = i[0].concrete_type.mech_prop + " + " + i[0].rebar_type.mech_prop
@@ -299,7 +288,9 @@ def plot_dataset(length_x,length_y, support, database_name, criteria, optima, fl
             for member in pair
             if member is not None
     ]
-    if crsec_type == "rc_rec" and sup == "LL-eingespannt":
+    if not members_excel:
+        pass
+    elif crsec_type == "rc_rec" and sup == "LL-eingespannt":
         class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_eingespannt_{basetype}{file_tag}.xlsx", folder="Results")
     elif crsec_type == "rc_rec" and sup == "LL-frei":
         class_to_excel_2.members_to_excel2(members_2d, f"Members_2D_LL_frei_{basetype}{file_tag}.xlsx", folder="Results")

@@ -90,14 +90,24 @@ def strip_and_complete_mech_prop(raw_val):
 
 def get_mean_materials(cursor, material, mech_prop, basetype):
     # returns one mean material per strength class of a material (same products as get_low_high_prod_ids):
-    # [{"mech_prop", "prod_id", "GWP", "density", "n"}]; GWP and density are the arithmetic means of the class,
+    # [{"mech_prop", "prod_id", "GWP", "density", "n"}]
+    # the sections compute CO2 per volume as GWP * density, so the mean must be taken of that product:
+    #   density = arithmetic mean of the densities                      [kg/m3]
+    #   GWP     = mean(GWP_i * density_i) / mean(density_i)             [kg-CO2-eq/t], density-weighted mean
+    #   -> GWP * density = mean(GWP_i * density_i) = mean CO2 per m3 of the class (exact)
+    # (old: GWP and density averaged separately -> mean(GWP) * mean(density) != mean(GWP * density))
     # prod_id is one product of the class: it only provides the data for building the material object
     groups = {}
-    for row in get_products_by_gwp(cursor, material, mech_prop, basetype): 
-        groups.setdefault(strip_and_complete_mech_prop(row[2]), []).append(row) # counting starts at 0 -> 
-    return [{"mech_prop": name, "prod_id": "'" + str(rows[0][0]) + "'", "n": len(rows),
-             "GWP": sum(row[1] for row in rows) / len(rows), "density": sum(row[3] for row in rows) / len(rows)}
-            for name, rows in sorted(groups.items())]
+    for row in get_products_by_gwp(cursor, material, mech_prop, basetype):
+        groups.setdefault(strip_and_complete_mech_prop(row[2]), []).append(row)
+    means = []
+    for name, rows in sorted(groups.items()):
+        n = len(rows)
+        density = sum(row[3] for row in rows) / n
+        gwp_per_m3 = sum(row[1] * row[3] for row in rows) / n  # mean of GWP * density [kg-CO2-eq/t * kg/m3]
+        means.append({"mech_prop": name, "prod_id": "'" + str(rows[0][0]) + "'", "n": n,
+                      "GWP": gwp_per_m3 / density, "density": density})
+    return means
 
 
 def apply_mean_material(material, mean):

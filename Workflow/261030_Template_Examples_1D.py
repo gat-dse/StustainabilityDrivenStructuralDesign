@@ -38,8 +38,9 @@ DEFAULTS = {
                                 # Members file: best member per span within each variant (all strength classes,
                                 # materials and t3 cases compete); only for basetype "epd", ignored for "kbob"
     "mean_gwp": True,           # True: additional "mean sections" (variant "mean"): one per strength class of the
-                                # materials of the run, with the arithmetical mean GWP and mean density of all products
-                                # of that class; rebar (B500B) and board (C24) are means as well; wd_rib: both t3 cases
+                                # materials of the run, with the density-weighted mean GWP and the mean density of all
+                                # products of that class (GWP * density = mean CO2 per m3); rebar (B500B) and board
+                                # (C24) are means as well; wd_rib: both t3 cases
                                 # are kept; only for basetype "epd", ignored for "kbob"
 }
 
@@ -447,6 +448,9 @@ def write_excel(path, sheets, df_runs):
 SORT_KEYS = {"GWP": ("co2_struct [kgCO2eq/m2]", "h_struct [m]"), "h": ("h_struct [m]", "co2_struct [kgCO2eq/m2]")}
 NO_SECTION = "no feasible section"
 COLUMN_BLOCK.update({"candidates (feasible/all)": "identification", "note": "identification"})
+# names of list entries in the member attributes (instead of the index), e.g. "fire_bottom" instead of "fire[0]"
+# fire: exposed sides of the member (0: no fire, 1: fire), see struct_analysis.Member1D
+LIST_LABELS = {"fire": ("bottom", "left", "top", "right")}
 
 
 def member_attributes(obj, path="", out=None):
@@ -457,8 +461,10 @@ def member_attributes(obj, path="", out=None):
     if obj is None or isinstance(obj, (numbers.Number, str)):
         out[path] = obj
     elif isinstance(obj, (list, tuple)):
+        labels = LIST_LABELS.get(path)
         for idx, item in enumerate(obj):
-            member_attributes(item, f"{path}[{idx}]", out)
+            name = f"{path}_{labels[idx]}" if labels and len(labels) == len(obj) else f"{path}[{idx}]"
+            member_attributes(item, name, out)
     elif hasattr(obj, "__dict__"):
         if path:
             out[path] = type(obj).__name__
