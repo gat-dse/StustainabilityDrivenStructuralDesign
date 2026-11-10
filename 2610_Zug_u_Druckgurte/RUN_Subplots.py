@@ -2,7 +2,8 @@
 Zug- und Druckgurte aller Materialien – Darstellung wie Vorlage:
   a) Zuggurt   b) Druckgurt   (getrennte Subplots)   c) Querschnitte
 
-Berechnung, Materialien und CO2-Werte stammen aus RUN.py (Median + 10%/90%-Fraktile).
+Berechnung, Materialien und CO2-Werte stammen aus RUN.py (Median + 10%/90%-Fraktile),
+CO2-Werte mit/ohne mittlere Transportdistanz: Schalter TRANSPORT (RUN.e_tr bzw. RUN.e).
 Beim Druckgurt sind Verkürzung u und Druckkraft N positiv aufgetragen.
 """
 
@@ -18,6 +19,12 @@ import RUN as base
 mm = base.mm
 HERE = Path(__file__).resolve().parent
 
+EXCLUDE = ()            # nicht dargestellte Materialien (alle werden gezeigt)
+
+TRANSPORT = False       # True: CO2-Werte inkl. mittlere Transportdistanz (RUN.e_tr), False: ohne (RUN.e)
+
+# Bewehrungsgehalte Stahlbeton aus RUN.py (RHO_T = 10 % Zug, RHO_C = 0.6 % Druck)
+
 # 'Beton' als eigenes Wort -> 'Stahlbeton' (nicht in 'Betonstahl' oder 'Stahlbeton')
 _BETON = re.compile(r"(?<![A-Za-zÄÖÜäöü])Beton(?![a-zäöü])")
 
@@ -27,19 +34,37 @@ def stahlbeton(text):
 
 
 # Beschriftungen je Subplot: key -> (u auf Medianlinie [mm], Textposition (u, N) [mm, MN], Krümmung)
-NOTES_TENSION = {
-    "t24": (0.6, (0.45, 20.5), 0.25),
-    "t":   (0.9, (1.45, 22.0), 0.2),
-    "a":   (2.8, (2.45, 18.0), -0.2),
-    "s":   (3.3, (3.55, 18.0), 0.2),
+# --- mit Transport (tiefere Kurven) ---
+NOTES_TENSION_TR = {
+    "t24": (0.45, (0.4, 10.5), 0.25),
+    "t":   (0.85, (1.15, 12.0), 0.2),
+    "a":   (2.6, (1.85, 10.4), -0.2),
+    "s":   (3.3, (3.55, 13.0), 0.2),
     "rc":  (3.6, (3.45, 1.4), -0.2),
     "pc":  (2.3, (1.85, 1.75), 0.2),
 }
-NOTES_COMPRESSION = {
-    "t24": (0.9, (0.5, 24.0), -0.2),
-    "t":   (1.25, (1.8, 23.5), 0.15),
-    "rc":  (2.8, (2.15, 20.3), 0.1),
+NOTES_COMPRESSION_TR = {
+    "t24": (0.95, (0.4, 13.5), -0.2),
+    "t":   (1.25, (1.1, 16.3), 0.15),
+    "rc":  (2.8, (2.1, 17.3), 0.1),
     "cc":  (3.0, (3.45, 17.6), 0.2),
+    "s":   (2.9, (2.95, 1.4), -0.15),
+    "a":   (1.8, (2.0, 1.4), 0.15),
+}
+# --- ohne Transport ---
+NOTES_TENSION_OT = {
+    "t24": (0.6, (0.35, 17.0), 0.25),
+    "t":   (0.9, (1.3, 15.5), 0.2),
+    "s":   (3.0, (1.55, 12.6), -0.2),
+    "a":   (2.8, (2.65, 11.6), -0.15),
+    "rc":  (3.6, (3.45, 1.4), -0.2),
+    "pc":  (2.3, (1.85, 1.75), 0.2),
+}
+NOTES_COMPRESSION_OT = {
+    "t24": (0.6, (0.35, 17.5), -0.2),
+    "t":   (1.2, (1.9, 18.4), 0.15),
+    "rc":  (2.8, (3.05, 18.4), 0.1),
+    "cc":  (3.0, (3.5, 15.0), 0.2),
     "s":   (2.9, (2.95, 1.4), -0.15),
     "a":   (1.8, (2.0, 1.4), 0.15),
 }
@@ -67,6 +92,8 @@ def _panel(ax, sign, notes, uu, u_max):
     """Zeichnet alle Materialien für Zug (sign=+1) oder Druck (sign=-1, positiv aufgetragen)."""
     ends = []
     for m in base.MATERIALS:
+        if m["key"] in EXCLUDE:
+            continue
         f, (k50, k10, k90), col = m["f"], m["keys"], m["color"]
         N50, N10, N90 = (sign * f(sign * uu, k) / 1e6 for k in (k50, k10, k90))
         if np.max(np.abs(N50)) < 1e-9:          # Material trägt in dieser Richtung nicht
@@ -94,7 +121,16 @@ def _panel(ax, sign, notes, uu, u_max):
         base._end_arrows(ax, ends, u_max, +1, min_gap=1.2)
 
 
-def plot(u_max=4, n=2001, y_max=27.5, fname="last_verformung_subplots.png"):
+def plot(*args, values=None, **kw):
+    """Plot mit CO2-Werten gemäss TRANSPORT (RUN.e_tr bzw. RUN.e); andere Werte über `values`."""
+    if values is None:
+        values = base.e_tr if TRANSPORT else base.e
+    with base.emissions(values):
+        return _plot(*args, transport=values is base.e_tr, **kw)
+
+
+def _plot(u_max=4, n=2001, y_max=20.0, fname="last_verformung_subplots.png",
+          transport=True):
     uu = np.linspace(0, u_max, n) * mm
 
     fig = plt.figure(figsize=(18, 14))
@@ -104,18 +140,32 @@ def plot(u_max=4, n=2001, y_max=27.5, fname="last_verformung_subplots.png"):
     axd = fig.add_subplot(gs[0, 1])
     axc = fig.add_subplot(gs[1, :])
 
-    _panel(axt, +1, NOTES_TENSION, uu, u_max)
-    _panel(axd, -1, NOTES_COMPRESSION, uu, u_max)
+    notes_t, notes_c = ((NOTES_TENSION_TR, NOTES_COMPRESSION_TR) if transport
+                        else (NOTES_TENSION_OT, NOTES_COMPRESSION_OT))
+    _panel(axt, +1, notes_t, uu, u_max)
+    _panel(axd, -1, notes_c, uu, u_max)
     _style_axis(axt, u_max, y_max, "$N_{Rd}$ [MN]", "Zuggurt")
     _style_axis(axd, u_max, y_max, "$N_{Rd}^{-}$ [MN]", "Druckgurt")
 
     handles = [Line2D([], [], color="k", lw=2.8, label="Median"),
                Line2D([], [], color="k", lw=1.1, ls=(0, (3, 2)), label="10%- / 90%-Fraktil")]
-    axt.legend(handles=handles, loc="upper right", bbox_to_anchor=(1.0, 0.93), frameon=False,
-               fontsize=12.5, title="Budget: 100 kgCO$_2$ pro m Gurtlänge", title_fontsize=12.5)
+    leg = axt.legend(handles=handles, loc="upper right", bbox_to_anchor=(1.07, 0.92),
+                     frameon=True, fancybox=False, fontsize=12.5, title_fontsize=12.5,
+                     title="Budget: 100 kgCO$_2$ pro Gurtlänge\n"
+                           + ("inkl. mittlere Transportdistanz, " if transport else "ohne Transport, ")
+                           + "gerechnet nach KBOB [5]",
+                     borderpad=0.7, handlelength=2.6)
+    leg._legend_box.align = "left"
+    frame = leg.get_frame()
+    frame.set_linestyle((0, (1, 2)))    # punktiert
+    frame.set_edgecolor("k")
+    frame.set_linewidth(1.2)
+    frame.set_facecolor("white")
+    frame.set_alpha(1.0)
+    leg.set_zorder(10)
 
     # Querschnitte aus RUN.py, Bezeichnungen 'Beton' -> 'Stahlbeton'
-    base._sections(axc)
+    _sections(axc)
     for t in axc.texts:
         t.set_text(stahlbeton(t.get_text()))
 
@@ -123,6 +173,12 @@ def plot(u_max=4, n=2001, y_max=27.5, fname="last_verformung_subplots.png"):
         ax.text(dx, 1.02, lab, transform=ax.transAxes, fontsize=17, va="bottom")
     base.save_fig(fig, HERE / fname, bbox_inches="tight", pad_inches=0.2)
     return fig
+
+
+def _sections(axc, exclude=EXCLUDE):
+    """Querschnitte aus RUN._sections, ohne die Materialien in `exclude`."""
+    base._sections(axc, exclude=exclude,
+                   titles={"cc": f"Umschnürter Beton|C30/37, $\\rho_w$ = {base.RHO_W:.1%}, $\\rho_l$ = {base.RHO_L:.1%}"})
 
 
 if __name__ == "__main__":

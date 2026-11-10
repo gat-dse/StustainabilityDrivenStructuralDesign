@@ -114,7 +114,7 @@ def plot(*args, values=None, **kw):
         return _plot(*args, **kw)
 
 
-def _plot(u_max=4, n=2001, y_max=20.0, fname="last_verformung_subplots_ohne_betonstahl.png"):
+def _plot(u_max=4, n=2001, y_max=25.0, fname="last_verformung_subplots_ohne_betonstahl.png"):
     uu = np.linspace(0, u_max, n) * mm
 
     fig = plt.figure(figsize=(18, 14))
@@ -163,5 +163,6 @@ def _sections(axc, exclude=EXCLUDE):
 
 
 if __name__ == "__main__":
-    plot()
+    plot(values=base.e)  # ohne Transport
+    # plot()                     # mit Transport (Standard, base.e_tr)
     plt.show()

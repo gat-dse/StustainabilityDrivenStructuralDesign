@@ -104,7 +104,7 @@ def label(r, short=False):
 # 2) Plot N(u) + Querschnitte
 # =============================================================================
 def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dark=False,
-         y_top=15.0, compact=False, slide=False, FS=16):
+         y_top=15.0, y_bottom=-35.9, compact=False, slide=False, FS=16):
     """compact=True: ohne (a)/(b), Querschnitte rechts neben dem Diagramm untereinander.
     slide=True: wie compact, aber im Folienformat 16:9 mit einheitlicher, grosser Schrift
     (Grundgrösse FS [pt])."""
@@ -152,6 +152,8 @@ def plot(rows, e_s, u_min=-4, u_max=4, n=4001, fname="stahlbeton_jahre.png", dar
     ymin = np.nanmin([np.nanmin(y) for y in Nall]) * 1.15
     if y_top is not None:                      # Zugbereich nur bis y_top [MN]
         ymax = y_top + 0.6                     # etwas Luft für die Pfeilspitze über 10 MN
+    if y_bottom is not None:                   # Druckbereich fix bis y_bottom [MN]
+        ymin = y_bottom                        # -35.9 = Wert des Nexigen-Plots (auto)
     ax.set_xlim(u_min - 0.1, u_max + 0.3)
     ax.set_ylim(ymin, ymax)
     for s in ("top", "right"):

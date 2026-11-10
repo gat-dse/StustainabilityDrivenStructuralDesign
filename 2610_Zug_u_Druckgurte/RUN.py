@@ -913,13 +913,15 @@ def invert_bw(fig):
                 lab.set_bbox(dict(facecolor="black", edgecolor="none", alpha=0.7, pad=0.5))
 
 def _sections(axc, exclude=(), titles=None, layout=None, W=1250.0, text_mm=1500.0,
-              fontsize=12.5, linespacing=1.5, line_mm=None):
+              fontsize=12.5, linespacing=1.5, line_mm=None, extra=None):
     """Querschnitte (Median-e) als Quadrate im gleichen Massstab + A und g0k.
     exclude: Material-Keys, die weggelassen werden; titles: {key: Titel} zum Überschreiben.
     layout: None = eine Zeile; sonst Liste von Zeilen mit Material-Keys, z.B.
             [["rc", "cc", "t", "t24"], ["pc", "a", "s"]]  (W = Spaltenbreite, text_mm = Platz
             für den Text unter den Quadraten, beides in mm im Querschnittsmassstab).
-    line_mm: falls gesetzt, wird die Texthöhe je Zeile aus der Zeilenzahl bestimmt."""
+    line_mm: falls gesetzt, wird die Texthöhe je Zeile aus der Zeilenzahl bestimmt.
+    extra: {key: [Zeilen]} zusätzliche Textzeilen unter einem Querschnitt (z.B. Kosten)."""
+    extra = extra or {}
     gk = {k: v * g / 1000 for k, v in gamma.items()}          # kN/m3
     A_rct = A_rc(RHO_T, e["c"], e["s"])
     A_rcc = A_rc(RHO_C, e["c"], e["s"])
@@ -966,7 +968,7 @@ def _sections(axc, exclude=(), titles=None, layout=None, W=1250.0, text_mm=1500.
         rows = [[k for k in row if k in keys] for row in layout]
         size = {s_[1]: np.sqrt(s_[2]) / mm for s_ in secs}
         nlin = {s_[1]: len(s_[3]) + 2 + (1 if "|" in s_[0] else 0) - (1 if s_[4] is None else 0)
-                for s_ in secs}
+                + len(extra.get(s_[1], [])) for s_ in secs}
         y, ncol = 0.0, max(len(r) for r in rows)
         for row in rows:
             amax = max(size[k] for k in row)
@@ -995,6 +997,7 @@ def _sections(axc, exclude=(), titles=None, layout=None, W=1250.0, text_mm=1500.
         txt += lines
         if g0k is not None:
             txt += [f"$g_{{0k}}$ = {g0k:.1f} kN/m"]
+        txt += extra.get(key, [])
         axc.annotate("\n".join(txt), xy=(x0, yb), xytext=(0, -8), textcoords="offset points",
                      ha="left", va="top", fontsize=fontsize, linespacing=linespacing,
                      annotation_clip=False)
