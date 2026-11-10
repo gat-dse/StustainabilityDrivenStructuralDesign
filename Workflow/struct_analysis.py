@@ -526,11 +526,20 @@ class FlatSlab2D(SupStrucRectangular):
         self.as_min = mr / ( 0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
 
         # Durchmesser Mindestbewehrung für 1. & 4. Lage
+        # Durchmesserliste nur einmal definiert (struct_optimization_2D.BEWEHRUNG_D); Import hier statt oben,
+        # weil struct_optimization_2D seinerseits struct_analysis importiert (zirkulärer Import)
+        from struct_optimization_2D import BEWEHRUNG_D
         self.di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
         self.di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
-        # Durchmesser Mindestbewehrung für 2. & 3. Lage
         self.di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5  # 2. Lage mit Abstand s_yu
         self.di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
+        
+        # aufrunden auf nächsten Realen Bewehrungsdurchmesser
+        self.di_xu_min = min((d for d in BEWEHRUNG_D if d >= self.di_xu_min), default=self.di_xu_min) 
+        self.di_xo_min = min((d for d in BEWEHRUNG_D if d >= self.di_xo_min), default=self.di_xo_min)
+        self.di_yu_min = min((d for d in BEWEHRUNG_D if d >= self.di_yu_min), default=self.di_yu_min)
+        self.di_yo_min = min((d for d in BEWEHRUNG_D if d >= self.di_yo_min), default=self.di_yo_min)
+        
 
         # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
         self.hmin_c = (2 * self.c_nom + 0.032
@@ -854,8 +863,8 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         self.roh_slab = self.as_p / self.d
 
         #Berechnung Geometrischer Bewehrungsgehalt roh für PB (aus Hausübung 02, Stahlbeton II)
-        self.roh = 0.85*(self.concrete_type.fcd/self.rebar_type.fsd)*(self.x_PB_p/self.d_PB)
-        self.rohs = 0.85 * (self.concrete_type.fcd / self.rebar_type.fsd) * (self.x_PB_n / self.ds_PB)
+        self.roh  = 0.85 * (self.concrete_type.fcd/self.rebar_type.fsd) * (self.x_PB_p/self.d_PB)
+        self.rohs = 0.85 * (self.concrete_type.fcd/self.rebar_type.fsd) * (self.x_PB_n/self.ds_PB)
 
         # Faktor für Durchbiegung Langzeit, gerissen
         self.Faktor_ger = self.f_w_ger(self.roh, self.rohs, self.phi, self.h, self.d_PB)
@@ -864,8 +873,8 @@ class RibbedConcrete(SupStrucRibbedConcrete):
         # Berechnung Vu (Querkraftwiderstand charak.) für Platte (Slab) & Plattenbalken
         [self.vu_p, self.vu_n, self.as_bw] = self.calc_shear_resistance('Platte')  #Platte "Querrichtung"
         [self.vu_PB_p, self.vu_PB_n, self.as_PB_bw] = self.calc_shear_resistance('Plattenbalken')  #Rippe Plattenbalken "Längsrichtung"
-        #Bewehrung Rippen vs. Mindestebewerung nach sIA262_2025, Formel (116)
-        self.rohw = (self.as_PB_bw / self.b_w) / (0.9 * self.d)
+        #Bewehrung Rippen vs. Mindestebewerung nach SIA262_2025, Formel (116)
+        self.rohw = (self.as_PB_bw / self.b_w) / (0.9 * self.d) # CHECK AGAIN -> formula says divide by s(stababstand) -> ds but why not ds_PB
         self.rohw_min = 0.001 * (self.concrete_type.fck * 1e-6 / 30) ** 0.5 * 500 / (self.rebar_type.fsk * 1e-6)  # Formel (116) mit fck und fyk in MPa
 
         self.g0k = self.calc_weight(concrete_type.weight) #Eigenlast QS pro Länge in [N/m']
@@ -1557,6 +1566,7 @@ class Member1D:
         if self.requirements.install == "ductile": #Lastfall häufig und w < L/350
             self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
 
+            
             if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
                 self.f_w_ger_2 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                            self.section.h, self.section.d)
@@ -1573,7 +1583,7 @@ class Member1D:
                         self.q_per * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
                                                                  self.section.h, self.section.d)
                         + (self.q_freq - self.q_per) * RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs,
-                                                                                   0, self.section.h, self.section.d)
+                                                                                   0, self.section.h, self.section.d)  
                         - self.q_per
                 )
 
@@ -1584,6 +1594,7 @@ class Member1D:
                                                              self.section.h, self.section.d)
                 self.f_w_ger_0 = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, 0,
                                                              self.section.h, self.section.d)
+                
                 '''
                 # Vereinfachte Berechnung für gerissene Durchbiegung mit SIA262:2025, Formel (104)
                 self.f_w_ger = RectangularConcrete.f_w_ger(self.section.roh, self.section.rohs, self.section.phi,
@@ -1679,6 +1690,7 @@ class Member1D:
                         shift = 0.35
                     else:
                         shift = 0.5
+                    #CHECK AGAIN -> mu_max apparently comes from calc_mu_pb -> x_p, d and mr_p should be all PB -> same for neg side
                     x_d = self.section.x_p / self.section.d
                     factor = min(0.5 * (1 + 2 / np.pi * np.arctan((self.section.mu_max - self.section.mr_p) / epsilon)),    #README: Wieso wird hier mit diesem factor gearbeitet? und nicht ienfahc mit qu_bend = 0 wie beim Mehrfehldträger?
                                  1 - 0.5 * (1 + 2 / np.pi * np.arctan((x_d - shift) / epsilon)))
@@ -1686,6 +1698,7 @@ class Member1D:
                 else:
                     # for all other cross-sections bending strength = 0
                     qu_bend = 0
+            # CHECK AGAIN -> rib shear never checked BUG?? -> same for the neg side
             qu_shear = self.section.vu_p / (max(alpha_v) * self.system.l_tot)
         else:
             if qs_class_vorh[1] <= qs_class_erf[1]:
@@ -1715,6 +1728,7 @@ class Member1D:
     def calc_qk_zul_gzt(self, gamma_g=1.35, gamma_q=1.5):
         self.qk_zul_gzt = (self.qu - gamma_g * self.gk) / gamma_q
 
+    # CHECK AGAIN -> comp against mr_PB_p not mr_p ?
     def calc_f1(self):
         # calculates first frequency of system according to HBT, Seite 46
         kf2 = self.system.kf2

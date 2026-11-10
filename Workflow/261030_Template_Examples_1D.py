@@ -4,8 +4,9 @@
 # HOW TO USE: copy this file and only adjust PART 1 (DEFAULTS and RUNS).
 # Before the first optimization starts, all runs are checked (allowed values, allowed combinations, products in the
 # database). If anything is wrong, the script stops with a list of all errors and nothing is optimized.
-# The results are written into one Excel (Results/<timestamp>_batch_1D.xlsx): one sheet per run (00, 01, ...) and the
-# sheet "runs". Plotting is done separately.
+# The results are written into one Excel (Results/<timestamp>_Members_1D.xlsx): one sheet per run (00, 01, ...) with
+# the best member per span and material variant (minmin / mean / maxmax, see min_max_only) and the sheet "runs".
+# Optional (SAVE_BATCH): Results/<timestamp>_batch_1D.xlsx with every optimized member. Plotting is done separately.
 
 
 # ======================================================================================================================
@@ -14,6 +15,8 @@
 
 # True: only check the runs and print the overview table, no optimization
 CHECK_ONLY = False
+# True: additionally save the batch file (every optimized member of every run, incl. infeasible ones)
+SAVE_BATCH = False
 
 #-----------------------------------------------------------------------------------------------------------------------
 # DEFAULTS: used for every key a run does not set itself
@@ -28,13 +31,17 @@ DEFAULTS = {
     "g2k": 0.75e3,              # n.t. Einbauten [N/m2]
     "qk": 2e3,                  # Nutzlast [N/m2]
     "use": "Wohnen",            # building use (Nutzung), only a label in the results; qk must fit it
-    "min_max_only": False,       # True: only products with MIN_MAX = 1 in the database (lowest and highest GWP of
-                                # each strength class); False: all products. Rebar, boards and mean sections
-                                # are not affected; only for basetype "epd", ignored for "kbob"
-    "mean_gwp": True,           # True: additional "mean sections": one per strength class of the materials of the
-                                # run, with the mean GWP and mean density of all products of that class; rebar
-                                # (B500B) and board (C24) are means as well; wd_rib: both t3 cases are kept;
-                                # only for basetype "epd", ignored for "kbob"
+    "min_max_only": True,       # True: per strength class 2 sections: "minmin" (lowest GWP product with MIN_MAX = 1
+                                # + lowest GWP rebar / board) and "maxmax" (highest + highest); a class with only
+                                # 1 product has no minmin / maxmax (only mean). False: every product x every
+                                # rebar / board (variant "all", much longer runtime).
+                                # Members file: best member per span within each variant (all strength classes,
+                                # materials and t3 cases compete); only for basetype "epd", ignored for "kbob"
+    "mean_gwp": True,           # True: additional "mean sections" (variant "mean"): one per strength class of the
+                                # materials of the run, with the density-weighted mean GWP and the mean density of all
+                                # products of that class (GWP * density = mean CO2 per m3); rebar (B500B) and board
+                                # (C24) are means as well; wd_rib: both t3 cases
+                                # are kept; only for basetype "epd", ignored for "kbob"
 }
 
 #-----------------------------------------------------------------------------------------------------------------------
@@ -68,6 +75,7 @@ import sqlite3
 import os
 import time
 import traceback
+import numbers
 from datetime import datetime
 from openpyxl.styles import PatternFill
 
@@ -204,7 +212,8 @@ def check_database(batch):
                 err.append(f"run {run['nr']}: no product for material {mat_name} with basetype {base!r}, "
                            f"min_max_only={min_max_only}")
         # CHECK SECONDARY MATERIALS: rebar for rc, boards for wd_rib (same queries as plot_dataset)
-        extra = {"rc": ("Steel_reinforcing_bar", "B500B"), "wd_rib": ("%3_and_5_plywood%", None)}
+        extra = {"rc": ("Steel_reinforcing_bar", "B500B"),
+                 "wd_rib": ("%3_and_5_plywood%", "C24" if base == "epd" else None)}
         mean_extra = {"rc": ("Steel_reinforcing_bar", "B500B"), "wd_rib": ("%3_and_5_plywood%", "C24")}
         key = crsec[:2] if crsec[:2] == "rc" else crsec
         use_mean = run["mean_gwp"] and base == "epd"
@@ -272,19 +281,12 @@ def prepare_runs(runs):
     if errors:
         print("\nINVALID RUNS - nothing was optimized:\n  " + "\n  ".join(errors))
         raise SystemExit(1)
-
-    # file_tag: suffix for the Members_*.xlsx file that plot_dataset writes per run.
-    # that file name only contains crsec_type, system, floor, basetype -> runs sharing these get "_run01", "_run02"... so they do not overwrite each other
-    name_key = lambda r: (r["crsec_type"], r["system"], r["floor"], r["basetype"])
-    for run in batch:
-        same_name = sum(name_key(r) == name_key(run) for r in batch)
-        run["file_tag"] = f"_run{run['nr']:02d}" if same_name > 1 else ""
     return batch
 
 
 def runs_table(batch):
     cols = ["nr", "label", "crsec_type", "system", "floor", "basetype", "alg", "max_iter", "lengths", "criteria",
-            "optima", "g2k", "qk", "use", "min_max_only", "mean_gwp", "mat_names", "file_tag"]
+            "optima", "g2k", "qk", "use", "min_max_only", "mean_gwp", "mat_names"]
     return pd.DataFrame([{c: (str(r[c]) if isinstance(r[c], list) else r[c]) for c in cols} for r in batch])
 
 
@@ -375,7 +377,7 @@ def member_row(entry, run, k):
     blocks = {
         # member_id = <run in the batch>-<member in the run>, both counted from 0 (first member: 00-000)
         "identification": {"member_id": f"{run['nr']:02d}-{k:03d}", "criterion": entry["criterion"],
-                           "optimum": entry["optimum"]},
+                           "optimum": entry["optimum"], "variant": entry["variant"]},
         "data source": {"basetype": run["basetype"], "use": run["use"]},
         "design configuration": {
             "plot_label": f"{run['system']}_{run['crsec_type']}_{run['floor']}_{run['basetype']}",
@@ -422,6 +424,91 @@ def write_sheet(writer, name, df):
     ws.freeze_panes = "B2"
 
 
+def all_columns(sheet_rows):
+    # column order of the longest row (feasible member), then the columns only other rows have (e.g. "note")
+    columns = max((list(r) for r in sheet_rows), key=len)
+    for r in sheet_rows:
+        columns += [c for c in r if c not in columns]
+    return columns
+
+
+def write_excel(path, sheets, df_runs):
+    # one sheet per run ({sheet name: rows}), last sheet "runs"; a run without rows (failed) has no sheet
+    with pd.ExcelWriter(path, engine="openpyxl") as writer:
+        for name, sheet_rows in sheets.items():
+            if sheet_rows:
+                write_sheet(writer, name, pd.DataFrame(sheet_rows, columns=all_columns(sheet_rows)))
+        df_runs.to_excel(writer, sheet_name="runs", index=False)
+    print(f"Results saved: {path}")
+
+
+#-----------------------------------------------------------------------------------------------------------------------
+# MEMBERS FILE: per span, criterion, optimum and material variant (see min_max_only) the best feasible member
+# best: optimum "GWP" -> lowest co2_struct, optimum "h" -> lowest h_struct; the other value decides a tie
+SORT_KEYS = {"GWP": ("co2_struct [kgCO2eq/m2]", "h_struct [m]"), "h": ("h_struct [m]", "co2_struct [kgCO2eq/m2]")}
+NO_SECTION = "no feasible section"
+COLUMN_BLOCK.update({"candidates (feasible/all)": "identification", "note": "identification"})
+# names of list entries in the member attributes (instead of the index), e.g. "fire_bottom" instead of "fire[0]"
+# fire: exposed sides of the member (0: no fire, 1: fire), see struct_analysis.Member1D
+LIST_LABELS = {"fire": ("bottom", "left", "top", "right")}
+
+
+def member_attributes(obj, path="", out=None):
+    # every attribute of a member (same content and order as the old Members_*.xlsx files), the path is the column
+    # name, e.g. "section.concrete_type.fck", "system.alpha_m[0]"; an object gets its class name as value
+    if out is None:
+        out = {}
+    if obj is None or isinstance(obj, (numbers.Number, str)):
+        out[path] = obj
+    elif isinstance(obj, (list, tuple)):
+        labels = LIST_LABELS.get(path)
+        for idx, item in enumerate(obj):
+            name = f"{path}_{labels[idx]}" if labels and len(labels) == len(obj) else f"{path}[{idx}]"
+            member_attributes(item, name, out)
+    elif hasattr(obj, "__dict__"):
+        if path:
+            out[path] = type(obj).__name__
+        for attr, value in vars(obj).items():
+            member_attributes(value, f"{path}.{attr}" if path else attr, out)
+    else:
+        out[path] = str(obj)
+    return out
+
+
+def with_identification(row, candidates, note):
+    # inserts the columns "candidates (feasible/all)" and "note" after "variant"
+    out = {}
+    for key, value in row.items():
+        out[key] = value
+        if key == "variant":
+            out.update({"candidates (feasible/all)": candidates, "note": note})
+    return out
+
+
+def best_rows(run, run_rows):
+    # one row per span, criterion, optimum and variant: the best feasible member with all its attributes, or a row
+    # with the note "no feasible section" if no member of that variant passed all checks
+    variants = [v for v in opt_and_plot.VARIANTS if any(row["variant"] == v for row, _ in run_rows)]
+    out = []
+    for criterion in run["criteria"]:
+        for optimum in run["optima"]:
+            for length in run["lengths"]:
+                for variant in variants:
+                    candidates = [(row, entry) for row, entry in run_rows
+                                  if (row["criterion"], row["optimum"], row["l_tot [m]"], row["variant"])
+                                  == (criterion, optimum, length, variant)]
+                    feasible = [(row, entry) for row, entry in candidates if row["feasible"]]
+                    count = f"{len(feasible)}/{len(candidates)}"
+                    if feasible:
+                        row, entry = min(feasible, key=lambda m: tuple(m[0][k] for k in SORT_KEYS[optimum]))
+                        out.append({**with_identification(row, count, ""), **member_attributes(entry["member"])})
+                    else:
+                        out.append(with_identification(
+                            {"member_id": None, "criterion": criterion, "optimum": optimum, "variant": variant},
+                            count, NO_SECTION) | {"run_nr": run["nr"], "feasible": False, "l_tot [m]": length})
+    return out
+
+
 #-----------------------------------------------------------------------------------------------------------------------
 # CHECK RUNS (shows only the runs and stops here if anything is wrong)
 batch = prepare_runs(RUNS)
@@ -450,7 +537,7 @@ for run in batch:
             run["lengths"], database_name, run["criteria"], run["optima"], get_floor(run["floor"]), req,
             run["crsec_type"], run["mat_names"], run["g2k"], run["qk"], run["max_iter"], len(run["lengths"]) - 1,
             system=run["system"], alg=run["alg"], basetype=run["basetype"],
-            results=results, file_tag=run["file_tag"], mean_gwp=run["mean_gwp"],
+            results=results, mean_gwp=run["mean_gwp"], members_excel=False,
             min_max_only=run["min_max_only"] and run["basetype"] == "epd")
     except Exception as e:
         traceback.print_exc()
@@ -459,7 +546,8 @@ for run in batch:
     if not results:
         failed.append((run["nr"], run["label"], "no products found (check mat_names / basetype)"))
         continue
-    rows += [member_row(entry, run, k) for k, entry in enumerate(results)]
+    # (row, entry) per member: the row for the tables, the entry for the member attributes of the Members file
+    rows += [(member_row(entry, run, k), entry) for k, entry in enumerate(results)]
 
 # Ende der Optimierung
 dauer = time.time() - start
@@ -470,18 +558,16 @@ for nr, label, err in failed:
 
 
 #-----------------------------------------------------------------------------------------------------------------------
-# SAVE ONE EXCEL: one sheet per run (00, 01, ...), last sheet "runs"; a failed run has no sheet, see status in "runs"
+# SAVE THE EXCEL FILES: one sheet per run (00, 01, ...), last sheet "runs"; a failed run has no sheet, see status in "runs"
 timestamp = datetime.now().strftime("%y%m%d_%H%M")
 os.makedirs(results_folder, exist_ok=True)
 df_runs["status"] = ["failed" if r["nr"] in [f[0] for f in failed] else "ok" for r in batch]
-excel_path = os.path.join(results_folder, f"{timestamp}_batch_1D.xlsx")
-with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-    for run in batch:
-        sheet_rows = [r for r in rows if r["run_nr"] == run["nr"]]
-        if not sheet_rows:
-            continue
-        # column order of the longest row (feasible member); infeasible rows only miss the result columns
-        columns = max((list(r) for r in sheet_rows), key=len)
-        write_sheet(writer, f"{run['nr']:02d}", pd.DataFrame(sheet_rows, columns=columns))
-    df_runs.to_excel(writer, sheet_name="runs", index=False)
-print(f"Results saved: {excel_path}")
+run_rows = {run["nr"]: [(row, entry) for row, entry in rows if row["run_nr"] == run["nr"]] for run in batch}
+# Members file: best member per span and variant
+write_excel(os.path.join(results_folder, f"{timestamp}_Members_1D.xlsx"),
+            {f"{run['nr']:02d}": best_rows(run, run_rows[run["nr"]]) if run_rows[run["nr"]] else []
+             for run in batch}, df_runs)
+# batch file (optional): every optimized member
+if SAVE_BATCH:
+    write_excel(os.path.join(results_folder, f"{timestamp}_batch_1D.xlsx"),
+                {f"{run['nr']:02d}": [row for row, _ in run_rows[run["nr"]]] for run in batch}, df_runs)
