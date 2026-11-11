@@ -926,173 +926,10 @@ def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter=None, alg=None)
 
     return None  # keine verfügbare Höhe erfüllt die Nachweise -> Aufrufer meldet "no feasible section"
 
-'''
-#OPTIMIERUNG mit Powell (alt)
-
-# outer function for finding optimal wooden rectangular cross-section
-def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28):
-    h_0 = member.section.h
-    bnds = [(0.1, h_max)] #h_max enstpricht der maximal verfügbaren Stärke für Massivholzdecken
-    minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
-    h_opt = math.ceil(minimal_h.x[0]*1000)/1000
-
-    #Check feasibilty: if optimizer hit upper bound, solution may be infeasible:
-    if h_opt >= h_max: #for wd_rec (Massivholzdecken) max available cross section height is 28 cm
-        # Only if it's truly at the max and still fails
-        feasibility = wd_rqs_h(h_opt, [member, criterion])
-        # For ULS: tolerance in kN/m; 0.5 kN/m is reasonable (5% of typical loads)
-        if feasibility > 0.5:  # Much higher tolerance
-            return None
-
-    section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
-    return section'''
-
-#TPE-OPTIMIERUNG
-
-##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
-# outer function for finding optimal wooden rectangular cross-section
-
-available_h = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28]
 
 
-def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter= 20, alg="TPE"):
-    h_0 = member.section.h
-    #Nur Höhen bis h_max zulassen
-    h_kandidaten = [h for h in available_h if h <= h_max] #h_max enstpricht der maximal verfügbaren Stärke für Massivholzdecken
-    if not h_kandidaten:
-        return None
-
-    add_arg = [member, criterion]
-    def objective(trial):
-        h = trial.suggest_categorical("h", h_kandidaten)
-        try:
-            return wd_rqs_h(h, add_arg)
-        except Exception:
-            return 1e20
-    study = optuna.create_study(
-        direction = "minimize",
-        sampler=optuna.samplers.TPESampler(seed=42)
-    )
-    #Startpunkt: nächstgelegene verfügbare Höhe zum ursprünglichen Querschnitt
-    study.enqueue_trial({
-        "h":min(h_kandidaten, key=lambda h: abs(h - h_0))
-    })
-
-    study.optimize(objective, n_trials=max_iter)
-
-    h_opt = study.best_params['h']
-
-    #Check feasibilty: if optimizer hit upper bound, solution may be infeasible:
-    if h_opt >= h_max: #for wd_rec (Massivholzdecken) max available cross section height is 28 cm
-        # Only if it's truly at the max and still fails
-        feasibility = wd_rqs_h(h_opt, [member, criterion])
-        # For ULS: tolerance in kN/m; 0.5 kN/m is reasonable (5% of typical loads)
-        if feasibility > 0.5:  # Much higher tolerance
-            return None
-
-    section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
-    return section
-
-# inner function used for optimizing wooden section in terms of height (equals co2)
-def wd_rqs_h(h, args):
-    m, criterion = args
-    querschnitt = struct_analysis.RectangularWood(m.section.wood_type, m.section.b, h, m.section.phi)
-    member = struct_analysis.Member1D(querschnitt, m.system, m.floorstruc, m.requirements, m.g2k, m.qk_area)
-    member.calc_qk_zul_gzt()
-    if criterion == "ULS":
-        to_minimize = abs(member.qk - member.qk_zul_gzt)
-    elif criterion == "SLS1":
-        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
-        # return penalty if w_adm =! w
-        penalty2 = 1e5*max(d1, d2, d3, 0)
-        to_minimize = member.section.h*(1000+penalty2)
-    elif criterion == "SLS2":
-        pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-        pen_w = member.wf_ed - member.requirements.w_f_cdr1*member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
-        # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-        pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
-        if member.f1 < member.requirements.f1:
-            penalty2 = max(pen_a*1e2, pen_w*1e5, pen_v*1e3, 0)
-        else:
-            penalty2 = max(pen_w*1e5, pen_v*1e3, 0)
-        to_minimize = member.section.h*(1+penalty2)
-    elif criterion == "FIRE":
-        # define penalty4, if fire resistance is not fulfilled
-        member.get_fire_resistance()
-        penalty4 = max(member.requirements.t_fire - member.fire_resistance, 0)
-        to_minimize = member.section.h*(1+penalty4)
-    elif criterion == "ENV":
-        d1, d2, d3 = [member.w_install - member.w_install_adm, member.w_use - member.w_use_adm,
-                      member.w_app - member.w_app_adm]
-        pen_a = member.a_ed - member.requirements.a_cd  # Grössenordnung 1e-2
-        pen_w = member.wf_ed - member.requirements.w_f_cdr1 * member.r1  # HBT S. 48. r2 wird gleich 1 gesetzt
-        # (Störungen im benachbarten Feld akzeptiert)  # Grössenordnung 1e-5
-        pen_v = member.ve_ed - member.ve_cd  # Grössenordnung 1e-3
-        penalty1 = max(member.qk - member.qk_zul_gzt, 0)
-        penalty2 = 1e5 * max(d1, d2, d3, 0)
-        if member.f1 < member.requirements.f1:
-            penalty3 = max(pen_a * 1e2, pen_w * 1e5, pen_v * 1e3, 0)
-        else:
-            penalty3 = max(pen_w * 1e5, pen_v * 1e3, 0)
-        member.get_fire_resistance()
-        penalty4 = max(member.requirements.t_fire - member.fire_resistance, 0)
-        to_minimize = member.section.h * (1 + penalty1 + penalty2 + penalty3 + penalty4)
-    else:
-        to_minimize = 99
-        print("criterion " + criterion + " is not defined")
-        print("criterion has to be 'ULS', 'SLS1', 'SLS2' or ENV")
-    return to_minimize
-
-##----------------------WOOD REQUIREMENTS--------------------------------------------------------------------
+##Otpimierung WD_RIB---------------------------------------------------------------------------------------
 # outer function for finding optimal wooden rib cross-section
-
-#ALTE VERSION
-
-'''
-def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100):
-    # definition of initial values for variables, which are going to be optimized
-    h0 = m.section.h
-    b0 = m.section.b
-    t20 = m.section.t2
-    t30 = m.section.t3
-    a0 = m.section.a
-    var0 = [b0, h0, t20, t30, a0]
-
-    # define bounds of variables
-    # Randbedingungen Abmessungen für R60 und Aufbau gemäss Lignum 4.1, Tabelle 433-2, Spalte G: Unten keine Beplankung, aber Hohlraumdämmung und Mindestabmessungen Rippen
-    bh = (0.22, 2.0)  # height of rib between 22 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
-    # Column G) and 200 cm
-    bb = (0.1, 0.52)  # width of rib between 10 cm (minimal requirement b x h = 100 x 220 for R60 according to Lignum 4.1, Table 433-2,
-    # Column G) and 52 cm
-    bt2 = (0.025, 0.16)  # hight of lower sheating between 2.5 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2,
-    # Column G) and 16 cm
-    bt3 = (0.027, 0.16)  # hight of lower sheating between 2.7 cm (minimal requirement for R60 according to Lignum 4.1, Table 433-2,
-    #Rippenabstand zwischen 0.625 und 0.7 m (Lignum4.1, Table 433-2)
-    ba = (0.625, 0.7)
-    bounds = [bb, bh, bt2, bt3, ba]
-
-    # definition of fixed values of cross-section
-    #TODO: Rippenabstand sollte als Variabel einfliessen. Achtung: gem. Tab. 433-2 darf der Abstand jedoch max. 700 mm sein! Grenzen entsprechend wählen.
-    l0 = m.li_max
-    # a = m.section.a
-    # t2 = m.section.t2
-    # t3 = m.section.t3
-
-    ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
-
-    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area]
-
-# optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
-    bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(wd_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
-                                                                            "method": "Powell"}, take_step=bounded_step)
-
-    b, h, t2, t3, a = opt.x
-    optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, b, h, a, t2, t3)
-    #print(l0, b, h, t2)
-    return optimized_section'''
-
 
 #NEU: Optimierung mit TPE
 # Handelsübliche Abmessungen (kategorial) für opt_wd_rib
@@ -1276,6 +1113,10 @@ def wd_rib_rqs(var, add_arg):
         print("criterion " + criterion + " is not defined")
         print("criterion has to be 'ULS', 'SLS1', 'SLS2', 'FIRE' or 'ENV'")
     return to_minimize
+
+
+
+
 
 # ----------------------------------------------------------------------------------------------------------------------
 # VERIFICATIONS OF AN OPTIMIZED MEMBER
