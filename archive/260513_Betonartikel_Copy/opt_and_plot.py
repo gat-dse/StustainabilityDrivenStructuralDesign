@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
-import class_to_excel
+#import class_to_excel
 import class_to_excel_2
 
 
