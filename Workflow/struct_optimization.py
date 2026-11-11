@@ -5,6 +5,7 @@ from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy
 import numpy as np
 import optuna
 import math
+import itertools
 
 
 class RandomDisplacementBounds(object):
@@ -106,7 +107,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         # Zulässige Durchmesser filtern
         BEWEHRUNG_D = [
-            0.006, 0.008, 0.010, 0.012, 0.014,
+            0.008, 0.010, 0.012, 0.014,
             0.016, 0.018, 0.020, 0.022,
             0.026, 0.030, 0.034, 0.040
         ]
@@ -264,7 +265,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
         ]
 
         BEWEHRUNG_D = [
-            0.006, 0.008, 0.010, 0.012, 0.014,
+            0.008, 0.010, 0.012, 0.014,
             0.016, 0.018, 0.020, 0.022,
             0.026, 0.030, 0.034, 0.040
         ]
