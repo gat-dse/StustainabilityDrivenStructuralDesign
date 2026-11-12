@@ -930,9 +930,8 @@ def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter=None, alg=None)
 
 
 ##Otpimierung WD_RIB---------------------------------------------------------------------------------------
-# outer function for finding optimal wooden rib cross-section
 
-#NEU: Optimierung mit TPE
+# Optimierung durch Berechnung aller handelsüblichen Kombinationen
 # Handelsübliche Abmessungen (kategorial) für opt_wd_rib
 T_KANDIDATEN_WDRIB = [0.027, 0.04]  # Beplankungsstärken t2 (unten) / t3 (oben)
 T2_FIX_WDRIB = 0.027 #Stärke Beplankung unten t2 fix (keine Optimierungsvariable)
@@ -940,10 +939,88 @@ BW_KANDIDATEN_WDRIB = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24]  # Rippenbr
 B_KANDIDATEN_WDRIB = [0.625, 0.7]  # Rippenabstand b (Lignum 4.1, Table 433-2)
 
 # Rippenhöhe h: Handelsstärken hängen vom Werkstoff der Rippe ab (Vollholz/BSH "C.." vs. Brettschichtholz "GL..")
-H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3]
+H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3] #2cm Schritte
 H_KANDIDATEN_GL = [0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.76, 0.8]  # 4 cm Schritte
 
 
+def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=None, alg=None, t2=T2_FIX_WDRIB, t3=T_KANDIDATEN_WDRIB[0]):
+    # Hohlkasten: alle handelsüblichen Kombinationen (bw, h, b) werden berechnet. Zurückgegeben wird die zulässige
+    # Kombination mit minimalem CO2 (to_opt="GWP") bzw. minimaler Höhe (to_opt="h").
+    # t2 und t3 sind fix vorgegeben und werden nicht optimiert. Pro Spannweite wird diese Funktion zweimal aufgerufen:
+    # einmal je Wert aus T_KANDIDATEN_WDRIB für t3 (Beplankung oben).
+    # max_iter und alg werden nicht benötigt (nur für einheitliche Signatur mit den anderen opt_*-Funktionen).
+
+    # Randbedingungen Abmessungen für R60 und Aufbau gemäss Lignum 4.1, Tabelle 433-2, Spalte G:
+    # Unten keine Beplankung, aber Hohlraumdämmung und Mindestabmessungen Rippen
+    bh = (0.20, 1.0)     # Rippenhöhe zwischen 20 cm (Mindestmass b x h = 120 x 200 für R60) und 1 m
+    bbw = (0.12, 0.52)   # Rippenbreite zwischen 12 cm (Mindestmass für R60) und 52 cm
+    bt2 = (0.025, 0.16)  # Beplankung unten zwischen 2.5 cm (Mindestmass für R60) und 16 cm
+    bt3 = (0.027, 0.16)  # Beplankung oben zwischen 2.7 cm (Mindestmass für R60) und 16 cm
+    bb = (0.625, 0.7)    # Rippenabstand b zwischen 0.625 und 0.7 m (Lignum 4.1, Table 433-2)
+
+    # t2, t3 sind fix vorgegeben -> nur prüfen, ob sie innerhalb der Randbedingungen liegen
+    if not (bt2[0] <= t2 <= bt2[1] and bt3[0] <= t3 <= bt3[1]):
+        return None
+
+    l0 = m.li_max
+    ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
+
+    # Handelsübliche Kandidaten auf die Randbedingungen (R60, Lignum 4.1) einschränken
+    bw_kandidaten = [x for x in BW_KANDIDATEN_WDRIB if bbw[0] <= x <= bbw[1]]
+    b_kandidaten = [x for x in B_KANDIDATEN_WDRIB if bb[0] <= x <= bb[1]]
+
+    # Höhenkandidaten in Abhängigkeit vom Werkstoff der Rippe (wood_type_1):
+    # mech_prop ist z.B. "'C24'" oder "'GL24h'" (inkl. Anführungszeichen aus der DB-Abfrage)
+    mech_prop_1 = ti1.mech_prop.strip("'\"")
+    h_kandidaten_full = H_KANDIDATEN_GL if mech_prop_1.startswith("GL") else H_KANDIDATEN_C
+    h_kandidaten = [x for x in h_kandidaten_full if bh[0] <= x <= bh[1]]
+
+    if not (bw_kandidaten and b_kandidaten and h_kandidaten):
+        # keine handelsübliche Kombination innerhalb der Randbedingungen (R60) verfügbar
+        return None
+
+    # Nachweise, die für das gewählte Kriterium erfüllt sein müssen (None = alle Nachweise aus failed_checks)
+    relevant = CHECKS_PER_CRITERION.get(criterion)
+
+    best_section, best_key = None, None
+
+    # alle Kombinationen berechnen
+    for bw, h, b in itertools.product(bw_kandidaten, h_kandidaten, b_kandidaten):
+        section = struct_analysis.RibWood(ti1, ti2, ti3, l0, bw, h, b, t2, t3)
+        test_member = struct_analysis.Member1D(section, m.system, m.floorstruc, m.requirements, m.g2k, m.qk_area)
+
+        # gleiche Nachweise wie bei der Auswertung im Aufrufer (failed_checks)
+        failed = failed_checks(test_member)
+        if relevant is not None:
+            failed = [f for f in failed if f in relevant]
+        if failed:
+            continue  # Kombination unzulässig
+
+        # Zielgrösse; bei Gleichstand entscheidet die jeweils andere Grösse
+        key = (section.co2, section.h) if to_opt == "GWP" else (section.h, section.co2)
+        if best_key is None or key < best_key:
+            best_section, best_key = section, key
+
+    return best_section  # None -> keine zulässige Kombination, Aufrufer meldet "no feasible section"
+
+
+
+
+
+
+'''
+#ALT: Optimierung mit TPE
+# Handelsübliche Abmessungen (kategorial) für opt_wd_rib
+T_KANDIDATEN_WDRIB = [0.027, 0.04]  # Beplankungsstärken t2 (unten) / t3 (oben)
+T2_FIX_WDRIB = 0.027 #Stärke Beplankung unten t2 fix (keine Optimierungsvariable)
+BW_KANDIDATEN_WDRIB = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24]  # Rippenbreite bw
+B_KANDIDATEN_WDRIB = [0.625, 0.7]  # Rippenabstand b (Lignum 4.1, Table 433-2)
+
+# Rippenhöhe h: Handelsstärken hängen vom Werkstoff der Rippe ab (Vollholz/BSH "C.." vs. Brettschichtholz "GL..")
+H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3] #2cm Schritte
+H_KANDIDATEN_GL = [0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.76, 0.8]  # 4 cm Schritte
+
+# outer function for finding optimal wooden rib cross-section
 def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_FIX_WDRIB, t3=T_KANDIDATEN_WDRIB[0]):
     #t2 und t3 sind fix vorgegeben und werden nicht optimiert. Pro Spannweite wird diese Funktion zweimal aufgerufen: einmal je Wert aus T_KANDIDATEN_WDRIB für t3 (Beplankung oben)
     # definition of initial values for variables, which are going to be optimized
@@ -1114,6 +1191,7 @@ def wd_rib_rqs(var, add_arg):
         print("criterion " + criterion + " is not defined")
         print("criterion has to be 'ULS', 'SLS1', 'SLS2', 'FIRE' or 'ENV'")
     return to_minimize
+'''
 
 
 
