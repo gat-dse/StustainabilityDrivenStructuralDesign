@@ -1544,7 +1544,7 @@ class Member1D:
         self.mEd_n = self.system.alpha_m[0] * self.q_gzt * self.system.l_tot ** 2
         self.mEd_p = self.system.alpha_m[1] * self.q_gzt * self.system.l_tot ** 2
         self.vEd = max(self.system.alpha_v[0] , self.system.alpha_v[1]) * self.q_gzt * self.system.l_tot
-        self.m = self.q_per / 10 # [N/m']
+        self.m = self.q_per / 10 # [kg/m'] Masse pro Querschnittsbreite
         self.w_install_adm = self.system.li_max / self.requirements.lw_install
         self.w_use_adm = self.system.li_max / self.requirements.lw_use
         self.w_app_adm = self.system.li_max / self.requirements.lw_app
@@ -1744,6 +1744,7 @@ class Member1D:
                 eil = self.section.ei1
             else:
                 eil = self.section.ei2
+            m = self.m
         else: #für Holz
             eil = self.section.ei1 / self.section.b
             m = self.m / self.section.b
@@ -1820,9 +1821,9 @@ class Member2D:
         self.psi = [psi0, psi1, psi2]
         self.q_rare = self.gk + self.qk
         self.q_freq = self.gk + self.psi[1] * self.qk
-        self.q_per = self.gk + self.psi[2] * self.qk # [N/m']
-        self.q_gzt = 1.35 * self.gk + 1.5 * self.qk # [N/m']
-        self.m = self.q_per / 10
+        self.q_per = self.gk + self.psi[2] * self.qk # [N/m2] pro m2
+        self.q_gzt = 1.35 * self.gk + 1.5 * self.qk # [N/m2] pro m2
+        self.m = self.q_per / 10 #[kg/m2] Masse pro m2
         self.w_install_adm = self.li_min / self.requirements.lw_install
         self.w_use_adm = self.li_min / self.requirements.lw_use
         self.w_app_adm = self.li_min / self.requirements.lw_app
