@@ -1223,9 +1223,13 @@ class RibWood(SupStrucRibWood):
         #print(f"mu1_rand_u, muq_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = {mu1_rand_u/1000:.2f}, {mu1_rand_o/1000:.2f}, {mu2_rand_u/1000:.2f}, {mu2_rand_o/1000:.2f}, {mu3_rand_u/1000:.2f}, {mu3_rand_o/1000:.2f}")
         mu_el = min(self.mu1_rand_u, self.mu1_rand_o, self.mu2_rand_u, self.mu2_rand_o, self.mu3_rand_u, self.mu3_rand_o)
         self.mu_max, self.mu_min = [mu_el, 0]
-        vu_el = self.calc_vu()
-        self.vu_p, self.vu_n = vu_el, vu_el
+
+        vu_el = self.calc_vu()     #vereinfachte  Berechnung, nur Steg wirkt mit
         self.vu_1_mitte, self.vu_2_fuge, self.vu_3_fuge = self.calc_vu_detail()
+        #massgebender Querkraftwiderstand: Minimum aus vereinfachtem Rippennachweis und Nachweis Schub in den Fugen (Steg-Beplankung)
+        vu_el =  min(vu_el, self.vu_1_mitte, self.vu_2_fuge, self.vu_3_fuge)
+        self.vu_p, self.vu_n = vu_el, vu_el
+
 
         self.qs_class_n, self.qs_class_p = [3, 3]  # Required cross-section class: 1:=PP, 2:EP, 3:EE
         self.g0k = self.calc_weight(wood_type_1.weight) # Eigenlast QS pro Laufmeter [N/m]
