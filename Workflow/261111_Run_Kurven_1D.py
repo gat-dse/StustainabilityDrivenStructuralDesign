@@ -32,7 +32,7 @@ DEFAULTS = {
     "basetype": "epd",          # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
     "alg": "TPE",               # rc sections: "basinhoppin" or "TPE" (wd_rec / wd_rib use their own algorithm)
     "max_iter": 150,             # max. number of iterations per optimization. Higher value leads to better results
-    "lengths": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],  # system lengths [m], at least 2 values
+    "lengths": [ 4, 6, 8],  # system lengths [m], at least 2 values
     "criteria": ["ENV"],        # "ULS", "SLS1" (deflections), "SLS2" (vibrations), "FIRE", "ENV" (all together)
     "optima": ["GWP"],          # "GWP" (min. GWP), "h" (min. height); several possible; wd_rec ignores this
     "g2k": 0.75e3,              # n.t. Einbauten [N/m2]
@@ -65,7 +65,7 @@ RUNS = [
    # {"crsec_type": "rc_rec", "floor": "Schuettung",  "system": "Simple Beam"},
     {"crsec_type": "rc_rec", "floor": "massiv",      "system": "Continuous 1D"},
     #{"crsec_type": "rc_rec", "floor": "Schuettung",  "system": "Continuous 1D"},
-    {"crsec_type": "rc_rib", "floor": "massiv",      "system": "Simple Beam", "max_iter":1000},
+    {"crsec_type": "rc_rib", "floor": "massiv",      "system": "Simple Beam", "max_iter":150},
    # {"crsec_type": "rc_rib", "floor": "Schuettung",  "system": "Simple Beam", "max_iter":1000},
 ]
 

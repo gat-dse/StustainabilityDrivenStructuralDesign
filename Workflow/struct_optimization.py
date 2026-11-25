@@ -561,7 +561,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
         # bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
 
     # bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
-    bh_w = (0.04, 1.2)  # height between 10 cm and 2.0 m
+    bh_w = (0.1, 1.2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bdi_pb_bw = (0.008, 0.016)  # diameter of rebars between 8mm and 16 mm for stirrups
     # Statische Grenze für Rippenbreite. Das exakte bewehrungsabhängige Minimum wird dynamisch über eine Penalty in der Zielfunktion erzwungen.
@@ -650,7 +650,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
             "b",
             bb[0],
             bb[1],
-            step=0.01
+            step=0.1
         )
 
         di_x_w = trial.suggest_categorical(
@@ -1212,11 +1212,23 @@ def failed_checks(member):
     if member.qk > member.qk_zul_gzt:
         failed.append("ULS")
 
-    # deflections: wood uncracked, rc_rib always cracked, rc_rec uncracked only if field and support are uncracked
+    # Aenderung 25.11.2026 -- VORHER:
+    #     if section_type == "rc_rec":
+    #         cracked = not (member.mkd_p < section.mr_p and abs(member.mkd_n) < abs(section.mr_n))
+    #     else:
+    #         cracked = section_type == "rc_rib"
+    # Fuer rc_rib war "gerissen" fest gesetzt, ohne Vergleich der Momente. SIA 262:2025, Ziff. 4.2.1.14
+    # knuepft den Uebergang ungerissen -> gerissen an das Erreichen der Betonzugfestigkeit, Ziff. 4.4.3.2.4
+    # nennt dafuer das Kriterium M_d < M_r; eine Sonderregel fuer Plattenbalken enthaelt die Norm nicht.
+    # NEU: fuer rc_rib wird das Rissmoment des Stegs (mr_pb_p / mr_pb_n) ausgewertet, da die Durchbiegung
+    #      in Spannrichtung vom Plattenbalken und nicht von der Platte bestimmt wird.
+    # deflections: wood uncracked, concrete uncracked only if field and support are uncracked
     if section_type == "rc_rec":
         cracked = not (member.mkd_p < section.mr_p and abs(member.mkd_n) < abs(section.mr_n))
+    elif section_type == "rc_rib":
+        cracked = not (member.mkd_p < section.mr_pb_p and abs(member.mkd_n) < abs(section.mr_pb_n))
     else:
-        cracked = section_type == "rc_rib"
+        cracked = False
     if cracked:
         d1, d2, d3 = [member.w_install_ger - member.w_install_adm, member.w_use_ger - member.w_use_adm,
                       member.w_app_ger - member.w_app_adm]
