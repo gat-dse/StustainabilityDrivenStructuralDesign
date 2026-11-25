@@ -5,6 +5,7 @@ from scipy.optimize import minimize  # import Minimierungsfunktion aus dem SyiPy
 import numpy as np
 import optuna
 import math
+import itertools
 
 
 class RandomDisplacementBounds(object):
@@ -50,45 +51,6 @@ bodenaufbau_rc_rib = struct_analysis.FloorStruc(bodenaufbau_rcdecke_slim, databa
 # ----------------------------------------------------------------------------------------------------------------------
 # OPTIMIZATION OF RECTANGULAR CONCRETE CROSS-SECTIONS
 # .......................................................................................................................
-# ----------------------------------------------------------------------------------------------------------------------
-# ABBRUCHKRITERIUM FUER DIE OPTUNA-STUDIEN
-# ......................................................................................................................
-class StopBeiStagnation:
-    """Beendet eine Optuna-Studie, sobald sich der beste Wert nicht mehr relevant verbessert.
-
-    Damit wird max_iter zur Obergrenze: einfache Querschnitte brechen frueh ab, aufwendige
-    (rc_rib) schoepfen die Grenze aus.
-
-    min_trials  nie vor so vielen Versuchen abbrechen; muss ueber n_startup_trials des TPE liegen
-    patience    so viele Versuche ohne relevante Verbesserung werden abgewartet
-    rel_tol     als Verbesserung zaehlt nur eine relative Senkung des Zielwerts ueber diesem Wert
-
-    Setzt die Zielfunktion das Attribut "machbar" (siehe rc_rib_rqs), so wird erst gezaehlt,
-    sobald der beste Versuch alle Nachweise erfuellt. Ohne dieses Attribut zaehlt der Zielwert
-    allein; der Abbruch kann dann auch auf einem unzulaessigen Querschnitt erfolgen - dasselbe
-    Resultat wie heute nach max_iter Versuchen, nur frueher. failed_checks() markiert ihn
-    anschliessend wie bisher.
-    """
-
-    def __init__(self, min_trials=200, patience=150, rel_tol=0.005):
-        self.min_trials = min_trials
-        self.patience = patience
-        self.rel_tol = rel_tol
-        self.bester = None
-        self.seit = 0
-
-    def __call__(self, study, trial):
-        if study.best_trial.user_attrs.get("machbar") is False:
-            return  # noch keine zulaessige Loesung gefunden, Zaehler laeuft nicht
-        wert = study.best_value
-        if self.bester is None or wert < self.bester * (1 - self.rel_tol):
-            self.bester, self.seit = wert, 0
-        else:
-            self.seit += 1
-        if trial.number + 1 >= self.min_trials and self.seit >= self.patience:
-            study.stop()
-
-
 def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="TPE"):
     # Definition des stabilen, spanweitenabhängigen Startwerts L/25
     l0 = m.li_max
@@ -190,8 +152,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         study1.optimize(
             objective_stufe1,
-            n_trials=max_iter,
-            callbacks=[StopBeiStagnation()]
+            n_trials=max_iter
         )
 
         h_opt = study1.best_params["h"]
@@ -252,8 +213,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         study2.optimize(
             objective_stufe2,
-            n_trials=max_iter,
-            callbacks=[StopBeiStagnation()]
+            n_trials=max_iter
         )
 
         # Resultate zusammenführen (s_xu, s_xo bleiben fix)
@@ -346,8 +306,7 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         study.optimize(
             objective,
-            n_trials=max_iter,
-            callbacks=[StopBeiStagnation()]
+            n_trials=max_iter
         )
 
         h = study.best_params["h"]
@@ -602,7 +561,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
         # bh_f = (max(0.08, m.section.hmin_c), 0.5)  # h_f_max_dynamisch)
 
     # bh_f = (max(0.08, m.section.hmin_c), 0.5)  # height between max(8 cm, Mindestplattenstärke für 4 Bewehrungslsagen) and 50 cm
-    bh_w = (0.1, 1.2)  # height between 10 cm and 2.0 m
+    bh_w = (0.04, 1.2)  # height between 10 cm and 2.0 m
     bdi_x_w = (0.008, 0.04)  # diameter of rebars between 8 mm and 40 mm
     bdi_pb_bw = (0.008, 0.016)  # diameter of rebars between 8mm and 16 mm for stirrups
     # Statische Grenze für Rippenbreite. Das exakte bewehrungsabhängige Minimum wird dynamisch über eine Penalty in der Zielfunktion erzwungen.
@@ -616,7 +575,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
     #                  +0.03 )
     # bb_w = (max(0.15, b_w_min_c), 0.4)  # rib width between 15 and 40 cm # 15 cm entspricht Mindeststegbreite für R60
 
-    bb = (0.4, 3)  # rib spacing between 0.4 and 2.5 m
+    bb = (0.4, 3.8)  # rib spacing between 0.4 and 2.5 m
     #bb = (1.0,
     #     1.0)  # rib spacing between 0.4 und 3.8 m (max Rippenbreite für Einfeldträger, sodass GZT für Platte in Querrichtung i.O.)
 
@@ -653,16 +612,6 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
     N_LAGEN = [1, 2]
     # ggf. vergrössern falls konstruktiv zulässig
 
-    # Rippenabstand: nur gebraeuchliche Raster, nicht stufenlos
-    RIPPENABSTAND = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0]
-
-    b_kandidaten = [
-        b_i for b_i in RIPPENABSTAND
-        if bb[0] <= b_i <= bb[1]
-    ]
-    if not b_kandidaten:
-        raise ValueError(f"kein Rippenabstand aus {RIPPENABSTAND} liegt in den Grenzen bb = {bb}")
-
     di_x_w_kandidaten = [
         d for d in BEWEHRUNG_D
         if bdi_x_w[0] <= d <= bdi_x_w[1]
@@ -697,9 +646,11 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
             step=0.01
         )
 
-        b = trial.suggest_categorical(
+        b = trial.suggest_float(
             "b",
-            b_kandidaten
+            bb[0],
+            bb[1],
+            step=0.01
         )
 
         di_x_w = trial.suggest_categorical(
@@ -736,8 +687,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
                     n_lagen
                 ],
                 add_arg,
-                alg="TPE",
-                trial=trial
+                alg="TPE"
             )
 
         except Exception:
@@ -759,7 +709,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
         ),
 
         "b_w": round(b_w0 / 0.01) * 0.01,
-        "b": min(b_kandidaten, key=lambda b_i: abs(b_i - b0)),
+        "b": round(b0 / 0.01) * 0.01,
 
         "di_pb_bw": min(
             di_pb_bw_kandidaten,
@@ -773,8 +723,7 @@ def opt_rc_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="basinhoppin"
 
     study.optimize(
         objective_rib,
-        n_trials=max_iter,
-        callbacks=[StopBeiStagnation()]
+        n_trials=max_iter
     )
 
     h_w = study.best_params["h_w"]
@@ -811,7 +760,7 @@ def rib_b_w_required(c_nom, di_x_w, n_x_w, di_pb_bw, n_lagen):
     return max(0.15, b_w_min_c2 if n_lagen == 2 and n_x_w > 1 else b_w_min_c)
 
 
-def rc_rib_rqs(var, add_arg, alg="basinhoppin", trial=None):
+def rc_rib_rqs(var, add_arg, alg="basinhoppin"):
 
 
     h_w, h_f, di_x_w, b_w, b, di_pb_bw, n_x_w, n_lagen = var
@@ -901,11 +850,6 @@ def rc_rib_rqs(var, add_arg, alg="basinhoppin", trial=None):
     member.get_fire_resistance()
     penalty4 = 1e5 *max(member.requirements.t_fire-member.fire_resistance, 0)
 
-    # Vermerk fuer StopBeiStagnation: erfuellt dieser Querschnitt alle Nachweise?
-    if trial is not None:
-        trial.set_user_attr("machbar",
-                            max(penalty1, penalty2, penalty3, penalty4, penalty_bw_scaled) <= 0)
-
     # optimize ULS only
     if criterion == "ULS":  # optimize ultimate limit state
         if to_opt == "GWP":
@@ -983,28 +927,7 @@ def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28, max_iter=None, alg=None)
 
     return None  # keine verfügbare Höhe erfüllt die Nachweise -> Aufrufer meldet "no feasible section"
 
-'''
-#OPTIMIERUNG mit Powell (alt)
 
-# outer function for finding optimal wooden rectangular cross-section
-def opt_gzt_wd_rqs(member, criterion="ULS", h_max=0.28):
-    h_0 = member.section.h
-    bnds = [(0.1, h_max)] #h_max enstpricht der maximal verfügbaren Stärke für Massivholzdecken
-    minimal_h = minimize(wd_rqs_h, h_0, args=[member, criterion], bounds=bnds, method='Powell')
-    h_opt = math.ceil(minimal_h.x[0]*1000)/1000
-
-    #Check feasibilty: if optimizer hit upper bound, solution may be infeasible:
-    if h_opt >= h_max: #for wd_rec (Massivholzdecken) max available cross section height is 28 cm
-        # Only if it's truly at the max and still fails
-        feasibility = wd_rqs_h(h_opt, [member, criterion])
-        # For ULS: tolerance in kN/m; 0.5 kN/m is reasonable (5% of typical loads)
-        if feasibility > 0.5:  # Much higher tolerance
-            return None
-
-    section = struct_analysis.RectangularWood(member.section.wood_type, member.section.b, h_opt)
-    return section'''
-
-#TPE-OPTIMIERUNG
 
 ##Otpimierung WD_RIB---------------------------------------------------------------------------------------
 
@@ -1042,20 +965,51 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=None, alg=None, t2=T2_
     l0 = m.li_max
     ti1, ti2, ti3 = m.section.wood_type_1, m.section.wood_type_2, m.section.wood_type_3
 
-    add_arg = [m.system, ti1, ti2, ti3, l0, m.floorstruc, m.requirements, to_opt, criterion, m.g2k, m.qk_area]
+    # Handelsübliche Kandidaten auf die Randbedingungen (R60, Lignum 4.1) einschränken
+    bw_kandidaten = [x for x in BW_KANDIDATEN_WDRIB if bbw[0] <= x <= bbw[1]]
+    b_kandidaten = [x for x in B_KANDIDATEN_WDRIB if bb[0] <= x <= bb[1]]
 
-# optimize with basinhopping algorithm with bounds also implemented on both levels (inner and outer):
-    bounded_step = RandomDisplacementBounds(np.array([b[0] for b in bounds]), np.array([b[1] for b in bounds]))
-    opt = basinhopping(wd_rib_rqs, var0, niter=max_iter, T=1, minimizer_kwargs={"args": (add_arg,), "bounds": bounds,
-                                                                            "method": "Powell"}, take_step=bounded_step)
+    # Höhenkandidaten in Abhängigkeit vom Werkstoff der Rippe (wood_type_1):
+    # mech_prop ist z.B. "'C24'" oder "'GL24h'" (inkl. Anführungszeichen aus der DB-Abfrage)
+    mech_prop_1 = ti1.mech_prop.strip("'\"")
+    h_kandidaten_full = H_KANDIDATEN_GL if mech_prop_1.startswith("GL") else H_KANDIDATEN_C
+    h_kandidaten = [x for x in h_kandidaten_full if bh[0] <= x <= bh[1]]
 
-    b, h, t2, t3, a = opt.x
-    optimized_section = struct_analysis.RibWood(ti1, ti2, ti3, l0, b, h, a, t2, t3)
-    #print(l0, b, h, t2)
-    return optimized_section'''
+    if not (bw_kandidaten and b_kandidaten and h_kandidaten):
+        # keine handelsübliche Kombination innerhalb der Randbedingungen (R60) verfügbar
+        return None
+
+    # Nachweise, die für das gewählte Kriterium erfüllt sein müssen (None = alle Nachweise aus failed_checks)
+    relevant = CHECKS_PER_CRITERION.get(criterion)
+
+    best_section, best_key = None, None
+
+    # alle Kombinationen berechnen
+    for bw, h, b in itertools.product(bw_kandidaten, h_kandidaten, b_kandidaten):
+        section = struct_analysis.RibWood(ti1, ti2, ti3, l0, bw, h, b, t2, t3)
+        test_member = struct_analysis.Member1D(section, m.system, m.floorstruc, m.requirements, m.g2k, m.qk_area)
+
+        # gleiche Nachweise wie bei der Auswertung im Aufrufer (failed_checks)
+        failed = failed_checks(test_member)
+        if relevant is not None:
+            failed = [f for f in failed if f in relevant]
+        if failed:
+            continue  # Kombination unzulässig
+
+        # Zielgrösse; bei Gleichstand entscheidet die jeweils andere Grösse
+        key = (section.co2, section.h) if to_opt == "GWP" else (section.h, section.co2)
+        if best_key is None or key < best_key:
+            best_section, best_key = section, key
+
+    return best_section  # None -> keine zulässige Kombination, Aufrufer meldet "no feasible section"
 
 
-#NEU: Optimierung mit TPE
+
+
+
+
+'''
+#ALT: Optimierung mit TPE
 # Handelsübliche Abmessungen (kategorial) für opt_wd_rib
 T_KANDIDATEN_WDRIB = [0.027, 0.04]  # Beplankungsstärken t2 (unten) / t3 (oben)
 T2_FIX_WDRIB = 0.027 #Stärke Beplankung unten t2 fix (keine Optimierungsvariable)
@@ -1063,10 +1017,10 @@ BW_KANDIDATEN_WDRIB = [0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24]  # Rippenbr
 B_KANDIDATEN_WDRIB = [0.625, 0.7]  # Rippenabstand b (Lignum 4.1, Table 433-2)
 
 # Rippenhöhe h: Handelsstärken hängen vom Werkstoff der Rippe ab (Vollholz/BSH "C.." vs. Brettschichtholz "GL..")
-H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3]
+H_KANDIDATEN_C = [0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24, 0.26, 0.28, 0.3] #2cm Schritte
 H_KANDIDATEN_GL = [0.12, 0.16, 0.2, 0.24, 0.28, 0.32, 0.36, 0.4, 0.44, 0.48, 0.52, 0.56, 0.6, 0.64, 0.68, 0.72, 0.76, 0.8]  # 4 cm Schritte
 
-
+# outer function for finding optimal wooden rib cross-section
 def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_FIX_WDRIB, t3=T_KANDIDATEN_WDRIB[0]):
     #t2 und t3 sind fix vorgegeben und werden nicht optimiert. Pro Spannweite wird diese Funktion zweimal aufgerufen: einmal je Wert aus T_KANDIDATEN_WDRIB für t3 (Beplankung oben)
     # definition of initial values for variables, which are going to be optimized
@@ -1137,8 +1091,7 @@ def opt_wd_rib(m, to_opt="GWP", criterion="ULS", max_iter=100, alg="TPE", t2=T2_
 
     study.optimize(
         objective,
-        n_trials=max_iter,
-        callbacks=[StopBeiStagnation()]
+        n_trials=max_iter
     )
 
     bw = study.best_params["bw"]
