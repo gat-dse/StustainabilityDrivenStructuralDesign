@@ -31,7 +31,7 @@ DEFAULTS = {
     "system": "Simple Beam",    # "Simple Beam", "Continuous 1D", "Two span 1D 1D"
     "basetype": "epd",          # data basis: "epd" (product EPDs) or "kbob" (generic KBOB v9.0 values)
     "alg": "TPE",               # rc sections: "basinhoppin" or "TPE" (wd_rec / wd_rib use their own algorithm)
-    "max_iter": 100,             # max. number of iterations per optimization. Higher value leads to better results
+    "max_iter": 150,             # max. number of iterations per optimization. Higher value leads to better results
     "lengths": [3, 4, 5, 6, 7, 8, 9, 10, 11, 12],  # system lengths [m], at least 2 values
     "criteria": ["ENV"],        # "ULS", "SLS1" (deflections), "SLS2" (vibrations), "FIRE", "ENV" (all together)
     "optima": ["GWP"],          # "GWP" (min. GWP), "h" (min. height); several possible; wd_rec ignores this
@@ -62,11 +62,11 @@ RUNS = [
     # Die fuenf Kurven der Vorlesungsdiagramme, je mit Standardaufbau ("massiv") und mit Schuettung.
     # Die zweiachsigen Platten stehen im 2D-Lauf, siehe 261111_Run_Kurven_2D.py.
     {"crsec_type": "rc_rec", "floor": "massiv",      "system": "Simple Beam"},
-    {"crsec_type": "rc_rec", "floor": "Schuettung",  "system": "Simple Beam"},
+   # {"crsec_type": "rc_rec", "floor": "Schuettung",  "system": "Simple Beam"},
     {"crsec_type": "rc_rec", "floor": "massiv",      "system": "Continuous 1D"},
-    {"crsec_type": "rc_rec", "floor": "Schuettung",  "system": "Continuous 1D"},
-    {"crsec_type": "rc_rib", "floor": "massiv",      "system": "Simple Beam"},
-    {"crsec_type": "rc_rib", "floor": "Schuettung",  "system": "Simple Beam"},
+    #{"crsec_type": "rc_rec", "floor": "Schuettung",  "system": "Continuous 1D"},
+    {"crsec_type": "rc_rib", "floor": "massiv",      "system": "Simple Beam", "max_iter":1000},
+   # {"crsec_type": "rc_rib", "floor": "Schuettung",  "system": "Simple Beam", "max_iter":1000},
 ]
 
 

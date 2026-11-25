@@ -49,7 +49,7 @@ mpl.rcParams.update({
 KURVEN = {
     "Continuous 1D_rc_rec":   ("#000000", "o", "Vollplatte, einachsig tragend,\ndurchlaufend"),
     "Simple Beam_rc_rec":     ("#2ca02c", "o", "Vollplatte, einachsig tragend,\neinfach gelagert"),
-    #"Simple Beam_rc_rib":     ("#9370db", "o", "Plattenbalken, einachsig tragend,\neinfach gelagert"),
+    "Simple Beam_rc_rib":     ("#9370db", "o", "Plattenbalken, einachsig tragend,\neinfach gelagert"),
     "2D_LL-eingespannt_rc_rec": ("#ffa042", "^", "Vollplatte, zweiachsig tragend,\ndurchlaufend"),
     "2D_LL-frei_rc_rec":      ("#8b0000", "^", "Vollplatte, zweiachsig tragend,\neinfach gelagert"),
 }

@@ -19,6 +19,7 @@ from datetime import date
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import pandas as pd
+from matplotlib.legend_handler import HandlerTuple
 from matplotlib.lines import Line2D
 
 HIER = os.path.dirname(os.path.abspath(__file__))
@@ -158,14 +159,24 @@ def main():
     for ax in axes:
         ax.set_ylim(0, y_max)
 
-    eintraege.append(Line2D([], [], linestyle="none", marker="o", markersize=9, markerfacecolor="white",
-                            markeredgecolor="#333333", label="offen: Data Validation < 2"))
+    handles = list(eintraege)
+    labels = [h.get_label() for h in handles]
+
+    # offene Marker: beide im Diagramm vorkommenden Formen nebeneinander in einem Eintrag
+    def offen(form):
+        return Line2D([], [], linestyle="none", marker=form, markersize=9, markerfacecolor="white",
+                      markeredgecolor="#333333")
+
+    handles.append((offen("s"), offen("D")))
+    labels.append("offen: Data Validation < 2")
+
     if BEIDE_VARIANTEN:
-        eintraege.append(Line2D([], [], color="#333333", marker="_", markersize=9, linewidth=1.0,
-                                alpha=0.6, label=f"Bandbreite Betonannahme ({VARIANTE} … {zweit})"))
+        handles.append(Line2D([], [], color="#333333", marker="_", markersize=9, linewidth=1.0, alpha=0.6))
+        labels.append(f"Bandbreite Betonannahme ({VARIANTE} … {zweit})")
 
     fig.suptitle("Bestandesbauten: GWP über Spannweite", y=0.98)
-    fig.legend(handles=eintraege, loc="lower center", ncol=3, frameon=False, bbox_to_anchor=(0.5, -0.04))
+    fig.legend(handles=handles, labels=labels, loc="lower center", ncol=3, frameon=False,
+               bbox_to_anchor=(0.5, -0.04), handler_map={tuple: HandlerTuple(ndivide=None, pad=0.9)})
     fig.tight_layout(rect=(0, 0.10, 1, 0.96))
 
     os.makedirs(DIAGRAMME, exist_ok=True)
