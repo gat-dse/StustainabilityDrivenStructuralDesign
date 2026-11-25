@@ -35,7 +35,7 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 # Zu analysierende Excel-Datei (liegt im selben Ordner wie dieses Skript) - hier anpassen:
-EXCEL_DATEI = "Members_wd_rec_simple_260902.xlsx"
+EXCEL_DATEI = "261112_1147_Members_wd_rec_simple__epd.xlsx"
 
 DEFAULT_SHEET_NAME = "Members_Comparison"
 

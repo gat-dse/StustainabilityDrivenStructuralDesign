@@ -8,7 +8,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from shapely.geometry import Polygon
 from scipy.interpolate import interp1d
-import class_to_excel
 import class_to_excel_2
 
 
@@ -516,42 +515,6 @@ def plot_dataset(lengths, database_name, criteria, optima, floorstruc, requireme
         for member in pair
         if member is not None
     ]
-
-    '''if crsec_type == "wd_rec":
-        class_to_excel.members_to_excel(members_1d, "Members_wd_rec.xlsx", folder="Resultate")
-
-    elif crsec_type == "rc_rec"and system == "Simple Beam":
-        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec.xlsx", folder="Resultate")
-        if members_1d:
-            floor_name = members_1d[0].floorstruc.name
-            floor_name_clean = str(floor_name)
-        else:
-            floor_name_clean = "default"
-
-        dynamic_filename = f"Members_rc_rec_{floor_name_clean}_2.xlsx"
-
-        class_to_excel_2.members_to_excel2(members_1d, dynamic_filename, folder="Results")
-        #class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2.xlsx", folder="Results")
-
-    elif crsec_type == "rc_rib" and system == "Simple Beam":
-        #class_to_excel.members_to_excel(members_1d, "Members_rc_rib.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_2.xlsx", folder="Results")
-    elif crsec_type == "rc_rec"and system == "Continuous 1D":
-        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec_cont.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_cont_2.xlsx", folder="Results")
-    elif crsec_type == "rc_rib" and system == "Continuous 1D":
-        #class_to_excel.members_to_excel(members_1d, "Members_rc_rib_cont.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rib_cont_2.xlsx", folder="Results")
-
-    elif crsec_type == "rc_rec"and system == "Two span 1D 1D":
-        #class_to_excel.members_to_excel(members_1d, "Members_rc_rec_2span.xlsx", folder="Resultate")
-        class_to_excel_2.members_to_excel2(members_1d, "Members_rc_rec_2span_2.xlsx", folder="Results")
-
-
-    elif crsec_type == "wd_rib":
-        class_to_excel.members_to_excel(members_1d, "Members_wd_rib.xlsx", folder="Resultate")
-    else:
-        print("cross-section type is not defined inside function plot_dataset()")'''
 
     # 1. Dynamisch den Bodenaufbau (floor_name) auslesen, falls vorhanden
     if members_1d and hasattr(members_1d[0], 'floorstruc') and members_1d[0].floorstruc:

@@ -1223,9 +1223,13 @@ class RibWood(SupStrucRibWood):
         #print(f"mu1_rand_u, muq_rand_o, mu2_rand_u, mu2_rand_o, mu3_rand_u, mu3_rand_o = {mu1_rand_u/1000:.2f}, {mu1_rand_o/1000:.2f}, {mu2_rand_u/1000:.2f}, {mu2_rand_o/1000:.2f}, {mu3_rand_u/1000:.2f}, {mu3_rand_o/1000:.2f}")
         mu_el = min(self.mu1_rand_u, self.mu1_rand_o, self.mu2_rand_u, self.mu2_rand_o, self.mu3_rand_u, self.mu3_rand_o)
         self.mu_max, self.mu_min = [mu_el, 0]
-        vu_el = self.calc_vu()
-        self.vu_p, self.vu_n = vu_el, vu_el
+
+        vu_el = self.calc_vu()     #vereinfachte  Berechnung, nur Steg wirkt mit
         self.vu_1_mitte, self.vu_2_fuge, self.vu_3_fuge = self.calc_vu_detail()
+        #massgebender Querkraftwiderstand: Minimum aus vereinfachtem Rippennachweis und Nachweis Schub in den Fugen (Steg-Beplankung)
+        vu_el =  min(vu_el, self.vu_1_mitte, self.vu_2_fuge, self.vu_3_fuge)
+        self.vu_p, self.vu_n = vu_el, vu_el
+
 
         self.qs_class_n, self.qs_class_p = [3, 3]  # Required cross-section class: 1:=PP, 2:EP, 3:EE
         self.g0k = self.calc_weight(wood_type_1.weight) # Eigenlast QS pro Laufmeter [N/m]
@@ -1525,22 +1529,22 @@ class Member1D:
         self.floorstruc = floorstruc
         self.requirements = requirements
         self.li_max = self.system.li_max
-        self.g0k = self.section.g0k #[kN/m]
-        self.g0k_b  = self.section.g0k_b #[kN/m2]
-        self.g1k = self.floorstruc.gk_area #[kN/m2]
-        self.g2k = g2k #[kN/m2]
-        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[kN/m']
-        self.qk_area = qk #[kN/m2] Nutzlast pro Flächeneineheit (Eingabewert)
-        self.qk = qk * self.section.b #[kN/m']
+        self.g0k = self.section.g0k #[N/m]
+        self.g0k_b  = self.section.g0k_b #[N/m2]
+        self.g1k = self.floorstruc.gk_area #[N/m2]
+        self.g2k = g2k #[N/m2]
+        self.gk = self.g0k + self.g1k * self.section.b + self.g2k * self.section.b #[N/m']
+        self.qk_area = qk #[N/m2] Nutzlast pro Flächeneineheit (Eingabewert)
+        self.qk = qk * self.section.b #[N/m']
         self.psi = [psi0, psi1, psi2]
-        self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [kN/m']
-        self.q_freq = self.gk + self.psi[1] * self.qk # [kN/m']
-        self.q_per = self.gk + self.psi[2] * self.qk # [kN/m']
-        self.q_gzt = 1.35*self.gk + 1.5*self.qk # [kN/m']
+        self.q_rare = self.gk + self.qk  #mit qk als Leiteinwirkung [N/m']
+        self.q_freq = self.gk + self.psi[1] * self.qk # [N/m']
+        self.q_per = self.gk + self.psi[2] * self.qk # [N/m']
+        self.q_gzt = 1.35*self.gk + 1.5*self.qk # [N/m']
         self.mEd_n = self.system.alpha_m[0] * self.q_gzt * self.system.l_tot ** 2
         self.mEd_p = self.system.alpha_m[1] * self.q_gzt * self.system.l_tot ** 2
         self.vEd = max(self.system.alpha_v[0] , self.system.alpha_v[1]) * self.q_gzt * self.system.l_tot
-        self.m = self.q_per / 10
+        self.m = self.q_per / 10 # [kg/m'] Masse pro Querschnittsbreite
         self.w_install_adm = self.system.li_max / self.requirements.lw_install
         self.w_use_adm = self.system.li_max / self.requirements.lw_use
         self.w_app_adm = self.system.li_max / self.requirements.lw_app
@@ -1652,10 +1656,11 @@ class Member1D:
         self.f1 = self.calc_f1()
         # calculation of further vibration criteria for wooden cross-sections
         section_material = self.section.section_type[0:2]
-        if section_material == "wd": #or section_material == "rc":  # check for material type #TODO Schwingungsnachweis Betondecken?
+        if section_material == "wd":
+            self.ei_l = self.section.ei1 / self.section.b #Umrechnung Steifigkeit in Haupttragrichtung pro 1 m Breite
             self.ei_b = max(self.section.ei_b,
                             self.floorstruc.ei)  # Berücksichtigung n.t. Bodenaufbau gemäss Beispielsammlung HBT)
-            self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.section.ei1) ** 0.25  # HBT Seite 46
+            self.bm_rech = self.system.li_max / 1.1 * (self.ei_b / self.ei_l) ** 0.25  # HBT Seite 46
             self.a_ed = self.calc_vib1()
             self.wf_ed, self.ve_ed = self.calc_vib2()
             if self.section.xi < 0.015:
@@ -1739,9 +1744,10 @@ class Member1D:
                 eil = self.section.ei1
             else:
                 eil = self.section.ei2
-        else:
-            eil = self.section.ei1
-        m = self.m
+            m = self.m
+        else: #für Holz
+            eil = self.section.ei1 / self.section.b
+            m = self.m / self.section.b
  #       print("m =", m)
         f1 = kf2 * np.pi / (2 * l_rech ** 2) * (eil / m) ** 0.5  # HBT, Seite 46    #FEHLER WARNUNG IN COMPARISON ULS SLS
         return f1
@@ -1749,7 +1755,7 @@ class Member1D:
     def calc_vib1(self, f0=700):
         # calculates a_Ed according to HBT, Seite 47
         f1 = self.f1
-        m_gen = self.m * self.system.li_max / 2 * self.bm_rech
+        m_gen = (self.m / self.section.b) * self.system.li_max / 2 * self.bm_rech
         xi = self.section.xi
         if f1 <= 5.1:
             alpha = 0.2
@@ -1766,13 +1772,14 @@ class Member1D:
 
     def calc_vib2(self, f=1000):
         # calculates W_F,ED according to to HBT, Seite 48
-        wf_ed = self.system.alpha_w_f_cd * f * self.system.li_max ** 3 / (self.bm_rech * self.section.ei1)
+        eil = self.section.ei1 / self.section.b
+        wf_ed = self.system.alpha_w_f_cd * f * self.system.li_max ** 3 / (self.bm_rech * eil)
         section_material = self.section.section_type[0:2]
         if section_material == "rc":  # take cracked stiffness for calculation of concrete sections
-            eil = self.section.ei2
+            eil = self.section.ei2 / self.section.b
         else:
-            eil = self.section.ei1
-        ve_ed = 364 / (self.bm_rech * (self.m ** 3 * eil * 1e6) ** 0.25)        #FEHLER WARNUNG IN COMPARISON ULS SLS
+            eil = self.section.ei1 / self.section.b
+        ve_ed = 364 / (self.bm_rech * ((self.m/self.section.b) ** 3 * eil * 1e6) ** 0.25)        #FEHLER WARNUNG IN COMPARISON ULS SLS
         return wf_ed, ve_ed
 
     def get_fire_resistance(self):
@@ -1805,18 +1812,18 @@ class Member2D:
         self.requirements = requirements
         self.li_min = min(self.system.lx, self.system.ly)
         self.li_max = self.system.li_max
-        self.g0k = self.section.g0k #[kN/m2]
+        self.g0k = self.section.g0k #[N/m2]
         self.g0k_b = self.section.g0k_b
-        self.g1k = self.floorstruc.gk_area #[kN/m2]
-        self.g2k = g2k #[kN/m2]
-        self.gk = self.g0k + self.g1k + self.g2k #[kN/m2]
-        self.qk = qk #[kN/m2]
+        self.g1k = self.floorstruc.gk_area #[N/m2]
+        self.g2k = g2k #[N/m2]
+        self.gk = self.g0k + self.g1k + self.g2k #[N/m2]
+        self.qk = qk #[N/m2]
         self.psi = [psi0, psi1, psi2]
         self.q_rare = self.gk + self.qk
         self.q_freq = self.gk + self.psi[1] * self.qk
-        self.q_per = self.gk + self.psi[2] * self.qk
-        self.q_gzt = 1.35 * self.gk + 1.5 * self.qk # [kN/m'] #TODO Achtung nur gültig für Breite 1m
-        self.m = self.q_per / 10
+        self.q_per = self.gk + self.psi[2] * self.qk # [N/m2] pro m2
+        self.q_gzt = 1.35 * self.gk + 1.5 * self.qk # [N/m2] pro m2
+        self.m = self.q_per / 10 #[kg/m2] Masse pro m2
         self.w_install_adm = self.li_min / self.requirements.lw_install
         self.w_use_adm = self.li_min / self.requirements.lw_use
         self.w_app_adm = self.li_min / self.requirements.lw_app
