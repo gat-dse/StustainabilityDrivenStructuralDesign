@@ -677,7 +677,7 @@ class FlatSlab2D(SupStrucRectangular):
     def calc_as_bw(di, n, s, d):
         #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
         #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
-        as_bw = np.pi * di ** 2 / 4 * n / s * 0.9*d
+        as_bw = np.pi * di ** 2 / 4 * n / s  # SIA262(2025) (116), asw = As / s = pi*d^2/4 * n / s
         return as_bw
 
     @staticmethod
