@@ -1586,6 +1586,8 @@ class Member1D:
         # Quelle: SIA 262:2025, Ziff. 4.4.3.2.5 zu Formel (104): "Die geometrischen Bewehrungsgehalte roh und
         #         roh' beziehen sich auf die statische Hoehe d des Bauteils sowie die mitwirkenden
         #         Plattenbreiten gemaess 4.1.3.3.2."
+        #Vorschlag@tg:
+        #if section_material == "rc":  # Alternative Durchbiegungsberechnung für Betonquerschnitte gem. SIA262,(104)
         if self.section.section_type == "rc_rib":
             d_ger = self.section.d_PB
         else:
