@@ -371,11 +371,6 @@ class RectangularConcrete(SupStrucRectangular):
         self.xi = xi
         #Biegesteifigkeit gerissen im Feld
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
-        # CHECK_26.11.2026 -- Vorschlag C2 (nicht aktiv): ei2 ist die gerissene Steifigkeit IM FELD (geht in f1 und
-        #   ve_ed ein) und soll deshalb wie Faktor_ger mit rho' im Feld (rohs_feld) statt mit der Stuetzenbewehrung
-        #   (rohs = as_n / ds) gerechnet werden. Einfeldtraeger: keine Aenderung (Lage 4 = Mindestbewehrung).
-        # Vorschlag:
-        # self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs_feld, 0, self.h, self.d)
 
 
     def calc_d(self):
@@ -1592,18 +1587,6 @@ class Member1D:
             d_ger = self.section.d_PB
         else:
             d_ger = self.section.d
-
-        # CHECK_26.11.2026 -- Vorschlag C1 (nicht aktiv): rho' im Feld fuer die gerissenen Durchbiegungen
-        # Problem: Alle aktiven f_w_ger-Aufrufe in diesem Block (w_install_ger, w_use_ger, w_app_ger sowie
-        #   f_w_ger_2 / f_w_ger_0) verwenden self.section.rohs = as_n / ds, d.h. die Stuetzenbewehrung. Die
-        #   Durchbiegung nach Gl. (104) entsteht im Feld; massgebend ist dort die obere Bewehrung im Feld
-        #   (Mindestbewehrung, RectangularConcrete.rohs_feld). Faktor_ger nutzt rohs_feld bereits, wird hier aber
-        #   nur in den auskommentierten '''...'''-Bloecken (vereinfachte Variante) verwendet und wirkt daher nicht.
-        #   Bei BeamContinuousSupEl wird die Durchbiegung so um 12-24 % unterschaetzt; Einfeldtraeger unveraendert.
-        # rc_rib: RibbedConcrete hat kein rohs_feld -> getattr faellt auf section.rohs zurueck (unveraendert).
-        # Vorschlag:
-        # rohs_ger = getattr(self.section, "rohs_feld", self.section.rohs)
-        # und in allen aktiven f_w_ger-Aufrufen dieses Blocks  self.section.rohs  durch  rohs_ger  ersetzen.
 
         if self.requirements.install == "ductile": #Lastfall häufig und w < L/350
             self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
