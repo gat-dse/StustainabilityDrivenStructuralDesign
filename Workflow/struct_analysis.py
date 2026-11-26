@@ -120,7 +120,7 @@ class ReadyMixedConcrete:
         self.fcd, self.tcd, self.ec2d = self.get_design_values()
 
     def get_design_values(self, gamma_c=1.5, eta_t=1):  # calculate design values
-        eta_fc = min((30e6 / self.fck) ** (1 / 3), 1)  # SIA 262, 4.2.1.2, Formel (26)
+        eta_fc = min((40e6 / self.fck) ** (1 / 3), 1)  # SIA 262(2025), 4.2.1.2, Formel (26)
         fcd = self.fck * eta_fc * eta_t / gamma_c  # SIA 262, 2.3.2.3, Formel (2)
         tcd = 0.3 * eta_t * 1e6 * (self.fck * 1e-6) ** 0.5 / gamma_c  # SIA 262, 2.3.2.4, Formel (3)
         ec2d = 0.003  # SIA 262, 4.2.4, Tabelle 8
