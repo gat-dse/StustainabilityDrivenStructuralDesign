@@ -10,7 +10,7 @@ import time
 
 
 # define system lengths for plot (Datapoints on x-Axis of plot)
-lengths = [4,5,6,7,8]
+lengths = [4,5,6,7,8,9,10,11,12]
 
 # Index of verified length (cross-sections of that length will be plotted)
 idx_vrc = 4
@@ -51,7 +51,7 @@ bodenaufbau_wd_rib.h_Floor = bodenaufbau_wd_rib.h_Floor - h_ins
 
 # define loads on member
 g2k = 0.75e3  # n.t. Einbauten
-qk = 2e3  # Nutzlast
+qk = 3e3  # Nutzlast
 
 # define service limit state criteria
 req = struct_analysis.Requirements()
@@ -73,7 +73,6 @@ start = time.time()
 # define materials for which date is searched in the database (table products, attribute material)
 
 
-
 # RECTANGUALR WOODEN CROSS-SECTION ("BRETTSTAPELDECKE") mit VOLLHOLZ
 # define materials for which date is searched in the database (table products, attribute material)
 mat_names_rc_wd = ["'Solid_structural_timber'", "'Glue_laminated_timber'"]
@@ -85,7 +84,7 @@ data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
 
 
-'''
+
 # RIB WOODEN CROSS-SECTION (Hohlkastendecke) mit Steg aus BSH oder Vollholz und Flanch oben und unten aus 3-Schichtplatte
 # define materials for which date is searched in the database (table products, attribute material)
 
@@ -96,7 +95,7 @@ data_max_new, vrfctn_members_new = opt_and_plot.plot_dataset(lengths, database_n
                                                               g2k, qk, max_iter, idx_vrc, basetype=basetype)
 data_max = max_of_arrays(data_max, data_max_new)
 vrfctn_members.append(vrfctn_members_new)
-'''
+
 
 
 # DEFINE LABELS OF PLOTS

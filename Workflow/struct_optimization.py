@@ -7,6 +7,9 @@ import optuna
 import math
 import itertools
 
+# Vorhandene Bewehrungsdurchmesser [m]; wird auch von struct_analysis.RectangularConcrete importiert
+BEWEHRUNG_D = [0.008, 0.010, 0.012, 0.014, 0.016, 0.018, 0.020, 0.022, 0.026, 0.030, 0.034, 0.040]
+
 
 class RandomDisplacementBounds(object):
     # random displacement with bounds for basinhopping optimization
@@ -89,8 +92,8 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
         # Fixe Werte aus dem Querschnitt auslesen
         b = m.section.b
         s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]  # Stababstände fix
-        di_yu, s_yu = m.section.bw[2][0], m.section.bw[2][1]
-        di_yo, s_yo = m.section.bw[3][0], m.section.bw[3][1]
+        di_yu, s_yu = 0.008, m.section.bw[2][1]  # 2. Lage fix: Start mit kleinstem Durchmesser
+        di_yo, s_yo = 0.008, m.section.bw[3][1]  # 3. Lage fix: Start mit kleinstem Durchmesser
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
@@ -246,9 +249,10 @@ def opt_rc_rec(m, to_opt="GWP", criterion="ULS", max_iter=100, h_min=0.2, alg="T
 
         # Fixe Werte aus dem Querschnitt auslesen
         b = m.section.b
-        s_xu, di_xo, s_xo = m.section.bw[0][1], m.section.bw[1][0], m.section.bw[1][1]  # Stababstände fix
-        di_yu, s_yu = m.section.bw[2][0], m.section.bw[2][1]
-        di_yo, s_yo = m.section.bw[3][0], m.section.bw[3][1]
+        s_xu, s_xo = m.section.bw[0][1], m.section.bw[1][1]  # Stababstände fix
+        di_xo = 0.008  # 4. Lage fix: Start mit kleinstem Durchmesser, RectangularConcrete setzt max(8 mm, Mindestbewehrung)
+        di_yu, s_yu = 0.008, m.section.bw[2][1]  # 2. Lage fix: Start mit kleinstem Durchmesser
+        di_yo, s_yo = 0.008, m.section.bw[3][1]  # 3. Lage fix: Start mit kleinstem Durchmesser
         di_bw, s_bw, n_bw = m.section.bw_bg[0], m.section.bw_bg[1], m.section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = m.section.phi, m.section.c_nom, m.section.xi, m.section.joint_surcharge
         co, st = m.section.concrete_type, m.section.rebar_type
@@ -1316,7 +1320,8 @@ def get_opt_sec(section, gwp_budget):
 
         # definition of fixed values of cross-section
         b = section.b
-        s_xu, di_xo, s_xo = section.bw[0][1], section.bw[1][0], section.bw[1][1]
+        s_xu, s_xo = section.bw[0][1], section.bw[1][1]
+        di_xo = 0.008  # 4. Lage fix: Start mit kleinstem Durchmesser, RectangularConcrete setzt max(8 mm, Mindestbewehrung)
         di_bw, s_bw, n_bw = section.bw_bg[0], section.bw_bg[1], section.bw_bg[2]
         phi, c_nom, xi, jnt_srch = section.phi, section.c_nom, section.xi, section.joint_surcharge
         co, st = section.concrete_type, section.rebar_type

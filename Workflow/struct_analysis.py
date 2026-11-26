@@ -307,26 +307,27 @@ class RectangularConcrete(SupStrucRectangular):
         # Mindestbewehrung für Vermeiden von Sprödbruchversagen mit MRd > Mr
         self.as_min = mr / (0.9 * self.d * self.rebar_type.fsd)  # Mindestbewehrung zur Verhinderung Sprödversagen für Rechteck-QS mit Annäherung z_eff = ca. 0.9*d
 
-        # Durchmesser Mindestbewehrung für 1. & 4. Lage
-        self.di_xu_min = ((self.as_min * s_xu * 4) / np.pi) ** 0.5  # 1. Lage mit Abstand s_xu
-        self.di_xo_min = ((self.as_min * s_xo * 4) / np.pi) ** 0.5  # 4. Lage mit Abstand s_xo
+        # Durchmesser Mindestbewehrung je Lage, aufgerundet auf den nächsten vorhandenen Durchmesser (BEWEHRUNG_D)
+        # Import hier statt oben, weil struct_optimization seinerseits struct_analysis importiert (zirkulärer Import)
+        from struct_optimization import BEWEHRUNG_D
 
-        # Durchmesser Mindestbewehrung für 2. & 3. Lage (Querbewehrung)
-        self.di_yu_min = ((self.as_min * s_yu * 4) / np.pi) ** 0.5  # 2. Lage mit Abstand s_yu
-        self.di_yo_min = ((self.as_min * s_yo * 4) / np.pi) ** 0.5  # 3. Lage mit Abstand s_yo
+        def d_vorhanden(di):
+            return min((d for d in BEWEHRUNG_D if d >= di), default=di)
+
+        self.di_xu_min = d_vorhanden(((self.as_min * s_xu * 4) / np.pi) ** 0.5)  # 1. Lage mit Abstand s_xu
+        self.di_xo_min = d_vorhanden(((self.as_min * s_xo * 4) / np.pi) ** 0.5)  # 4. Lage mit Abstand s_xo
+        self.di_yu_min = d_vorhanden(((self.as_min * s_yu * 4) / np.pi) ** 0.5)  # 2. Lage mit Abstand s_yu
+        self.di_yo_min = d_vorhanden(((self.as_min * s_yo * 4) / np.pi) ** 0.5)  # 3. Lage mit Abstand s_yo
+
+        # Update Bewehrungsmatrix: max(8 mm, Mindestbewehrung, Eingabe). Für feste Lagen wird als Eingabe der
+        # kleinste vorhandene Durchmesser (8 mm) übergeben, womit max(8 mm, Mindestbewehrung) massgebend ist.
+        self.bw[0][0] = max(0.008, self.di_xu_min, di_xu)  # 1. Lage
+        self.bw[1][0] = max(0.008, self.di_xo_min, di_xo)  # 4. Lage
+        self.bw[2][0] = max(0.008, self.di_yu_min, di_yu)  # 2. Lage
+        self.bw[3][0] = max(0.008, self.di_yo_min, di_yo)  # 3. Lage
 
         # Mindestplattenstärke hmin = 2*cnom + Durchmesser aller 4 Lagen + 32 mm (Grösstkorn)
-        self.hmin_c = (2 * c_nom + 0.032
-                       + max(0.008, self.di_xu_min, di_xu)  # 1. Lage
-                       + max(0.008, self.di_xo_min, di_xo)  # 4. Lage
-                       + max(0.008, self.di_yu_min)  # 2. Lage
-                       + max(0.008, self.di_yo_min))  # 3. Lage
-
-        # Update Bewehrungsmatrix unter Berücksichtigung von Mindestbewehrung und d,min = 8 mm
-        self.bw[0][0] = max(0.008, self.di_xu_min, di_xu) # 1. Lage
-        self.bw[1][0] = max(0.008, self.di_xo_min, di_xo) # 4. Lage
-        self.bw[2][0] = max(0.008, self.di_yu_min, di_yu) # 2. Lage
-        self.bw[3][0] = max(0.008, self.di_yo_min, di_yo) # 3. Lage
+        self.hmin_c = 2 * c_nom + 0.032 + sum(lage[0] for lage in self.bw)
 
         #Update Statische Höhe und Rissmoment
         [self.d, self.ds] = self.calc_d() #Statische Höhe. d für positive Biegung (untere Lagen), ds für negative Biegung (obere Lagen)
@@ -370,6 +371,11 @@ class RectangularConcrete(SupStrucRectangular):
         self.xi = xi
         #Biegesteifigkeit gerissen im Feld
         self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs, 0, self.h, self.d)
+        # CHECK_26.11.2026 -- Vorschlag C2 (nicht aktiv): ei2 ist die gerissene Steifigkeit IM FELD (geht in f1 und
+        #   ve_ed ein) und soll deshalb wie Faktor_ger mit rho' im Feld (rohs_feld) statt mit der Stuetzenbewehrung
+        #   (rohs = as_n / ds) gerechnet werden. Einfeldtraeger: keine Aenderung (Lage 4 = Mindestbewehrung).
+        # Vorschlag:
+        # self.ei2 = self.ei1 / self.f_w_ger(self.roh, self.rohs_feld, 0, self.h, self.d)
 
 
     def calc_d(self):
@@ -450,7 +456,7 @@ class RectangularConcrete(SupStrucRectangular):
     def calc_as_bw(di, n, s, d):
         #in: Bewehrungsduchmesser di [m], Anzahl Stäbe n [], Bewehrungsabstand s [m], Statische Höhe d [m]
         #out: Bewehrungsquerschnittsfläche Querkraftbewehrung as_bw [mm2]
-        as_bw = np.pi * di ** 2 / 4 * n / s #SIA262(2025, (116)
+        as_bw = np.pi * di ** 2 / 4 * n / s #SIA262(2025) (116), asw = As / s = pi*d^2/4 * n / s
         return as_bw
 
     @staticmethod
@@ -1585,6 +1591,18 @@ class Member1D:
         else:
             d_ger = self.section.d
 
+        # CHECK_26.11.2026 -- Vorschlag C1 (nicht aktiv): rho' im Feld fuer die gerissenen Durchbiegungen
+        # Problem: Alle aktiven f_w_ger-Aufrufe in diesem Block (w_install_ger, w_use_ger, w_app_ger sowie
+        #   f_w_ger_2 / f_w_ger_0) verwenden self.section.rohs = as_n / ds, d.h. die Stuetzenbewehrung. Die
+        #   Durchbiegung nach Gl. (104) entsteht im Feld; massgebend ist dort die obere Bewehrung im Feld
+        #   (Mindestbewehrung, RectangularConcrete.rohs_feld). Faktor_ger nutzt rohs_feld bereits, wird hier aber
+        #   nur in den auskommentierten '''...'''-Bloecken (vereinfachte Variante) verwendet und wirkt daher nicht.
+        #   Bei BeamContinuousSupEl wird die Durchbiegung so um 12-24 % unterschaetzt; Einfeldtraeger unveraendert.
+        # rc_rib: RibbedConcrete hat kein rohs_feld -> getattr faellt auf section.rohs zurueck (unveraendert).
+        # Vorschlag:
+        # rohs_ger = getattr(self.section, "rohs_feld", self.section.rohs)
+        # und in allen aktiven f_w_ger-Aufrufen dieses Blocks  self.section.rohs  durch  rohs_ger  ersetzen.
+
         if self.requirements.install == "ductile": #Lastfall häufig und w < L/350
             self.w_install = self.unit_def * (self.q_freq + self.q_per * (self.section.phi - 1))
 
@@ -1776,6 +1794,50 @@ class Member1D:
                     qu_bend = 0
             qu_shear = vu_n / (min(alpha_v) * self.system.l_tot)
         return min(qu_bend, qu_shear)
+
+        # CHECK_26.11.2026 -- Vorschlag A (nicht aktiv): Feld UND Stuetze nachweisen, Minimum aus Feld, Stuetze, Querkraft
+        # Problem: Oben wird nur das betragsmaessig groessere Moment nachgewiesen. Bei BeamContinuousSupEl
+        #   (alpha_m = [-1/12, 1/24]) wird so nur die Stuetze geprueft, das Feld (ql^2/24) nie. Beispiel C25/30,
+        #   h = 0.20 m, L = 7.5 m, Lage 1 D8/150, Lage 4 D16/150: mEd+ = 28.1 > mRd+ = 25.0 kNm/m, qu Code = 19.2 kN/m
+        #   (genuegend), qu Feld = 10.7 kN/m < qd = 12.0 kN/m.
+        # Weitere Punkte im bestehenden Stuetzen-Zweig (else), im Vorschlag mitkorrigiert:
+        #   - Ductility-Pruefung mit qs_class_vorh[1] / qs_class_erf[1] (Feld) statt [0] (Stuetze).
+        #   - factor: (mu_min - mr) hat bei negativen Momenten das falsche Vorzeichen. Fuer |mu_min| < |mr| (sproedes
+        #     Versagen) ergibt sich factor ~ 1 statt ~ 0, fuer |mu_min| > |mr| factor ~ 0 statt ~ 1. Richtig: |mu| - |mr|.
+        #     Praktisch wenig Wirkung, da Lage 4 heute immer >= Mindestbewehrung ist und qs_cl_erf = 3.
+        #   - Querkraft mit min(alpha_v); fuer BeamContinuousSupEl ohne Wirkung (0.5 / 0.5), fuer BeamTwoSpan falsch.
+        # Glaettungsfaktor je Vorzeichen unveraendert (arctan-Uebergang bei Mr und bei x/d = 0.35 bzw. 0.5).
+        # Vorschlag (ersetzt den gesamten Block ab "if min(alpha_m) >= 0 ..."):
+        #
+        # def qu_biegung(i):
+        #     # i = 1: Feld (positives Moment, alpha_m[1]); i = 0: Stuetze (negatives Moment, alpha_m[0])
+        #     alpha = alpha_m[i]
+        #     if alpha == 0:
+        #         return np.inf  # kein Moment dieses Vorzeichens -> kein Nachweis
+        #     mu = self.section.mu_max if i == 1 else self.section.mu_min
+        #     if qs_class_vorh[i] <= qs_class_erf[i]:
+        #         return mu / (alpha * self.system.l_tot ** 2)
+        #     if self.section.section_type[0:2] != "rc":
+        #         return 0
+        #     if rippe:
+        #         mr, x, d = ((self.section.mr_pb_p, self.section.x_PB_p, self.section.d_PB) if i == 1 else
+        #                     (self.section.mr_pb_n, self.section.x_PB_n, self.section.ds_PB))
+        #     else:
+        #         mr, x, d = ((self.section.mr_p, self.section.x_p, self.section.d) if i == 1 else
+        #                     (self.section.mr_n, self.section.x_n, self.section.ds))
+        #     epsilon = 1.0e-3
+        #     shift = 0.35 if qs_class_vorh[i] == 1 else 0.5
+        #     factor = min(0.5 * (1 + 2 / np.pi * np.arctan((abs(mu) - abs(mr)) / epsilon)),
+        #                  1 - 0.5 * (1 + 2 / np.pi * np.arctan((x / d - shift) / epsilon)))
+        #     return factor * mu / (alpha * self.system.l_tot ** 2)
+        #
+        # qu_feld = qu_biegung(1)
+        # qu_stuetze = qu_biegung(0)
+        # # Querkraft am Auflager mit dem groessten Faktor; bei Einspannung/Durchlauf (Stuetzmoment vorhanden)
+        # # ist oben Zug -> Widerstand mit ds (vu_n), sonst mit d (vu_p)
+        # vu_auflager = vu_n if min(alpha_m) < 0 else vu_p
+        # qu_shear = vu_auflager / (max(alpha_v) * self.system.l_tot)
+        # return min(qu_feld, qu_stuetze, qu_shear)
 
     def calc_qk_zul_gzt(self, gamma_g=1.35, gamma_q=1.5):
         self.qk_zul_gzt = (self.qu - gamma_g * self.gk) / gamma_q
